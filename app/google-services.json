@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "310630748149",
+    "project_id": "grad-proj-5e09c",
+    "storage_bucket": "grad-proj-5e09c.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:310630748149:android:0fa589ca444b407c0cdabc",
+        "android_client_info": {
+          "package_name": "smu.ai.graduation_project"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBFRvkcwud7JkQOj0DUBl3rrhqwUXCjdUg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
