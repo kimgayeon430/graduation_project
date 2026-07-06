@@ -66,6 +66,7 @@ dependencies {
     implementation(libs.firebase.analytics)
     implementation(libs.firebase.auth)
     implementation(libs.firebase.firestore)
+    implementation(libs.coil.compose)
 
 
     // Add the dependencies for any other desired Firebase products
