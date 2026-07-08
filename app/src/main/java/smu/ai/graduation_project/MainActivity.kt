@@ -20,10 +20,15 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -33,13 +38,19 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.google.firebase.Firebase
 import com.google.firebase.auth.auth
+import com.google.firebase.firestore.firestore
 import smu.ai.graduation_project.navigation.Screen
+import smu.ai.graduation_project.ui.admin.AdminMissionEditScreen
 import smu.ai.graduation_project.ui.admin.AdminHomeScreen
+import smu.ai.graduation_project.ui.admin.AdminMissionListScreen
+import smu.ai.graduation_project.ui.admin.AdminUserManagementScreen
 import smu.ai.graduation_project.ui.screens.HomeScreen
+import smu.ai.graduation_project.ui.screens.InProgressMissionScreen
 import smu.ai.graduation_project.ui.screens.LandingScreen
 import smu.ai.graduation_project.ui.screens.LoginScreen
 import smu.ai.graduation_project.ui.screens.MissionDetailScreen
 import smu.ai.graduation_project.ui.screens.MissionListScreen
+import smu.ai.graduation_project.ui.screens.MissionPerformScreen
 import smu.ai.graduation_project.ui.screens.ProfileScreen
 import smu.ai.graduation_project.ui.screens.RankingScreen
 import smu.ai.graduation_project.ui.screens.SignUpScreen
@@ -109,13 +120,25 @@ private fun AppRoot() {
 @Composable
 private fun MainApp(onLogout: () -> Unit) {
     val navController = rememberNavController()
-    val items = listOf(Screen.Home, Screen.Mission, Screen.Add, Screen.Ranking, Screen.Profile)
+    val allItems = listOf(Screen.Home, Screen.Mission, Screen.Add, Screen.Ranking, Screen.Profile)
+    val currentUser = Firebase.auth.currentUser
+    val context = LocalContext.current
+    var isAdmin by remember { mutableStateOf(false) }
+
+    LaunchedEffect(currentUser?.uid) {
+        currentUser?.uid?.let { uid ->
+            Firebase.firestore.collection("admins").document(uid).get().addOnSuccessListener { doc ->
+                isAdmin = doc.exists()
+            }
+        }
+    }
 
     Scaffold(
         containerColor = Color.White,
         bottomBar = {
             val entry by navController.currentBackStackEntryAsState()
             val current = entry?.destination
+            val items = if (isAdmin) allItems else allItems.filterNot { it == Screen.Add }
             if (items.any { it.route == current?.route }) {
                 NavigationBar(containerColor = Color.White) {
                     items.forEach { screen ->
@@ -158,40 +181,93 @@ private fun MainApp(onLogout: () -> Unit) {
             composable("mission_perform/{missionId}") { backStack ->
                 MissionPerformScreen(
                     missionId = backStack.arguments?.getString("missionId").orEmpty(),
-                    onBack = { navController.popBackStack() }
+                    onNavigateBack = { navController.popBackStack() }
                 )
             }
-            composable(Screen.Add.route) { AdminHomeScreen({}, {}) }
-            composable(Screen.Ranking.route) { RankingScreen() }
-            composable(Screen.Profile.route) { ProfileScreen(onLogout) }
-        }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun MissionPerformScreen(missionId: String, onBack: () -> Unit) {
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Mission perform") },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, null)
+            composable("profile/in-progress") {
+                InProgressMissionScreen(
+                    onNavigateBack = { navController.popBackStack() },
+                    onContinueMission = { navController.navigate("mission_perform/$it") }
+                )
+            }
+            composable(Screen.Add.route) {
+                if (isAdmin) {
+                    AdminHomeScreen(
+                        onNavigateToMissionManagement = { navController.navigate("admin/missions") },
+                        onNavigateToUserManagement = { navController.navigate("admin/users") }
+                    )
+                } else {
+                    LaunchedEffect(Unit) {
+                        android.widget.Toast.makeText(context, "관리자만 접근할 수 있습니다.", android.widget.Toast.LENGTH_SHORT).show()
+                        navController.navigate(Screen.Home.route) {
+                            popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
                     }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.White)
-            )
-        },
-        containerColor = Color.White
-    ) { innerPadding ->
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding),
-            contentAlignment = Alignment.Center
-        ) {
-            Text("Performing $missionId")
+                }
+            }
+            composable("admin/users") {
+                if (isAdmin) {
+                    AdminUserManagementScreen(
+                        onNavigateBack = { navController.popBackStack() }
+                    )
+                } else {
+                    LaunchedEffect(Unit) {
+                        android.widget.Toast.makeText(context, "관리자만 접근할 수 있습니다.", android.widget.Toast.LENGTH_SHORT).show()
+                        navController.popBackStack()
+                    }
+                }
+            }
+            composable("admin/missions") {
+                if (isAdmin) {
+                    AdminMissionListScreen(
+                        onNavigateBack = { navController.popBackStack() },
+                        onAddMission = { navController.navigate("admin/missions/new") },
+                        onEditMission = { navController.navigate("admin/missions/edit/$it") }
+                    )
+                } else {
+                    LaunchedEffect(Unit) {
+                        android.widget.Toast.makeText(context, "관리자만 접근할 수 있습니다.", android.widget.Toast.LENGTH_SHORT).show()
+                        navController.popBackStack()
+                    }
+                }
+            }
+            composable("admin/missions/new") {
+                if (isAdmin) {
+                    AdminMissionEditScreen(
+                        missionId = null,
+                        onNavigateBack = { navController.popBackStack() },
+                        onSaveSuccess = { navController.popBackStack() }
+                    )
+                } else {
+                    LaunchedEffect(Unit) {
+                        android.widget.Toast.makeText(context, "관리자만 접근할 수 있습니다.", android.widget.Toast.LENGTH_SHORT).show()
+                        navController.popBackStack()
+                    }
+                }
+            }
+            composable("admin/missions/edit/{missionId}") { backStack ->
+                if (isAdmin) {
+                    AdminMissionEditScreen(
+                        missionId = backStack.arguments?.getString("missionId"),
+                        onNavigateBack = { navController.popBackStack() },
+                        onSaveSuccess = { navController.popBackStack() }
+                    )
+                } else {
+                    LaunchedEffect(Unit) {
+                        android.widget.Toast.makeText(context, "관리자만 접근할 수 있습니다.", android.widget.Toast.LENGTH_SHORT).show()
+                        navController.popBackStack()
+                    }
+                }
+            }
+            composable(Screen.Ranking.route) { RankingScreen() }
+            composable(Screen.Profile.route) {
+                ProfileScreen(
+                    onLogout = onLogout,
+                    onNavigateToInProgressMissions = { navController.navigate("profile/in-progress") }
+                )
+            }
         }
     }
 }

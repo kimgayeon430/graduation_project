@@ -8,6 +8,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -18,6 +19,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.clickable
 import smu.ai.graduation_project.model.UserRank
 import smu.ai.graduation_project.ui.theme.*
 import java.util.Locale
@@ -42,11 +44,19 @@ fun InfoCardSmall(title: String, icon: ImageVector, modifier: Modifier = Modifie
 }
 
 @Composable
-fun StatCard(title: String, value: String, icon: ImageVector, modifier: Modifier = Modifier) {
+fun StatCard(
+    title: String,
+    value: String,
+    icon: ImageVector,
+    modifier: Modifier = Modifier,
+    onClick: (() -> Unit)? = null
+) {
     Card(
-        modifier = modifier,
+        modifier = modifier.then(
+            if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier
+        ),
         colors = CardDefaults.cardColors(containerColor = Color.White),
-        border = androidx.compose.foundation.BorderStroke(0.5.dp, Color.LightGray),
+        border = BorderStroke(0.5.dp, Color.LightGray),
         shape = RoundedCornerShape(12.dp)
     ) {
         Row(
