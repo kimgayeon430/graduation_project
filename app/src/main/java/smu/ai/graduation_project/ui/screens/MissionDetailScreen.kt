@@ -212,26 +212,36 @@ fun MissionDetailScreen(
                             onPerformMission(missionId)
                         } else {
                             isStarting = true
-                            db.collection("user_missions")
-                                .add(
-                                    mapOf(
-                                        "userId" to user.uid,
-                                        "missionId" to currentMission.id,
-                                        "title" to currentMission.title,
-                                        "points" to currentMission.points,
-                                        "status" to "In Progress",
-                                        "progress" to 0f
-                                    )
-                                )
-                                .addOnSuccessListener {
-                                    isStarting = false
-                                    userMissionStatus = "진행중"
-                                    onPerformMission(missionId)
-                                }
+                            
+                            val userMissionId = "\${user.uid}_\${currentMission.id}"
+                            val userMissionRef = db.collection("user_missions")
+                                .document(userMissionId)
+
+                            val userMissionData = mapOf(
+                                "userId" to user.uid,
+                                "missionId" to currentMission.id,
+                                "title" to currentMission.title,
+                                "points" to currentMission.points,
+                                "status" to "In Progress",
+                                "progress" to 0f
+                            )
+
+                            userMissionStatus = "진행중"
+
+                            userMissionRef
+                                .set(userMissionData)
                                 .addOnFailureListener {
-                                    isStarting = false
-                                    Toast.makeText(context, "미션 시작에 실패했습니다.", Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(
+                                        context,
+                                        "미션 정보를 서버에 저장하지 못했습니다.",
+                                        Toast.LENGTH_SHORT
+                                    ).show()
                                 }
+
+                            isStarting = false
+                            onPerformMission(missionId)
+
+
                         }
                     },
                     modifier = Modifier
