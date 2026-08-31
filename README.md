@@ -101,9 +101,3 @@ cd graduation_project
 - 위치 인증 기준 및 부정 인증 방지 로직 고도화
 - ViewModel과 Repository 계층을 통한 상태 관리 개선
 - 단위 테스트와 UI 테스트 확대
-
-## 개발자
-
-**김가연**  
-숙명여자대학교 인공지능공학부  
-GitHub: [@kimgayeon430](https://github.com/kimgayeon430)
