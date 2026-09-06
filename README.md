@@ -14,7 +14,7 @@
 - 회원가입 직후 여행 취향(투어·맛집·체험·쇼핑) 복수 선택 및 저장
 - 전체 미션 목록 조회 및 상세 정보 확인
 - 미션별 GPS 위치 인증 (목표 지점 반경 200m 이내)
-- 위치 인증 후 카메라 촬영 → 미리보기 → Firebase Storage 업로드로 사진 인증
+- 위치 인증 후 카메라 촬영 → 미리보기 → Supabase Storage 업로드로 사진 인증
 - 인증 단계별 포인트 지급 및 진행 상태 저장 (중복 지급 방지)
 - 진행 중인 미션 확인 및 이어서 수행
 - 홈에서 선호 카테고리를 우선한 규칙 기반 미션 추천 (완료한 미션 제외)
@@ -36,7 +36,8 @@
 | Language | Kotlin |
 | UI | Jetpack Compose, Material 3 |
 | Navigation | Navigation Compose |
-| Backend | Firebase Authentication, Cloud Firestore, Cloud Storage |
+| Backend | Firebase Authentication, Cloud Firestore |
+| 이미지 저장 | Supabase Storage (public 버킷 + anon 업로드 정책) |
 | Image Loading | Coil |
 | Build | Gradle Kotlin DSL, Version Catalog |
 | Architecture | 미션 수행 기능을 ViewModel · Repository(인터페이스/Firebase 구현) · 순수 도메인 로직으로 분리 |
@@ -52,8 +53,8 @@
    - 1단계 보상 = `min(미션 포인트, 100)`
 2. **2단계 · 사진 인증**
    - 카메라로 사진을 촬영하고 미리보기로 확인합니다. (`FileProvider` + `TakePicture`)
-   - 사진을 `mission_photos/{missionId}/{uid}_{timestamp}.jpg` 로 업로드합니다.
-   - 업로드가 성공한 뒤에만 트랜잭션으로 미션을 `Completed` 처리하고 2단계 보상을 지급하며, `photoUrl`·`photoStoragePath`·`photoVerified`·`photoUploadedAt` 을 저장합니다.
+   - 사진을 Supabase Storage 버킷 `mission-photos` 의 `{missionId}/{uid}_{timestamp}.jpg` 로 업로드하고 공개 URL 을 받습니다. (`SupabaseStorage`, 백그라운드 스레드)
+   - 업로드가 성공한 뒤에만 트랜잭션으로 미션을 `Completed` 처리하고 2단계 보상을 지급하며, `photoUrl`(Supabase 공개 URL)·`photoStoragePath`·`photoVerified`·`photoUploadedAt` 을 저장합니다.
    - 2단계 보상 = `미션 포인트 - 1단계 보상`
    - 업로드나 저장이 실패하면 미션은 완료되지 않으며, 재시도해도 포인트는 한 번만 지급됩니다.
    - 사용자가 처음 완료할 때 같은 트랜잭션에서 `missions/{id}.completionCount` 를 1 올립니다. (추천 인기도 신호)
@@ -82,7 +83,7 @@ AI 모델 없이 현재 데이터만으로 설명 가능한 점수 규칙으로 
 
 ```text
 app/src/main/java/smu/ai/graduation_project
-├── data/           # Repository 인터페이스와 Firebase 구현 (미션 수행 데이터 접근)
+├── data/           # Repository 인터페이스·Firebase 구현, Supabase Storage 업로드
 ├── domain/         # Firebase 비의존 순수 로직 (거리·보상·완료·취향·추천 규칙)
 ├── model/          # Mission, UserRank 등 데이터 모델
 ├── navigation/     # 화면 경로 및 내비게이션 정의
@@ -108,7 +109,7 @@ app/src/test/java/smu/ai/graduation_project
 | `MissionScorer` | 명시적·암묵적 취향, 난이도 적합도, 거리 근접도, 인기도로 미션 기본 점수 계산 (근거 포함) |
 | `MissionRecommender` | 후보 필터 + 점수 정렬 + 다양성 감점으로 상위 N건 추천 |
 
-## Firestore · Storage 데이터
+## Firestore · Supabase Storage 데이터
 
 | 경로 | 주요 필드 |
 | --- | --- |
@@ -116,7 +117,7 @@ app/src/test/java/smu/ai/graduation_project
 | `missions/{id}` | `title`, `desc`, `category`, `points`, `imageUrl`, `location`(GeoPoint), `completionCount` |
 | `user_missions/{id}` | `userId`, `missionId`, `status`, `progress`, `stage1RewardGranted`, `stage2RewardGranted`, `photoUrl`, `photoStoragePath`, `photoVerified`, `photoUploadedAt`, `completedAt` |
 | `admins/{uid}` | `email`, `name` |
-| Storage `mission_photos/{missionId}/{uid}_{timestamp}.jpg` | 사진 인증 이미지 |
+| Supabase Storage `mission-photos/{missionId}/{uid}_{timestamp}.jpg` | 사진 인증 이미지 (공개 URL 로 접근) |
 
 ## 실행 방법
 
@@ -125,7 +126,8 @@ app/src/test/java/smu/ai/graduation_project
 - Android Studio
 - JDK 11 이상 (Gradle 실행에는 JDK 17 이상 권장)
 - Android SDK 26 이상
-- Email/Password 인증, Firestore, Storage가 활성화된 Firebase 프로젝트
+- Email/Password 인증과 Firestore가 활성화된 Firebase 프로젝트
+- 사진 업로드용 Supabase 프로젝트 (무료 플랜, 결제 수단 불필요)
 
 ### 실행
 
@@ -135,11 +137,21 @@ cd graduation_project
 ```
 
 1. Android Studio에서 프로젝트 루트 폴더를 엽니다.
-2. Firebase Console에서 Android 앱을 등록하고 Authentication·Firestore·Storage를 활성화합니다.
+2. Firebase Console에서 Android 앱을 등록하고 Authentication·Firestore를 활성화합니다.
 3. 발급받은 `google-services.json`을 `app/` 폴더에 추가합니다.
-4. Storage 보안 규칙에서 인증된 사용자가 `mission_photos/` 경로에 이미지를 업로드할 수 있도록 허용합니다.
-5. Gradle Sync를 완료합니다.
-6. 에뮬레이터 또는 Android 기기에서 앱을 실행합니다.
+4. Supabase에서 프로젝트를 만들고 Storage에 **public 버킷** `mission-photos` 를 생성합니다.
+5. 그 버킷에 anon INSERT 정책을 추가합니다. (SQL Editor에서)
+   ```sql
+   create policy "anon upload mission-photos"
+   on storage.objects for insert to anon
+   with check (bucket_id = 'mission-photos');
+   ```
+6. `local.properties` 에 Supabase 설정을 추가합니다. (anon/publishable 키는 클라이언트 노출용이라 안전)
+   ```properties
+   SUPABASE_URL=https://<프로젝트>.supabase.co
+   SUPABASE_ANON_KEY=<anon 또는 publishable 키>
+   ```
+7. Gradle Sync 후 에뮬레이터 또는 Android 기기에서 앱을 실행합니다.
 
 ### 단위 테스트
 
@@ -166,5 +178,5 @@ cd graduation_project
 - 사진 인증 부정 방지(촬영 시각·위치 메타데이터 검증)와 관리자 검수 흐름
 - 시간대·미션 간 동시출현(협업 필터링)까지 반영한 추천 고도화 및 오프라인 평가(hit@k)
 - ViewModel·Repository 패턴을 홈·목록·관리자 등 나머지 화면으로 확대
-- Firestore·Storage 보안 규칙 정비 및 서버 사이드 포인트 검증
+- Firestore 보안 규칙 정비, Supabase Storage 업로드 서버 검증, 서버 사이드 포인트 검증
 - Compose UI 테스트와 Repository 계약 테스트 추가

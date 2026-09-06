@@ -1,6 +1,5 @@
 package smu.ai.graduation_project.data
 
-import android.net.Uri
 import com.google.firebase.firestore.GeoPoint
 
 /**
@@ -43,6 +42,7 @@ interface MissionRepository {
         val stage: Stage,
         cause: Throwable?
     ) : Exception(cause) {
+        /** UPLOAD = Supabase Storage 업로드 실패, FINALIZE = 업로드 후 Firestore 완료 처리 실패. */
         enum class Stage { UPLOAD, FINALIZE }
     }
 
@@ -77,15 +77,15 @@ interface MissionRepository {
     )
 
     /**
-     * 2단계 사진 인증. 사진을 Storage 에 업로드하고, 성공 후에만 트랜잭션으로 미션을 완료 처리하며
-     * 아직 지급 전이면 `users/{uid}.points` 를 2단계 보상만큼 올린다.
+     * 2단계 사진 인증. 사진을 Supabase Storage 에 업로드하고, 성공 후에만 트랜잭션으로 미션을
+     * 완료 처리하며 아직 지급 전이면 `users/{uid}.points` 를 2단계 보상만큼 올린다.
      * 완료 판정/보상 계산은 [smu.ai.graduation_project.domain.MissionCompletion] 에 위임한다.
      */
     fun uploadPhotoAndComplete(
         missionId: String,
         userMissionDocId: String,
         uid: String,
-        photoUri: Uri,
+        photoBytes: ByteArray,
         missionPoints: Int,
         onResult: (CompleteResult) -> Unit,
         onError: (Exception) -> Unit

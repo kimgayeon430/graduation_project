@@ -195,6 +195,14 @@ fun MissionPerformScreen(
         }
     }
 
+    // 촬영본 Uri 를 바이트로 읽어 ViewModel 로 넘긴다 (Supabase 업로드용). 실패 시 null.
+    fun readCapturedPhotoBytes(): ByteArray? =
+        state.capturedPhotoUri?.let { uri ->
+            runCatching {
+                context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+            }.getOrNull()
+        }
+
     fun startPhotoCapture() {
         if (!state.locationVerified) {
             Toast.makeText(context, "먼저 위치 인증을 완료해주세요.", Toast.LENGTH_SHORT).show()
@@ -385,7 +393,7 @@ fun MissionPerformScreen(
                                     Text("다시 촬영")
                                 }
                                 Button(
-                                    onClick = { viewModel.uploadPhotoAndComplete() },
+                                    onClick = { viewModel.uploadPhotoAndComplete(readCapturedPhotoBytes()) },
                                     enabled = !state.isUploading,
                                     modifier = Modifier.weight(1f),
                                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE38B2C)),
