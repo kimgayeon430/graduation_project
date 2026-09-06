@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -51,6 +52,7 @@ import smu.ai.graduation_project.ui.screens.LoginScreen
 import smu.ai.graduation_project.ui.screens.MissionDetailScreen
 import smu.ai.graduation_project.ui.screens.MissionListScreen
 import smu.ai.graduation_project.ui.screens.MissionPerformScreen
+import smu.ai.graduation_project.ui.screens.PreferenceScreen
 import smu.ai.graduation_project.ui.screens.ProfileScreen
 import smu.ai.graduation_project.ui.screens.RankingScreen
 import smu.ai.graduation_project.ui.screens.SignUpScreen
@@ -73,7 +75,13 @@ class MainActivity : ComponentActivity() {
 private fun AppRoot() {
     val auth = Firebase.auth
     val rootNavController = rememberNavController()
-    val startDestination = if (auth.currentUser != null) "main" else "landing"
+    val startDestination = if (auth.currentUser != null) "gate" else "landing"
+
+    fun goMain() {
+        rootNavController.navigate("main") {
+            popUpTo(rootNavController.graph.id) { inclusive = true }
+        }
+    }
 
     NavHost(navController = rootNavController, startDestination = startDestination) {
         composable("landing") {
@@ -87,7 +95,8 @@ private fun AppRoot() {
             SignUpScreen(
                 onNavigateBack = { rootNavController.popBackStack() },
                 onSignUpSuccess = {
-                    rootNavController.navigate("main") {
+                    // 신규 가입자는 항상 취향 선택 화면으로
+                    rootNavController.navigate("preference") {
                         popUpTo("landing") { inclusive = true }
                     }
                 }
@@ -97,11 +106,25 @@ private fun AppRoot() {
             LoginScreen(
                 onNavigateBack = { rootNavController.popBackStack() },
                 onLoginSuccess = {
-                    rootNavController.navigate("main") {
+                    // 기존 사용자는 preferences 유무에 따라 분기 (gate)
+                    rootNavController.navigate("gate") {
                         popUpTo("landing") { inclusive = true }
                     }
                 }
             )
+        }
+        composable("gate") {
+            PreferenceGate(
+                onNeedsPreference = {
+                    rootNavController.navigate("preference") {
+                        popUpTo(rootNavController.graph.id) { inclusive = true }
+                    }
+                },
+                onReady = { goMain() }
+            )
+        }
+        composable("preference") {
+            PreferenceScreen(onComplete = { goMain() })
         }
         composable("main") {
             MainApp(
@@ -113,6 +136,35 @@ private fun AppRoot() {
                 }
             )
         }
+    }
+}
+
+/**
+ * 로그인된 기존 사용자를 `users/{uid}.preferences` 유무에 따라 분기한다.
+ * - preferences 가 있으면 메인으로
+ * - 없거나 문서가 없으면 취향 선택 화면으로
+ * - 조회 실패 시에는 앱을 막지 않도록 메인으로 진행
+ */
+@Composable
+private fun PreferenceGate(
+    onNeedsPreference: () -> Unit,
+    onReady: () -> Unit
+) {
+    val uid = Firebase.auth.currentUser?.uid
+    LaunchedEffect(uid) {
+        if (uid == null) {
+            onReady()
+            return@LaunchedEffect
+        }
+        Firebase.firestore.collection("users").document(uid).get()
+            .addOnSuccessListener { doc ->
+                val prefs = doc.get("preferences") as? List<*>
+                if (doc.exists() && !prefs.isNullOrEmpty()) onReady() else onNeedsPreference()
+            }
+            .addOnFailureListener { onReady() }
+    }
+    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        CircularProgressIndicator(color = MainPurple)
     }
 }
 

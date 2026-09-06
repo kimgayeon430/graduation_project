@@ -56,6 +56,7 @@ import androidx.compose.ui.unit.sp
 import com.google.firebase.Firebase
 import com.google.firebase.auth.auth
 import com.google.firebase.firestore.firestore
+import smu.ai.graduation_project.domain.MissionRecommender
 import smu.ai.graduation_project.model.Mission
 import smu.ai.graduation_project.ui.theme.CardGray
 import smu.ai.graduation_project.ui.theme.GradientEnd
@@ -71,14 +72,38 @@ fun HomeScreen(onNavigateToDetail: (String) -> Unit) {
     var userName by remember { mutableStateOf(user?.displayName ?: "Traveler") }
     var startedCount by remember { mutableIntStateOf(0) }
     val totalGoal = 5
+
     var activeMission by remember { mutableStateOf<Mission?>(null) }
+    var allMissions by remember { mutableStateOf<List<Mission>>(emptyList()) }
+    var completedMissionIds by remember { mutableStateOf<Set<String>>(emptySet()) }
+    var preferences by remember { mutableStateOf<List<String>>(emptyList()) }
+    var missionsLoaded by remember { mutableStateOf(false) }
 
     LaunchedEffect(user?.uid) {
+        // 추천 후보로 쓸 전체 미션 (읽기 전용 — 일반 미션 목록/관리자 기능과 무관)
+        Firebase.firestore.collection("missions").get()
+            .addOnSuccessListener { snapshot ->
+                allMissions = snapshot.documents.mapNotNull { doc ->
+                    val title = doc.getString("title") ?: return@mapNotNull null
+                    Mission(
+                        id = doc.id,
+                        title = title,
+                        desc = doc.getString("desc") ?: "",
+                        points = doc.getLong("points")?.toInt() ?: 0,
+                        category = doc.getString("category") ?: "투어"
+                    )
+                }
+                missionsLoaded = true
+            }
+            .addOnFailureListener { missionsLoaded = true }
+
         user?.uid?.let { uid ->
             Firebase.firestore.collection("users").document(uid).addSnapshotListener { snapshot, _ ->
                 if (snapshot != null && snapshot.exists()) {
                     points = snapshot.getLong("points") ?: 0L
                     userName = snapshot.getString("nickname") ?: user.displayName ?: "Traveler"
+                    @Suppress("UNCHECKED_CAST")
+                    preferences = (snapshot.get("preferences") as? List<String>).orEmpty()
                 }
             }
 
@@ -90,36 +115,42 @@ fun HomeScreen(onNavigateToDetail: (String) -> Unit) {
                     val documents = snapshot.documents
                     startedCount = documents.size
 
+                    completedMissionIds = documents
+                        .filter { doc ->
+                            val status = doc.getString("status").orEmpty()
+                            status.contains("완료") || status.equals("Completed", true)
+                        }
+                        .mapNotNull { it.getString("missionId") }
+                        .toSet()
+
                     val currentActive = documents.firstOrNull { doc ->
                         val status = doc.getString("status").orEmpty()
                         status.contains("진행") || status.contains("吏꾪뻾")
                     }
 
-                    if (currentActive != null) {
-                        activeMission = Mission(
-                            id = currentActive.getString("missionId") ?: "",
-                            title = currentActive.getString("title") ?: "",
+                    activeMission = currentActive?.let { doc ->
+                        Mission(
+                            id = doc.getString("missionId") ?: "",
+                            title = doc.getString("title") ?: "",
                             desc = "현재 진행 중인 미션입니다.",
-                            points = currentActive.getLong("points")?.toInt() ?: 0,
+                            points = doc.getLong("points")?.toInt() ?: 0,
                             status = "진행중"
                         )
-                    } else {
-                        Firebase.firestore.collection("missions").limit(1).get()
-                            .addOnSuccessListener { missionSnapshot ->
-                                val doc = missionSnapshot.documents.firstOrNull() ?: return@addOnSuccessListener
-                                activeMission = Mission(
-                                    id = doc.id,
-                                    title = doc.getString("title") ?: "",
-                                    desc = doc.getString("desc") ?: "",
-                                    points = doc.getLong("points")?.toInt() ?: 0,
-                                    category = doc.getString("category") ?: "투어",
-                                    status = "추천"
-                                )
-                            }
                     }
                 }
         }
     }
+
+    // 규칙 기반 추천: 진행 중 미션이 있으면 그것을, 없으면 선호 카테고리 우선 추천 1건
+    val recommendedMission = remember(allMissions, preferences, completedMissionIds) {
+        MissionRecommender.recommend(
+            missions = allMissions,
+            preferences = preferences,
+            completedMissionIds = completedMissionIds,
+            limit = 1
+        ).firstOrNull()
+    }
+    val displayMission = activeMission ?: recommendedMission?.copy(status = "추천")
 
     Column(
         modifier = Modifier
@@ -217,7 +248,7 @@ fun HomeScreen(onNavigateToDetail: (String) -> Unit) {
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                if (activeMission?.status == "진행중") "현재 진행 중인 미션" else "추천 미션",
+                if (activeMission != null) "현재 진행 중인 미션" else "추천 미션",
                 fontWeight = FontWeight.Bold,
                 fontSize = 18.sp
             )
@@ -226,7 +257,7 @@ fun HomeScreen(onNavigateToDetail: (String) -> Unit) {
             }
         }
 
-        activeMission?.let { mission ->
+        displayMission?.let { mission ->
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(containerColor = Color.White),
@@ -276,6 +307,24 @@ fun HomeScreen(onNavigateToDetail: (String) -> Unit) {
                             )
                         }
                     }
+                }
+            }
+        }
+
+        if (displayMission == null && missionsLoaded) {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = CardGray),
+                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+                shape = RoundedCornerShape(16.dp)
+            ) {
+                Column(modifier = Modifier.padding(20.dp)) {
+                    Text("지금은 추천할 미션이 없어요", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                    Text(
+                        "새로운 미션이 등록되면 여기에 표시됩니다. 미션 탭에서 전체 미션을 둘러보세요.",
+                        fontSize = 12.sp,
+                        color = Color.Gray
+                    )
                 }
             }
         }
