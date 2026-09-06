@@ -1,14 +1,18 @@
-﻿package smu.ai.graduation_project.ui.screens
+package smu.ai.graduation_project.ui.screens
 
 import android.Manifest
+import android.content.pm.PackageManager
 import android.location.Location
 import android.location.LocationManager
+import android.net.Uri
 import android.os.Build
 import android.os.CancellationSignal
 import android.widget.Toast
+import java.io.File
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -26,6 +30,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.LocationSearching
 import androidx.compose.material.icons.filled.Place
@@ -35,6 +40,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -54,12 +60,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
+import androidx.core.content.FileProvider
+import androidx.lifecycle.viewmodel.compose.viewModel
+import coil.compose.AsyncImage
 import com.google.firebase.Firebase
 import com.google.firebase.auth.auth
-import com.google.firebase.firestore.FieldValue
-import com.google.firebase.firestore.GeoPoint
-import com.google.firebase.firestore.SetOptions
-import com.google.firebase.firestore.firestore
 import smu.ai.graduation_project.ui.theme.CardGray
 import smu.ai.graduation_project.ui.theme.LightPurple
 import smu.ai.graduation_project.ui.theme.MainPurple
@@ -68,33 +73,39 @@ import smu.ai.graduation_project.ui.theme.MainPurple
 @Composable
 fun MissionPerformScreen(
     missionId: String,
-    onNavigateBack: () -> Unit
+    onNavigateBack: () -> Unit,
+    viewModel: MissionPerformViewModel = viewModel()
 ) {
     val context = LocalContext.current
-    val db = Firebase.firestore
-    val user = Firebase.auth.currentUser
-    val locationManager = remember {
-        context.getSystemService(LocationManager::class.java)
+    val uid = Firebase.auth.currentUser?.uid
+    val locationManager = remember { context.getSystemService(LocationManager::class.java) }
+    val state = viewModel.uiState
+
+    // 카메라 인텐트로 넘긴 임시 파일 Uri (촬영 성공 시 ViewModel 로 전달)
+    var pendingCameraUri by remember { mutableStateOf<Uri?>(null) }
+
+    LaunchedEffect(missionId, uid) {
+        viewModel.loadData(missionId, uid)
     }
 
-    var missionTitle by remember { mutableStateOf("미션") }
-    var missionPoints by remember { mutableStateOf(0) }
-    var isVerifying by remember { mutableStateOf(false) }
-    var isCompleting by remember { mutableStateOf(false) }
-    var locationVerified by remember { mutableStateOf(false) }
-    var missionCompleted by remember { mutableStateOf(false) }
-    var stage1RewardGranted by remember { mutableStateOf(false) }
-    var stage2RewardGranted by remember { mutableStateOf(false) }
-    var verificationText by remember { mutableStateOf("아직 위치 인증을 하지 않았습니다.") }
-    var missionDocId by remember { mutableStateOf<String?>(null) }
-    var missionLocation by remember { mutableStateOf<GeoPoint?>(null) }
+    // 일회성 이벤트: 토스트
+    LaunchedEffect(state.toastMessage) {
+        state.toastMessage?.let {
+            Toast.makeText(context, it, Toast.LENGTH_SHORT).show()
+            viewModel.onToastShown()
+        }
+    }
+    // 일회성 이벤트: 뒤로가기
+    LaunchedEffect(state.navigateBack) {
+        if (state.navigateBack) {
+            viewModel.onNavigateHandled()
+            onNavigateBack()
+        }
+    }
 
-    val allowedRadiusMeters = 200f
-    val stage1Reward = minOf(100, missionPoints)
-    val stage2Reward = (missionPoints - stage1Reward).coerceAtLeast(0)
-
-    fun verifyLocation() {
-        if (user == null) {
+    // ---- 위치(GPS) 획득: Android 프레임워크 영역 ----
+    fun requestLocation() {
+        if (Firebase.auth.currentUser == null) {
             Toast.makeText(context, "로그인이 필요합니다.", Toast.LENGTH_SHORT).show()
             return
         }
@@ -109,212 +120,93 @@ fun MissionPerformScreen(
             return
         }
 
-        isVerifying = true
-        val onLocationResult: (Location?) -> Unit = locationResult@{ location ->
-            if (location == null) {
-                isVerifying = false
-                Toast.makeText(context, "현재 위치를 가져오지 못했습니다.", Toast.LENGTH_SHORT).show()
-            } else {
-                val lat = location.latitude
-                val lng = location.longitude
-                val targetLocation = missionLocation
-                if (targetLocation == null) {
-                    isVerifying = false
-                    Toast.makeText(context, "미션 위치 정보가 없습니다.", Toast.LENGTH_SHORT).show()
-                    return@locationResult
-                }
-
-                val distanceResult = FloatArray(1)
-                Location.distanceBetween(
-                    lat,
-                    lng,
-                    targetLocation.latitude,
-                    targetLocation.longitude,
-                    distanceResult
-                )
-                val distanceMeters = distanceResult[0]
-                val isNearEnough = distanceMeters <= allowedRadiusMeters
-
-                verificationText = if (isNearEnough) {
-                    "위치 인증 완료 · 목표 지점까지 %.0fm".format(distanceMeters)
-                } else {
-                    "현재 위치가 인증 범위를 벗어났습니다 · %.0fm 떨어져 있어요".format(distanceMeters)
-                }
-                locationVerified = isNearEnough
-                val targetDocId = missionDocId
-                if (targetDocId != null) {
-                    val userMissionRef = db.collection("user_missions").document(targetDocId)
-                    val userRef = db.collection("users").document(user.uid)
-                    db.runTransaction { transaction ->
-                        val userMissionSnapshot = transaction.get(userMissionRef)
-                        val alreadyRewarded = userMissionSnapshot.getBoolean("stage1RewardGranted") == true
-                        val rewardToGrant = if (isNearEnough && !alreadyRewarded) stage1Reward else 0
-                        transaction.update(
-                            userMissionRef,
-                            mapOf(
-                                "locationVerified" to isNearEnough,
-                                "verifiedLatitude" to lat,
-                                "verifiedLongitude" to lng,
-                                "distanceToTargetMeters" to distanceMeters,
-                                "progress" to if (isNearEnough) 0.5f else 0f,
-                                "status" to "In Progress",
-                                "stage1RewardGranted" to (alreadyRewarded || isNearEnough),
-                                "stage1RewardPoints" to stage1Reward
-                            )
-                        )
-                        if (rewardToGrant > 0) {
-                            transaction.set(
-                                userRef,
-                                mapOf("points" to FieldValue.increment(rewardToGrant.toLong())),
-                                SetOptions.merge()
-                            )
-                        }
-                        rewardToGrant
-                    }.addOnSuccessListener { rewardToGrant ->
-                            isVerifying = false
-                            if (isNearEnough) {
-                                stage1RewardGranted = true
-                            }
-                            Toast.makeText(
-                                context,
-                                when {
-                                    !isNearEnough -> "미션 위치 근처에서 다시 시도해주세요."
-                                    rewardToGrant > 0 -> "위치 인증 완료. ${rewardToGrant}P가 지급되었습니다."
-                                    else -> "위치 인증이 완료되었습니다."
-                                },
-                                Toast.LENGTH_SHORT
-                            ).show()
-                        }.addOnFailureListener {
-                            isVerifying = false
-                            Toast.makeText(context, "위치 인증 처리에 실패했습니다.", Toast.LENGTH_SHORT).show()
-                        }
-                } else {
-                    isVerifying = false
-                    Toast.makeText(context, "미션 진행 정보가 없습니다.", Toast.LENGTH_SHORT).show()
-                }
-            }
-        }
-
+        viewModel.onLocationRequestStarted()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             val provider = if (gpsEnabled) LocationManager.GPS_PROVIDER else LocationManager.NETWORK_PROVIDER
             locationManager.getCurrentLocation(provider, CancellationSignal(), context.mainExecutor) { location ->
-                onLocationResult(location)
+                viewModel.onLocationResult(location)
             }
         } else {
             val location = locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER)
                 ?: locationManager.getLastKnownLocation(LocationManager.NETWORK_PROVIDER)
-            onLocationResult(location)
+            viewModel.onLocationResult(location)
         }
     }
 
-    fun completeMission() {
-        if (user == null) {
-            Toast.makeText(context, "로그인이 필요합니다.", Toast.LENGTH_SHORT).show()
-            return
-        }
-        val targetDocId = missionDocId
-        if (targetDocId == null) {
-            Toast.makeText(context, "미션 진행 정보가 없습니다.", Toast.LENGTH_SHORT).show()
-            return
-        }
-        if (!locationVerified) {
-            Toast.makeText(context, "먼저 위치 인증을 완료해주세요.", Toast.LENGTH_SHORT).show()
-            return
-        }
-
-        isCompleting = true
-        val userMissionRef = db.collection("user_missions").document(targetDocId)
-        val userRef = db.collection("users").document(user.uid)
-
-        db.runTransaction { transaction ->
-            val missionSnapshot = transaction.get(userMissionRef)
-            val status = missionSnapshot.getString("status").orEmpty()
-            val alreadyCompleted = status.contains("완료") || status.equals("Completed", true)
-            val alreadyRewarded = missionSnapshot.getBoolean("stage2RewardGranted") == true
-            val rewardToGrant = if (!alreadyRewarded) stage2Reward else 0
-            transaction.update(
-                userMissionRef,
-                mapOf(
-                    "status" to "Completed",
-                    "progress" to 1f,
-                    "locationVerified" to true,
-                    "stage2RewardGranted" to true,
-                    "stage2RewardPoints" to stage2Reward,
-                    "completedAt" to FieldValue.serverTimestamp()
-                )
-            )
-            if (!alreadyCompleted && rewardToGrant > 0) {
-                transaction.set(
-                    userRef,
-                    mapOf("points" to FieldValue.increment(rewardToGrant.toLong())),
-                    SetOptions.merge()
-                )
-            }
-            rewardToGrant to alreadyCompleted
-        }.addOnSuccessListener { result ->
-            isCompleting = false
-            missionCompleted = true
-            stage2RewardGranted = true
-            verificationText = "위치 인증 완료 · 미션이 완료되었습니다."
-            val rewardToGrant = result.first
-            val alreadyCompleted = result.second
-            Toast.makeText(
-                context,
-                when {
-                    alreadyCompleted -> "이미 완료 처리된 미션입니다."
-                    rewardToGrant > 0 -> "사진 인증 완료. ${rewardToGrant}P가 지급되었습니다."
-                    else -> "사진 인증 완료."
-                },
-                Toast.LENGTH_SHORT
-            ).show()
-            onNavigateBack()
-        }.addOnFailureListener {
-            isCompleting = false
-            Toast.makeText(context, "미션 완료 처리에 실패했습니다.", Toast.LENGTH_SHORT).show()
-        }
-    }
-
-    val permissionLauncher = rememberLauncherForActivityResult(
+    val locationPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestMultiplePermissions()
     ) { result ->
         val granted = result[Manifest.permission.ACCESS_FINE_LOCATION] == true ||
             result[Manifest.permission.ACCESS_COARSE_LOCATION] == true
         if (granted) {
-            verifyLocation()
+            requestLocation()
         } else {
             Toast.makeText(context, "위치 권한이 필요합니다.", Toast.LENGTH_SHORT).show()
         }
     }
 
-    LaunchedEffect(missionId, user?.uid) {
-        db.collection("missions").document(missionId).get().addOnSuccessListener { doc ->
-            missionTitle = doc.getString("title") ?: "미션"
-            missionPoints = doc.getLong("points")?.toInt() ?: 0
-            missionLocation = doc.getGeoPoint("location")
+    fun onVerifyLocationClick() {
+        val hasFine = ContextCompat.checkSelfPermission(
+            context, Manifest.permission.ACCESS_FINE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED
+        val hasCoarse = ContextCompat.checkSelfPermission(
+            context, Manifest.permission.ACCESS_COARSE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED
+        if (hasFine || hasCoarse) {
+            requestLocation()
+        } else {
+            locationPermissionLauncher.launch(
+                arrayOf(
+                    Manifest.permission.ACCESS_FINE_LOCATION,
+                    Manifest.permission.ACCESS_COARSE_LOCATION
+                )
+            )
         }
+    }
 
-        user?.uid?.let { uid ->
-            db.collection("user_missions")
-                .whereEqualTo("userId", uid)
-                .whereEqualTo("missionId", missionId)
-                .get()
-                .addOnSuccessListener { snapshot ->
-                    val doc = snapshot.documents.firstOrNull()
-                    missionDocId = doc?.id
-                    val rawStatus = doc?.getString("status").orEmpty()
-                    val verified = doc?.getBoolean("locationVerified") == true
-                    locationVerified = verified
-                    missionCompleted = rawStatus.contains("완료") || rawStatus.equals("Completed", true)
-                    stage1RewardGranted = doc?.getBoolean("stage1RewardGranted") == true
-                    stage2RewardGranted = doc?.getBoolean("stage2RewardGranted") == true
-                    if (missionCompleted) {
-                        verificationText = "위치 인증 완료 · 미션 완료 상태입니다."
-                    } else if (verified) {
-                        val lat = doc.getDouble("verifiedLatitude") ?: 0.0
-                        val lng = doc.getDouble("verifiedLongitude") ?: 0.0
-                        verificationText = "위치 인증 완료: %.5f, %.5f".format(lat, lng)
-                    }
-                }
+    // ---- 카메라 촬영: Android 프레임워크 영역 ----
+    val cameraLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.TakePicture()
+    ) { success ->
+        val uri = pendingCameraUri
+        if (success && uri != null) {
+            viewModel.onPhotoCaptured(uri)
+        } else {
+            pendingCameraUri = null
+            viewModel.onPhotoCaptureCancelled()
+        }
+    }
+
+    fun launchCamera() {
+        val dir = File(context.cacheDir, "mission_photos").apply { mkdirs() }
+        val file = File(dir, "capture_${System.currentTimeMillis()}.jpg")
+        val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+        pendingCameraUri = uri
+        cameraLauncher.launch(uri)
+    }
+
+    val cameraPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) {
+            launchCamera()
+        } else {
+            Toast.makeText(context, "카메라 권한이 필요합니다.", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    fun startPhotoCapture() {
+        if (!state.locationVerified) {
+            Toast.makeText(context, "먼저 위치 인증을 완료해주세요.", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val hasCamera = ContextCompat.checkSelfPermission(
+            context, Manifest.permission.CAMERA
+        ) == PackageManager.PERMISSION_GRANTED
+        if (hasCamera) {
+            launchCamera()
+        } else {
+            cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
         }
     }
 
@@ -349,12 +241,12 @@ fun MissionPerformScreen(
                     modifier = Modifier.padding(22.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    Text(missionTitle, fontWeight = FontWeight.ExtraBold, fontSize = 26.sp, color = Color(0xFF2C2C2C))
+                    Text(state.missionTitle, fontWeight = FontWeight.ExtraBold, fontSize = 26.sp, color = Color(0xFF2C2C2C))
                     Text("첫 단계는 현재 위치를 인증하는 것입니다. GPS 권한을 허용하고 현장에서 인증 버튼을 눌러주세요.", color = Color.Gray, lineHeight = 21.sp)
-                    Text("포인트 지급: 1단계 ${stage1Reward}P · 2단계 ${stage2Reward}P", color = Color(0xFF5A4DB4), fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
-                    missionLocation?.let {
+                    Text("포인트 지급: 1단계 ${state.stage1Reward}P · 2단계 ${state.stage2Reward}P", color = Color(0xFF5A4DB4), fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                    state.missionLocation?.let {
                         Text(
-                            "목표 위치: %.4f, %.4f · 반경 ${allowedRadiusMeters.toInt()}m 안에서 인증".format(it.latitude, it.longitude),
+                            "목표 위치: %.4f, %.4f · 반경 ${state.allowedRadiusMeters.toInt()}m 안에서 인증".format(it.latitude, it.longitude),
                             color = MainPurple,
                             fontSize = 13.sp,
                             fontWeight = FontWeight.Medium
@@ -376,20 +268,20 @@ fun MissionPerformScreen(
                         Box(
                             modifier = Modifier
                                 .size(42.dp)
-                                .background(if (locationVerified) Color(0xFFE7F7EA) else Color.White, CircleShape),
+                                .background(if (state.locationVerified) Color(0xFFE7F7EA) else Color.White, CircleShape),
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
-                                if (locationVerified) Icons.Default.CheckCircle else Icons.Default.LocationSearching,
+                                if (state.locationVerified) Icons.Default.CheckCircle else Icons.Default.LocationSearching,
                                 null,
-                                tint = if (locationVerified) Color(0xFF4CAF50) else MainPurple
+                                tint = if (state.locationVerified) Color(0xFF4CAF50) else MainPurple
                             )
                         }
                         Spacer(modifier = Modifier.width(12.dp))
                         Column {
                             Text("1단계 · GPS 위치 인증", fontWeight = FontWeight.Bold, fontSize = 17.sp)
                             Text(
-                                if (stage1RewardGranted && locationVerified) "$verificationText · ${stage1Reward}P 지급 완료" else verificationText,
+                                if (state.stage1RewardGranted && state.locationVerified) "${state.verificationText} · ${state.stage1Reward}P 지급 완료" else state.verificationText,
                                 color = Color.Gray,
                                 fontSize = 13.sp
                             )
@@ -397,29 +289,16 @@ fun MissionPerformScreen(
                     }
 
                     Button(
-                        onClick = {
-                            val hasFine = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == android.content.pm.PackageManager.PERMISSION_GRANTED
-                            val hasCoarse = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == android.content.pm.PackageManager.PERMISSION_GRANTED
-                            if (hasFine || hasCoarse) {
-                                verifyLocation()
-                            } else {
-                                permissionLauncher.launch(
-                                    arrayOf(
-                                        Manifest.permission.ACCESS_FINE_LOCATION,
-                                        Manifest.permission.ACCESS_COARSE_LOCATION
-                                    )
-                                )
-                            }
-                        },
-                        enabled = !isVerifying,
+                        onClick = { onVerifyLocationClick() },
+                        enabled = !state.isVerifying,
                         modifier = Modifier.fillMaxWidth(),
                         colors = ButtonDefaults.buttonColors(containerColor = MainPurple),
                         shape = RoundedCornerShape(16.dp)
                     ) {
-                        if (isVerifying) {
+                        if (state.isVerifying) {
                             CircularProgressIndicator(color = Color.White, modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
                         } else {
-                            Text(if (locationVerified) "위치 다시 인증하기" else "위치 인증하기", fontWeight = FontWeight.Bold)
+                            Text(if (state.locationVerified) "위치 다시 인증하기" else "위치 인증하기", fontWeight = FontWeight.Bold)
                         }
                     }
                 }
@@ -427,7 +306,7 @@ fun MissionPerformScreen(
 
             Surface(
                 modifier = Modifier.fillMaxWidth(),
-                color = if (locationVerified) Color(0xFFFFF7E8) else CardGray,
+                color = if (state.locationVerified) Color(0xFFFFF7E8) else CardGray,
                 shape = RoundedCornerShape(22.dp)
             ) {
                 Column(
@@ -438,23 +317,23 @@ fun MissionPerformScreen(
                         Box(
                             modifier = Modifier
                                 .size(42.dp)
-                                .background(if (missionCompleted) Color(0xFFE7F7EA) else Color.White, CircleShape),
+                                .background(if (state.missionCompleted) Color(0xFFE7F7EA) else Color.White, CircleShape),
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
                                 Icons.Default.CheckCircle,
                                 null,
-                                tint = if (missionCompleted) Color(0xFF4CAF50) else MainPurple
+                                tint = if (state.missionCompleted) Color(0xFF4CAF50) else MainPurple
                             )
                         }
                         Spacer(modifier = Modifier.width(12.dp))
                         Column {
                             Text("2단계 · 사진 인증", fontWeight = FontWeight.Bold, fontSize = 17.sp)
                             Text(
-                                if (missionCompleted) {
-                                    if (stage2RewardGranted) "사진 인증까지 완료됐고 ${stage2Reward}P 지급도 반영됐습니다." else "사진 인증까지 완료된 상태입니다."
-                                } else if (locationVerified) {
-                                    "위치 인증이 끝났습니다. 사진 인증 완료 시 ${stage2Reward}P가 지급됩니다."
+                                if (state.missionCompleted) {
+                                    if (state.stage2RewardGranted) "사진 인증까지 완료됐고 ${state.stage2Reward}P 지급도 반영됐습니다." else "사진 인증까지 완료된 상태입니다."
+                                } else if (state.locationVerified) {
+                                    "위치 인증이 끝났습니다. 사진 인증 완료 시 ${state.stage2Reward}P가 지급됩니다."
                                 } else {
                                     "위치 인증이 끝나야 사진 인증 단계로 진행할 수 있습니다."
                                 },
@@ -464,20 +343,64 @@ fun MissionPerformScreen(
                         }
                     }
 
-                    Button(
-                        onClick = ::completeMission,
-                        enabled = locationVerified && !missionCompleted && !isCompleting,
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE38B2C)),
-                        shape = RoundedCornerShape(16.dp)
-                    ) {
-                        if (isCompleting) {
-                            CircularProgressIndicator(color = Color.White, modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                    // 촬영한 사진 미리보기 (로컬 촬영본 우선, 없으면 업로드된 사진)
+                    val previewModel: Any? = state.capturedPhotoUri ?: state.photoUrl
+                    if (previewModel != null) {
+                        AsyncImage(
+                            model = previewModel,
+                            contentDescription = "인증 사진 미리보기",
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(200.dp)
+                                .border(1.dp, Color(0xFFE0D8C4), RoundedCornerShape(14.dp))
+                                .background(Color.White, RoundedCornerShape(14.dp))
+                        )
+                    }
+
+                    state.uploadError?.let {
+                        Text(it, color = Color(0xFFD32F2F), fontSize = 13.sp)
+                    }
+
+                    if (!state.missionCompleted) {
+                        if (state.capturedPhotoUri == null) {
+                            Button(
+                                onClick = { startPhotoCapture() },
+                                enabled = state.locationVerified && !state.isUploading,
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE38B2C)),
+                                shape = RoundedCornerShape(16.dp)
+                            ) {
+                                Icon(Icons.Default.CameraAlt, null, modifier = Modifier.size(18.dp))
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("사진 촬영하기", fontWeight = FontWeight.Bold)
+                            }
                         } else {
-                            Text(
-                                if (missionCompleted) "사진 인증 완료" else "사진 인증하기",
-                                fontWeight = FontWeight.Bold
-                            )
+                            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                OutlinedButton(
+                                    onClick = { startPhotoCapture() },
+                                    enabled = !state.isUploading,
+                                    modifier = Modifier.weight(1f),
+                                    shape = RoundedCornerShape(16.dp)
+                                ) {
+                                    Text("다시 촬영")
+                                }
+                                Button(
+                                    onClick = { viewModel.uploadPhotoAndComplete() },
+                                    enabled = !state.isUploading,
+                                    modifier = Modifier.weight(1f),
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE38B2C)),
+                                    shape = RoundedCornerShape(16.dp)
+                                ) {
+                                    if (state.isUploading) {
+                                        CircularProgressIndicator(color = Color.White, modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                                    } else {
+                                        Text(if (state.uploadError != null) "다시 시도" else "사진 인증 완료", fontWeight = FontWeight.Bold)
+                                    }
+                                }
+                            }
+                        }
+                        if (state.isUploading) {
+                            Text("사진 업로드 중입니다...", color = Color.Gray, fontSize = 12.sp)
                         }
                     }
                 }
@@ -495,8 +418,8 @@ fun MissionPerformScreen(
                 ) {
                     Text("진행 상태", fontWeight = FontWeight.Bold, fontSize = 18.sp)
                     StatusRow("위치 권한", "허용 후 인증 버튼 실행", Icons.Default.Place)
-                    StatusRow("GPS 인증", if (locationVerified) "인증 완료 · ${if (stage1RewardGranted) "${stage1Reward}P 지급" else "지급 대기"}" else "대기 중", Icons.Default.LocationSearching)
-                    StatusRow("사진 인증", if (missionCompleted) "완료됨 · ${if (stage2RewardGranted) "${stage2Reward}P 지급" else "지급 대기"}" else if (locationVerified) "버튼 활성화" else "위치 인증 후 진행", Icons.Default.CheckCircle)
+                    StatusRow("GPS 인증", if (state.locationVerified) "인증 완료 · ${if (state.stage1RewardGranted) "${state.stage1Reward}P 지급" else "지급 대기"}" else "대기 중", Icons.Default.LocationSearching)
+                    StatusRow("사진 인증", if (state.missionCompleted) "완료됨 · ${if (state.stage2RewardGranted) "${state.stage2Reward}P 지급" else "지급 대기"}" else if (state.locationVerified) "버튼 활성화" else "위치 인증 후 진행", Icons.Default.CheckCircle)
                 }
             }
         }
