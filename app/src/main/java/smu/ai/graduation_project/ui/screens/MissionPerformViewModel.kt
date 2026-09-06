@@ -8,6 +8,8 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import smu.ai.graduation_project.data.FirebaseMissionRepository
 import smu.ai.graduation_project.data.MissionRepository
+import smu.ai.graduation_project.domain.LocationVerification
+import smu.ai.graduation_project.domain.MissionCompletion
 
 /**
  * 미션 수행 화면의 상태 보유 + Firebase 조회·위치 인증·사진 업로드·포인트 지급 흐름 조정.
@@ -48,8 +50,7 @@ class MissionPerformViewModel(
                 missionId = missionId,
                 uid = uid,
                 onResult = { state ->
-                    val completed = state.status.contains("완료") ||
-                        state.status.equals("Completed", true)
+                    val completed = MissionCompletion.isCompleted(state.status)
                     uiState = uiState.copy(
                         missionDocId = state.docId,
                         locationVerified = state.locationVerified,
@@ -95,14 +96,15 @@ class MissionPerformViewModel(
             return
         }
 
-        val distanceResult = FloatArray(1)
-        Location.distanceBetween(
-            location.latitude, location.longitude,
-            target.latitude, target.longitude,
-            distanceResult
+        val verification = LocationVerification.verify(
+            currentLat = location.latitude,
+            currentLon = location.longitude,
+            targetLat = target.latitude,
+            targetLon = target.longitude,
+            allowedRadiusMeters = uiState.allowedRadiusMeters.toDouble()
         )
-        val distanceMeters = distanceResult[0]
-        val isNearEnough = distanceMeters <= uiState.allowedRadiusMeters
+        val distanceMeters = verification.distanceMeters
+        val isNearEnough = verification.isWithinRadius
 
         uiState = uiState.copy(
             locationVerified = isNearEnough,
@@ -126,7 +128,7 @@ class MissionPerformViewModel(
             latitude = location.latitude,
             longitude = location.longitude,
             distanceMeters = distanceMeters,
-            stage1Reward = uiState.stage1Reward,
+            missionPoints = uiState.missionPoints,
             onResult = { result ->
                 uiState = uiState.copy(
                     isVerifying = false,
@@ -190,7 +192,7 @@ class MissionPerformViewModel(
             userMissionDocId = docId,
             uid = uid!!,
             photoUri = localUri,
-            stage2Reward = state.stage2Reward,
+            missionPoints = state.missionPoints,
             onResult = { result ->
                 uiState = uiState.copy(
                     isUploading = false,

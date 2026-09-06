@@ -6,6 +6,8 @@ import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.SetOptions
 import com.google.firebase.firestore.firestore
 import com.google.firebase.storage.storage
+import smu.ai.graduation_project.domain.MissionCompletion
+import smu.ai.graduation_project.domain.MissionRewardPolicy
 
 /**
  * [MissionRepository] 의 Firebase(Firestore + Storage) 구현.
@@ -69,8 +71,8 @@ class FirebaseMissionRepository : MissionRepository {
         isNearEnough: Boolean,
         latitude: Double,
         longitude: Double,
-        distanceMeters: Float,
-        stage1Reward: Int,
+        distanceMeters: Double,
+        missionPoints: Int,
         onResult: (MissionRepository.LocationVerifyResult) -> Unit,
         onError: (Exception) -> Unit
     ) {
@@ -79,7 +81,11 @@ class FirebaseMissionRepository : MissionRepository {
         db.runTransaction { transaction ->
             val userMissionSnapshot = transaction.get(userMissionRef)
             val alreadyRewarded = userMissionSnapshot.getBoolean("stage1RewardGranted") == true
-            val rewardToGrant = if (isNearEnough && !alreadyRewarded) stage1Reward else 0
+            val rewardToGrant = MissionRewardPolicy.stage1RewardToGrant(
+                missionPoints = missionPoints,
+                isNearEnough = isNearEnough,
+                alreadyGranted = alreadyRewarded
+            )
             transaction.update(
                 userMissionRef,
                 mapOf(
@@ -88,9 +94,9 @@ class FirebaseMissionRepository : MissionRepository {
                     "verifiedLongitude" to longitude,
                     "distanceToTargetMeters" to distanceMeters,
                     "progress" to if (isNearEnough) 0.5f else 0f,
-                    "status" to "In Progress",
+                    "status" to MissionCompletion.STATUS_IN_PROGRESS,
                     "stage1RewardGranted" to (alreadyRewarded || isNearEnough),
-                    "stage1RewardPoints" to stage1Reward
+                    "stage1RewardPoints" to MissionRewardPolicy.stage1Reward(missionPoints)
                 )
             )
             if (rewardToGrant > 0) {
@@ -111,7 +117,7 @@ class FirebaseMissionRepository : MissionRepository {
         userMissionDocId: String,
         uid: String,
         photoUri: Uri,
-        stage2Reward: Int,
+        missionPoints: Int,
         onResult: (MissionRepository.CompleteResult) -> Unit,
         onError: (Exception) -> Unit
     ) {
@@ -130,13 +136,19 @@ class FirebaseMissionRepository : MissionRepository {
                 db.runTransaction { transaction ->
                     val missionSnapshot = transaction.get(userMissionRef)
                     val status = missionSnapshot.getString("status").orEmpty()
-                    val alreadyCompleted = status.contains("완료") || status.equals("Completed", true)
+                    val alreadyCompleted = MissionCompletion.isCompleted(status)
                     val alreadyRewarded = missionSnapshot.getBoolean("stage2RewardGranted") == true
-                    val rewardToGrant = if (!alreadyRewarded) stage2Reward else 0
+                    // 이 콜백은 업로드 성공 후에만 실행되므로 uploadSucceeded = true
+                    val outcome = MissionCompletion.resolve(
+                        currentStatus = status,
+                        missionPoints = missionPoints,
+                        stage2AlreadyGranted = alreadyRewarded,
+                        uploadSucceeded = true
+                    )
                     transaction.update(
                         userMissionRef,
                         mapOf(
-                            "status" to "Completed",
+                            "status" to outcome.newStatus,
                             "progress" to 1f,
                             "locationVerified" to true,
                             "photoUrl" to downloadUri.toString(),
@@ -144,18 +156,18 @@ class FirebaseMissionRepository : MissionRepository {
                             "photoVerified" to true,
                             "photoUploadedAt" to FieldValue.serverTimestamp(),
                             "stage2RewardGranted" to true,
-                            "stage2RewardPoints" to stage2Reward,
+                            "stage2RewardPoints" to MissionRewardPolicy.stage2Reward(missionPoints),
                             "completedAt" to FieldValue.serverTimestamp()
                         )
                     )
-                    if (!alreadyCompleted && rewardToGrant > 0) {
+                    if (outcome.pointsToGrant > 0) {
                         transaction.set(
                             userRef,
-                            mapOf("points" to FieldValue.increment(rewardToGrant.toLong())),
+                            mapOf("points" to FieldValue.increment(outcome.pointsToGrant.toLong())),
                             SetOptions.merge()
                         )
                     }
-                    Triple(rewardToGrant, alreadyCompleted, downloadUri.toString())
+                    Triple(outcome.pointsToGrant, alreadyCompleted, downloadUri.toString())
                 }.addOnSuccessListener { result ->
                     onResult(
                         MissionRepository.CompleteResult(

@@ -2,6 +2,8 @@ package smu.ai.graduation_project.ui.screens
 
 import android.net.Uri
 import com.google.firebase.firestore.GeoPoint
+import smu.ai.graduation_project.domain.LocationVerification
+import smu.ai.graduation_project.domain.MissionRewardPolicy
 
 /**
  * [MissionPerformScreen] 이 그리는 데 필요한 모든 상태.
@@ -30,7 +32,7 @@ data class MissionPerformUiState(
     val toastMessage: String? = null,
     val navigateBack: Boolean = false
 ) {
-    val allowedRadiusMeters: Float get() = 200f
-    val stage1Reward: Int get() = minOf(100, missionPoints)
-    val stage2Reward: Int get() = (missionPoints - stage1Reward).coerceAtLeast(0)
+    val allowedRadiusMeters: Float get() = LocationVerification.DEFAULT_ALLOWED_RADIUS_METERS.toFloat()
+    val stage1Reward: Int get() = MissionRewardPolicy.stage1Reward(missionPoints)
+    val stage2Reward: Int get() = MissionRewardPolicy.stage2Reward(missionPoints)
 }

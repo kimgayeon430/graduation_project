@@ -61,7 +61,8 @@ interface MissionRepository {
 
     /**
      * 1단계 위치 인증. `user_missions` 문서를 갱신하고, 범위 안이면서 아직 지급 전이면
-     * `users/{uid}.points` 를 [stage1Reward] 만큼 올린다. (트랜잭션으로 중복 지급 방지)
+     * `users/{uid}.points` 를 1단계 보상만큼 올린다. (트랜잭션으로 중복 지급 방지)
+     * 보상 계산은 [smu.ai.graduation_project.domain.MissionRewardPolicy] 에 위임한다.
      */
     fun verifyLocation(
         userMissionDocId: String,
@@ -69,22 +70,23 @@ interface MissionRepository {
         isNearEnough: Boolean,
         latitude: Double,
         longitude: Double,
-        distanceMeters: Float,
-        stage1Reward: Int,
+        distanceMeters: Double,
+        missionPoints: Int,
         onResult: (LocationVerifyResult) -> Unit,
         onError: (Exception) -> Unit
     )
 
     /**
      * 2단계 사진 인증. 사진을 Storage 에 업로드하고, 성공 후에만 트랜잭션으로 미션을 완료 처리하며
-     * 아직 지급 전이면 `users/{uid}.points` 를 [stage2Reward] 만큼 올린다.
+     * 아직 지급 전이면 `users/{uid}.points` 를 2단계 보상만큼 올린다.
+     * 완료 판정/보상 계산은 [smu.ai.graduation_project.domain.MissionCompletion] 에 위임한다.
      */
     fun uploadPhotoAndComplete(
         missionId: String,
         userMissionDocId: String,
         uid: String,
         photoUri: Uri,
-        stage2Reward: Int,
+        missionPoints: Int,
         onResult: (CompleteResult) -> Unit,
         onError: (Exception) -> Unit
     )
