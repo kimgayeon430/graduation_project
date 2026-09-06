@@ -56,6 +56,7 @@
    - 업로드가 성공한 뒤에만 트랜잭션으로 미션을 `Completed` 처리하고 2단계 보상을 지급하며, `photoUrl`·`photoStoragePath`·`photoVerified`·`photoUploadedAt` 을 저장합니다.
    - 2단계 보상 = `미션 포인트 - 1단계 보상`
    - 업로드나 저장이 실패하면 미션은 완료되지 않으며, 재시도해도 포인트는 한 번만 지급됩니다.
+   - 사용자가 처음 완료할 때 같은 트랜잭션에서 `missions/{id}.completionCount` 를 1 올립니다. (추천 인기도 신호)
 
 ## 개인화 추천 (규칙 기반)
 
@@ -66,8 +67,10 @@ AI 모델 없이 현재 데이터만으로 설명 가능한 점수 규칙으로 
    - **명시적 취향**: 미션 카테고리가 `users/{uid}.preferences` 에 포함되면 가산
    - **암묵적 취향**: 그 카테고리 미션을 완료한 비율만큼 가산
    - **난이도 적합도**: 미션 포인트대가 사용자 레벨 기대치에 가까울수록 가산
+   - **거리 근접도**: 미션 목표 지점이 현재 위치에 가까울수록 가산 (위치 권한이 이미 허용된 경우에만)
+   - **인기도**: 다른 사용자의 완료 횟수(`missions/{id}.completionCount`)가 많을수록 가산
 3. "기본 점수 − 다양성 감점 × 이미 뽑힌 같은 카테고리 수" 가 가장 높은 미션을 하나씩 3건 선택합니다.
-4. 각 추천에는 점수에 기여한 근거(예: `맛집 취향`, `자주 하는 유형`)를 칩으로 표시합니다.
+4. 각 추천에는 점수에 기여한 근거(예: `맛집 취향`, `자주 하는 유형`, `가까운 미션`, `인기 미션`)를 칩으로 표시합니다.
 5. 진행 중인 미션이 있으면 추천 대신 해당 미션을 노출합니다.
 6. 추천 결과가 없거나 조회에 실패하면 빈 화면 대신 안내 카드를 표시합니다.
 
@@ -102,7 +105,7 @@ app/src/test/java/smu/ai/graduation_project
 | `MissionRewardPolicy` | 1·2단계 보상 계산과 중복 지급 방지 규칙 |
 | `MissionCompletion` | 사진 인증 가능 여부·완료 처리 결과(`resolve`) 계산 |
 | `TravelPreference` | 취향 카테고리 정의, 최소 1개 선택 규칙, 저장용 정규화 |
-| `MissionScorer` | 명시적·암묵적 취향과 난이도 적합도로 미션 기본 점수 계산 (근거 포함) |
+| `MissionScorer` | 명시적·암묵적 취향, 난이도 적합도, 거리 근접도, 인기도로 미션 기본 점수 계산 (근거 포함) |
 | `MissionRecommender` | 후보 필터 + 점수 정렬 + 다양성 감점으로 상위 N건 추천 |
 
 ## Firestore · Storage 데이터
@@ -110,7 +113,7 @@ app/src/test/java/smu/ai/graduation_project
 | 경로 | 주요 필드 |
 | --- | --- |
 | `users/{uid}` | `nickname`, `mail`, `points`, `level`, `preferences[]` |
-| `missions/{id}` | `title`, `desc`, `category`, `points`, `imageUrl`, `location`(GeoPoint) |
+| `missions/{id}` | `title`, `desc`, `category`, `points`, `imageUrl`, `location`(GeoPoint), `completionCount` |
 | `user_missions/{id}` | `userId`, `missionId`, `status`, `progress`, `stage1RewardGranted`, `stage2RewardGranted`, `photoUrl`, `photoStoragePath`, `photoVerified`, `photoUploadedAt`, `completedAt` |
 | `admins/{uid}` | `email`, `name` |
 | Storage `mission_photos/{missionId}/{uid}_{timestamp}.jpg` | 사진 인증 이미지 |
@@ -161,7 +164,7 @@ cd graduation_project
 ## 향후 개선 계획
 
 - 사진 인증 부정 방지(촬영 시각·위치 메타데이터 검증)와 관리자 검수 흐름
-- 거리·인기도(완료자 수)·시간대·미션 간 동시출현까지 반영한 추천 고도화 및 오프라인 평가(hit@k)
+- 시간대·미션 간 동시출현(협업 필터링)까지 반영한 추천 고도화 및 오프라인 평가(hit@k)
 - ViewModel·Repository 패턴을 홈·목록·관리자 등 나머지 화면으로 확대
 - Firestore·Storage 보안 규칙 정비 및 서버 사이드 포인트 검증
 - Compose UI 테스트와 Repository 계약 테스트 추가

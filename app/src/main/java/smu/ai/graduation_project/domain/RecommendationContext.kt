@@ -11,7 +11,11 @@ data class RecommendationContext(
     /** 완료한 미션을 카테고리별로 센 값 (암묵적 취향 신호). */
     val completedCountByCategory: Map<String, Int> = emptyMap(),
     /** 사용자 레벨 (기본 1). 난이도 적합도 계산에 사용. */
-    val userLevel: Int = 1
+    val userLevel: Int = 1,
+    /** 미션 id → 사용자 현재 위치로부터의 거리(m). 위치를 모르면 비어 있다. */
+    val distanceMetersByMissionId: Map<String, Double> = emptyMap(),
+    /** 미션 id → 지금까지 완료된 횟수 (인기도 신호). */
+    val completionCountByMissionId: Map<String, Int> = emptyMap()
 ) {
     /** 지금까지 완료한 전체 미션 수. */
     val totalCompleted: Int get() = completedCountByCategory.values.sum()
@@ -21,4 +25,10 @@ data class RecommendationContext(
         if (totalCompleted <= 0) return 0.0
         return (completedCountByCategory[category] ?: 0).toDouble() / totalCompleted
     }
+
+    /** 미션까지의 거리(m). 사용자 위치나 미션 좌표를 모르면 null. */
+    fun distanceMeters(missionId: String): Double? = distanceMetersByMissionId[missionId]
+
+    /** 미션의 완료 횟수. 기록이 없으면 0. */
+    fun completionCount(missionId: String): Int = completionCountByMissionId[missionId] ?: 0
 }

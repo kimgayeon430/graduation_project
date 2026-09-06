@@ -39,7 +39,7 @@ object MissionRecommender {
      *
      * 규칙:
      *  1. id 가 비었거나 이미 완료한 미션은 후보에서 제외한다.
-     *  2. 각 후보의 기본 점수를 계산한다(명시적 취향 · 암묵적 취향 · 난이도 적합도).
+     *  2. 각 후보의 기본 점수를 계산한다(명시적 취향 · 암묵적 취향 · 난이도 적합도 · 거리 · 인기도).
      *  3. "현재 점수 = 기본 점수 − 다양성 감점 × 이미 뽑힌 같은 카테고리 수" 가
      *     가장 높은 후보를 한 개씩 뽑는다.
      *  4. 점수가 같으면 입력 순서가 앞선 후보를 뽑는다(결과가 안정적).
@@ -57,7 +57,10 @@ object MissionRecommender {
         val candidates = missions.filter { it.id.isNotBlank() && it.id !in completed }
         if (candidates.isEmpty()) return emptyList()
 
-        val remaining = candidates.map { MissionScorer.score(it, context, weights) }.toMutableList()
+        val maxCompletionCount = candidates.maxOfOrNull { context.completionCount(it.id) } ?: 0
+        val remaining = candidates
+            .map { MissionScorer.score(it, context, weights, maxCompletionCount) }
+            .toMutableList()
         val pickedCategoryCount = HashMap<String, Int>()
         val picked = ArrayList<MissionScorer.Scored>(minOf(limit, remaining.size))
 

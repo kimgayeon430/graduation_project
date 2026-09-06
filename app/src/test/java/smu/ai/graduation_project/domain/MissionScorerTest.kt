@@ -59,6 +59,54 @@ class MissionScorerTest {
         assertEquals(100, MissionScorer.expectedPoints(0)) // 레벨은 최소 1로 취급
     }
 
+    // 거리: 가까운 미션일수록 점수가 높고, 멀면 기여가 없다
+    @Test
+    fun proximityRewardsNearbyMissions() {
+        val near = Mission(id = "near", title = "미션", category = "투어", points = 100)
+        val far = Mission(id = "far", title = "미션", category = "투어", points = 100)
+        val context = RecommendationContext(
+            distanceMetersByMissionId = mapOf("near" to 500.0, "far" to 30_000.0)
+        )
+        val nearScored = MissionScorer.score(near, context)
+        val farScored = MissionScorer.score(far, context)
+
+        assertTrue(nearScored.score > farScored.score)
+        assertTrue(nearScored.reasons.contains("가까운 미션"))
+        assertFalse(farScored.reasons.contains("가까운 미션"))
+    }
+
+    // 거리 정보가 없으면 근접도 신호는 무시된다
+    @Test
+    fun proximityIgnoredWhenLocationUnknown() {
+        val m = Mission(id = "x", title = "미션", category = "투어", points = 100)
+        val scored = MissionScorer.score(m, RecommendationContext())
+        assertFalse(scored.reasons.contains("가까운 미션"))
+    }
+
+    // 인기도: 완료 횟수가 많은 미션에 가산 (최대값 대비 상대값)
+    @Test
+    fun popularityRewardsFrequentlyCompletedMissions() {
+        val popular = Mission(id = "p", title = "미션", category = "투어", points = 100)
+        val rare = Mission(id = "r", title = "미션", category = "투어", points = 100)
+        val context = RecommendationContext(
+            completionCountByMissionId = mapOf("p" to 9, "r" to 1)
+        )
+        val popularScored = MissionScorer.score(popular, context, maxCompletionCount = 10)
+        val rareScored = MissionScorer.score(rare, context, maxCompletionCount = 10)
+
+        assertTrue(popularScored.score > rareScored.score)
+        assertTrue(popularScored.reasons.contains("인기 미션"))
+        assertFalse(rareScored.reasons.contains("인기 미션"))
+    }
+
+    // 완료 기록이 없으면(maxCompletionCount == 0) 인기도 신호는 무시된다
+    @Test
+    fun popularityIgnoredWhenNoCompletions() {
+        val m = Mission(id = "x", title = "미션", category = "투어", points = 100)
+        val scored = MissionScorer.score(m, RecommendationContext(), maxCompletionCount = 0)
+        assertFalse(scored.reasons.contains("인기 미션"))
+    }
+
     // 같은 입력이면 항상 같은 결과 (설명 가능 · 재현 가능)
     @Test
     fun scoringIsDeterministic() {

@@ -14,7 +14,9 @@ object MissionCompletion {
         /** users.points 에 더할 2단계 보상. 중복이면 0. */
         val pointsToGrant: Int,
         /** user_missions 를 완료로 표시할지 여부. */
-        val markCompleted: Boolean
+        val markCompleted: Boolean,
+        /** missions.completionCount 를 1 올릴지 여부(이 사용자가 처음 완료할 때만 true). */
+        val countTowardPopularity: Boolean
     )
 
     fun isCompleted(status: String): Boolean =
@@ -43,7 +45,12 @@ object MissionCompletion {
         uploadSucceeded: Boolean
     ): Outcome {
         if (!uploadSucceeded) {
-            return Outcome(newStatus = currentStatus, pointsToGrant = 0, markCompleted = false)
+            return Outcome(
+                newStatus = currentStatus,
+                pointsToGrant = 0,
+                markCompleted = false,
+                countTowardPopularity = false
+            )
         }
         val alreadyCompleted = isCompleted(currentStatus)
         val points = MissionRewardPolicy.stage2RewardToGrant(
@@ -51,6 +58,11 @@ object MissionCompletion {
             alreadyCompleted = alreadyCompleted,
             alreadyGranted = stage2AlreadyGranted
         )
-        return Outcome(newStatus = STATUS_COMPLETED, pointsToGrant = points, markCompleted = true)
+        return Outcome(
+            newStatus = STATUS_COMPLETED,
+            pointsToGrant = points,
+            markCompleted = true,
+            countTowardPopularity = !alreadyCompleted
+        )
     }
 }

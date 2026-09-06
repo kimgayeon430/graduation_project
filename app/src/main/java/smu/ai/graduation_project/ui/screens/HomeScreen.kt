@@ -50,12 +50,20 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import android.Manifest
+import android.content.Context
+import android.content.pm.PackageManager
+import android.location.LocationManager
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import com.google.firebase.Firebase
 import com.google.firebase.auth.auth
+import com.google.firebase.firestore.GeoPoint
 import com.google.firebase.firestore.firestore
+import smu.ai.graduation_project.domain.GeoDistance
 import smu.ai.graduation_project.domain.MissionRecommender
 import smu.ai.graduation_project.domain.MissionScorer
 import smu.ai.graduation_project.domain.RecommendationContext
@@ -69,6 +77,7 @@ import smu.ai.graduation_project.ui.theme.Orange
 
 @Composable
 fun HomeScreen(onNavigateToDetail: (String) -> Unit) {
+    val context = LocalContext.current
     val user = Firebase.auth.currentUser
     var points by remember { mutableLongStateOf(0L) }
     var userName by remember { mutableStateOf(user?.displayName ?: "Traveler") }
@@ -80,7 +89,28 @@ fun HomeScreen(onNavigateToDetail: (String) -> Unit) {
     var completedMissionIds by remember { mutableStateOf<Set<String>>(emptySet()) }
     var preferences by remember { mutableStateOf<List<String>>(emptyList()) }
     var level by remember { mutableIntStateOf(1) }
+    var missionGeo by remember { mutableStateOf<Map<String, GeoPoint>>(emptyMap()) }
+    var completionCounts by remember { mutableStateOf<Map<String, Int>>(emptyMap()) }
+    var userLatLng by remember { mutableStateOf<Pair<Double, Double>?>(null) }
     var missionsLoaded by remember { mutableStateOf(false) }
+
+    // 위치 권한이 이미 허용돼 있으면 마지막 known location 을 읽는다. (홈에서 새로 팝업은 띄우지 않음)
+    LaunchedEffect(Unit) {
+        val granted = ContextCompat.checkSelfPermission(
+            context, Manifest.permission.ACCESS_FINE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED || ContextCompat.checkSelfPermission(
+            context, Manifest.permission.ACCESS_COARSE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED
+        if (!granted) return@LaunchedEffect
+        val lm = context.getSystemService(Context.LOCATION_SERVICE) as? LocationManager
+            ?: return@LaunchedEffect
+        val best = try {
+            lm.getProviders(true).mapNotNull { lm.getLastKnownLocation(it) }.maxByOrNull { it.time }
+        } catch (e: SecurityException) {
+            null
+        }
+        if (best != null) userLatLng = best.latitude to best.longitude
+    }
 
     LaunchedEffect(user?.uid) {
         // 추천 후보로 쓸 전체 미션 (읽기 전용 — 일반 미션 목록/관리자 기능과 무관)
@@ -95,6 +125,12 @@ fun HomeScreen(onNavigateToDetail: (String) -> Unit) {
                         points = doc.getLong("points")?.toInt() ?: 0,
                         category = doc.getString("category") ?: "투어"
                     )
+                }
+                missionGeo = snapshot.documents.mapNotNull { doc ->
+                    doc.getGeoPoint("location")?.let { doc.id to it }
+                }.toMap()
+                completionCounts = snapshot.documents.associate { doc ->
+                    doc.id to (doc.getLong("completionCount")?.toInt() ?: 0)
                 }
                 missionsLoaded = true
             }
@@ -146,9 +182,20 @@ fun HomeScreen(onNavigateToDetail: (String) -> Unit) {
         }
     }
 
+    // 사용자 현재 위치 ↔ 각 미션 목표 지점 거리(m). 위치를 모르면 빈 맵.
+    val distances = remember(missionGeo, userLatLng) {
+        val loc = userLatLng
+        if (loc == null) emptyMap<String, Double>()
+        else missionGeo.mapValues { (_, geo) ->
+            GeoDistance.meters(loc.first, loc.second, geo.latitude, geo.longitude)
+        }
+    }
+
     // 규칙 기반 추천: 진행 중 미션이 있으면 그것을 우선 표시, 없으면 점수 기반 추천 상위 3건.
-    // 점수 = 명시적 취향 + 암묵적 취향(완료 이력) + 난이도 적합도 − 다양성 감점 (MissionScorer)
-    val recommendations = remember(allMissions, preferences, completedMissionIds, level) {
+    // 점수 = 명시적 취향 + 암묵적 취향(완료 이력) + 난이도 적합도 + 거리 근접도 + 인기도 − 다양성 감점
+    val recommendations = remember(
+        allMissions, preferences, completedMissionIds, level, distances, completionCounts
+    ) {
         MissionRecommender.recommendScored(
             missions = allMissions,
             context = RecommendationContext(
@@ -157,7 +204,9 @@ fun HomeScreen(onNavigateToDetail: (String) -> Unit) {
                     .filter { it.id in completedMissionIds }
                     .groupingBy { it.category }
                     .eachCount(),
-                userLevel = level
+                userLevel = level,
+                distanceMetersByMissionId = distances,
+                completionCountByMissionId = completionCounts
             ),
             completedMissionIds = completedMissionIds,
             limit = 3

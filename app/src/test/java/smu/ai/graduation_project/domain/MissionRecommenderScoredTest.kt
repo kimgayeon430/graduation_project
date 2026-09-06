@@ -116,6 +116,26 @@ class MissionRecommenderScoredTest {
         assertEquals(listOf("a", "b", "c"), result.map { it.mission.id })
     }
 
+    // 다른 신호가 같으면 완료자가 많은(인기) 미션이 먼저 온다
+    @Test
+    fun popularityBreaksTies() {
+        val missions = listOf(
+            mission("a", "투어"),
+            mission("b", "투어"),
+            mission("c", "투어")
+        )
+        val result = MissionRecommender.recommendScored(
+            missions = missions,
+            context = RecommendationContext(
+                completionCountByMissionId = mapOf("a" to 1, "b" to 20, "c" to 5)
+            ),
+            completedMissionIds = emptyList(),
+            limit = 1
+        )
+        assertEquals("b", result.first().mission.id)
+        assertTrue(result.first().reasons.contains("인기 미션"))
+    }
+
     @Test
     fun returnsEmptyWhenNoCandidates() {
         assertTrue(

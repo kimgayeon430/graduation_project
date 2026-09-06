@@ -13,6 +13,10 @@ data class RecommendationWeights(
     val implicitAffinity: Double = 2.0,
     /** 미션 난이도(포인트대)가 사용자 레벨에 맞을수록 주는 가산치. */
     val difficultyFit: Double = 1.0,
+    /** 미션이 사용자 현재 위치에 가까울수록 주는 가산치. */
+    val proximity: Double = 1.5,
+    /** 다른 사용자가 많이 완료한 미션에 주는 가산치. */
+    val popularity: Double = 1.0,
     /** 추천 목록에 같은 카테고리가 하나 쌓일 때마다 빼는 감점치 (다양성). */
     val diversityPenalty: Double = 2.0
 ) {

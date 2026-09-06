@@ -125,6 +125,7 @@ class FirebaseMissionRepository : MissionRepository {
         val storageRef = storage.reference.child(storagePath)
         val userMissionRef = db.collection("user_missions").document(userMissionDocId)
         val userRef = db.collection("users").document(uid)
+        val missionRef = db.collection("missions").document(missionId)
 
         storageRef.putFile(photoUri)
             .continueWithTask { task ->
@@ -164,6 +165,14 @@ class FirebaseMissionRepository : MissionRepository {
                         transaction.set(
                             userRef,
                             mapOf("points" to FieldValue.increment(outcome.pointsToGrant.toLong())),
+                            SetOptions.merge()
+                        )
+                    }
+                    // 이 사용자가 처음 완료할 때만 미션 인기도(completionCount) 를 올린다.
+                    if (outcome.countTowardPopularity) {
+                        transaction.set(
+                            missionRef,
+                            mapOf("completionCount" to FieldValue.increment(1L)),
                             SetOptions.merge()
                         )
                     }
