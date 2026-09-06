@@ -1,4 +1,4 @@
-﻿package smu.ai.graduation_project.ui.screens
+package smu.ai.graduation_project.ui.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -22,18 +22,19 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Circle
 import androidx.compose.material.icons.filled.Image
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -69,16 +70,27 @@ fun MissionListScreen(onMissionClick: (String) -> Unit) {
     )
     var selectedCategory by remember { mutableStateOf(categories.first()) }
     var missions by remember { mutableStateOf<List<Mission>>(emptyList()) }
+    var showMap by rememberSaveable { mutableStateOf(false) }
+    var loading by remember { mutableStateOf(true) }
+    var loadError by remember { mutableStateOf<String?>(null) }
+    var reload by remember { mutableStateOf(0) }
     val db = Firebase.firestore
     val user = Firebase.auth.currentUser
 
-    LaunchedEffect(selectedCategory, user?.uid) {
+    DisposableEffect(selectedCategory, user?.uid, reload) {
+        var active = true
+        loading = true
+        loadError = null
+        missions = emptyList()
         val query = selectedCategory.dbValue?.let {
             db.collection("missions").whereEqualTo("category", it)
         } ?: db.collection("missions")
 
         query.get().addOnSuccessListener { missionSnapshot ->
+            if (!active) return@addOnSuccessListener
             val loadedMissions = missionSnapshot.documents.map { doc ->
+                val location = doc.getGeoPoint("location")
+
                 Mission(
                     id = doc.id,
                     title = doc.getString("title") ?: "제목 없는 미션",
@@ -88,48 +100,67 @@ fun MissionListScreen(onMissionClick: (String) -> Unit) {
                     imageUrl = doc.getString("imageUrl").orEmpty(),
                     status = "미 진행",
                     progress = 0f,
-                    progressText = "0/1"
+                    progressText = "0/1",
+                    latitude = location?.latitude,
+                    longitude = location?.longitude
                 )
             }
 
             if (user == null) {
                 missions = loadedMissions
+                loading = false
             } else {
                 db.collection("user_missions")
                     .whereEqualTo("userId", user.uid)
                     .get()
                     .addOnSuccessListener { userMissionSnapshot ->
-                        val byMissionId = userMissionSnapshot.documents.associateBy {
-                            it.getString("missionId").orEmpty()
-                        }
-                        missions = loadedMissions.map { mission ->
-                            val userMission = byMissionId[mission.id]
-                            val rawStatus = userMission?.getString("status").orEmpty()
-                            val progress = userMission?.get("progress")?.toString()?.toFloatOrNull() ?: 0f
-                            val normalizedStatus = when {
-                                rawStatus.contains("완료") || rawStatus.equals("Completed", true) -> "완료"
-                                rawStatus.contains("진행") || rawStatus.equals("In Progress", true) -> "진행중"
-                                else -> "미 진행"
+                        if (active) {
+                            val byMissionId = userMissionSnapshot.documents.associateBy {
+                                it.getString("missionId").orEmpty()
                             }
-                            mission.copy(
-                                status = normalizedStatus,
-                                progress = progress.coerceIn(0f, 1f),
-                                progressText = if (progress >= 1f) "1/1" else if (progress > 0f) "2/3" else "0/1"
-                            )
+                            missions = loadedMissions.map { mission ->
+                                val userMission = byMissionId[mission.id]
+                                val rawStatus = userMission?.getString("status").orEmpty()
+                                val progress = userMission?.get("progress")?.toString()?.toFloatOrNull() ?: 0f
+                                val normalizedStatus = when {
+                                    rawStatus.contains("완료") || rawStatus.equals("Completed", true) -> "완료"
+                                    rawStatus.contains("진행") || rawStatus.equals("In Progress", true) -> "진행중"
+                                    else -> "미 진행"
+                                }
+                                mission.copy(
+                                    status = normalizedStatus,
+                                    progress = progress.coerceIn(0f, 1f),
+                                    progressText = if (progress >= 1f) "1/1" else if (progress > 0f) "2/3" else "0/1"
+                                )
+                            }
+                            loading = false
+                        }
+                    }
+                    .addOnFailureListener {
+                        if (active) {
+                            missions = loadedMissions
+                            loading = false
+                            loadError = "미션 진행 상태를 불러오지 못했습니다."
                         }
                     }
             }
+        }.addOnFailureListener {
+            if (active) {
+                loading = false
+                loadError = "미션을 불러오지 못했습니다. 연결 상태를 확인하고 다시 시도해 주세요."
+            }
         }
+        onDispose { active = false }
     }
 
     Scaffold(
         containerColor = Color.White,
         topBar = {
             CenterAlignedTopAppBar(
-                title = { Text("미션 목록", fontWeight = FontWeight.Bold, fontSize = 20.sp) },
+                title = { Text(if (showMap) "미션 지도" else "미션 목록", fontWeight = FontWeight.Bold, fontSize = 20.sp) },
                 actions = {
-                    IconButton(onClick = { }) {
-                        Icon(Icons.Default.Search, null)
+                    TextButton(onClick = { showMap = !showMap }) {
+                        Text(if (showMap) "목록 보기" else "지도 보기")
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.White)
@@ -167,13 +198,33 @@ fun MissionListScreen(onMissionClick: (String) -> Unit) {
                 }
             }
 
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                items(missions) { mission ->
-                    MissionListCard(mission = mission, onClick = { onMissionClick(mission.id) })
+            loadError?.let { message ->
+                Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically) {
+                    Text(message, modifier = Modifier.weight(1f), color = Color.DarkGray)
+                    TextButton(onClick = { reload++ }) { Text("다시 시도") }
+                }
+            }
+
+            if (loading) {
+                Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator()
+                }
+            } else if (showMap) {
+                MissionMapScreen(
+                    missions = missions,
+                    onMissionClick = onMissionClick,
+                    modifier = Modifier.fillMaxWidth().weight(1f)
+                )
+            } else {
+                LazyColumn(
+                    modifier = Modifier.fillMaxWidth().weight(1f),
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    items(missions) { mission ->
+                        MissionListCard(mission = mission, onClick = { onMissionClick(mission.id) })
+                    }
                 }
             }
         }

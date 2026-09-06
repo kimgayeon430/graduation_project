@@ -9,7 +9,9 @@ data class Mission(
     val imageUrl: String = "",
     val status: String = "미 진행",
     val progress: Float = 0f,
-    val progressText: String = "0/1"
+    val progressText: String = "0/1",
+    val latitude: Double? = null,
+    val longitude: Double? = null
 )
 
 data class UserRank(

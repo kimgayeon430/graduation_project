@@ -213,7 +213,7 @@ fun MissionDetailScreen(
                         } else {
                             isStarting = true
                             
-                            val userMissionId = "\${user.uid}_\${currentMission.id}"
+                            val userMissionId = "${user.uid}_${currentMission.id}"
                             val userMissionRef = db.collection("user_missions")
                                 .document(userMissionId)
 
