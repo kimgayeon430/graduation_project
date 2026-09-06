@@ -12,7 +12,9 @@
 - Firebase Authentication 기반 회원가입, 로그인 및 로그아웃
 - 로그인 없이 둘러볼 수 있는 게스트 진입
 - 회원가입 직후 여행 취향(투어·맛집·체험·쇼핑) 복수 선택 및 저장
+- 기존 사용자는 `preferences` 유무를 판정(gate)해 취향 선택 화면을 건너뛰거나 거침
 - 전체 미션 목록 조회 및 상세 정보 확인
+- 미션 목록 ↔ **네이버 지도** 전환: 좌표가 있는 미션을 지도 마커로 모아 보고, 마커를 눌러 상세로 이동
 - 미션별 GPS 위치 인증 (목표 지점 반경 200m 이내)
 - 위치 인증 후 카메라 촬영 → 미리보기 → Supabase Storage 업로드로 사진 인증
 - 인증 단계별 포인트 지급 및 진행 상태 저장 (중복 지급 방지)
@@ -33,13 +35,14 @@
 
 | 구분 | 기술 |
 | --- | --- |
-| Language | Kotlin |
-| UI | Jetpack Compose, Material 3 |
-| Navigation | Navigation Compose |
-| Backend | Firebase Authentication, Cloud Firestore |
+| Language | Kotlin 2.2.10 |
+| UI | Jetpack Compose (BOM 2026.02.01), Material 3, Compose Compiler 플러그인 |
+| Navigation | Navigation Compose (루트 그래프 + 하단 탭 그래프 2단 구성) |
+| Backend | Firebase Authentication(Email/Password), Cloud Firestore |
+| 지도 | 네이버 지도 SDK `com.naver.maps:map-sdk` (미션 위치 마커·정보창) |
 | 이미지 저장 | Supabase Storage (public 버킷 + anon 업로드 정책) |
 | Image Loading | Coil |
-| Build | Gradle Kotlin DSL, Version Catalog |
+| Build | Gradle 9.4.1 (Kotlin DSL), Version Catalog, AGP 9.2.0, `compileSdk 36` / `minSdk 26` / `targetSdk 36` |
 | Architecture | 미션 수행 기능을 ViewModel · Repository(인터페이스/Firebase 구현) · 순수 도메인 로직으로 분리 |
 | Testing | JUnit4 단위 테스트 (도메인 규칙) |
 
@@ -79,10 +82,33 @@ AI 모델 없이 현재 데이터만으로 설명 가능한 점수 규칙으로 
 
 신규 가입자는 회원가입 직후 취향 선택 화면으로 이동하고, 기존 사용자는 `preferences` 가 없을 때만 이 화면을 거칩니다.
 
+## 미션 지도
+
+미션 목록 화면 우상단의 **지도 보기 / 목록 보기** 토글로 같은 미션을 리스트와 네이버 지도로 번갈아 볼 수 있습니다. (`MissionMapScreen`)
+
+- 위도·경도가 모두 유효한(유한값) 미션만 지도에 표시하고, 나머지는 리스트에서만 노출합니다.
+- 거의 같은 좌표의 미션은 하나의 마커로 묶어 정보창(`InfoWindow`)에 개수를 표시합니다.
+- 마커/정보창을 누르면 해당 미션 상세로 이동합니다.
+- `MapView` 는 Compose `AndroidView` 로 감싸고 `Lifecycle` 이벤트와 `rememberSaveable` 로 상태(카메라 위치 등)를 화면 회전에도 유지합니다.
+- 네이버 지도 인증 키(`NCP_KEY_ID`)는 `local.properties` → `manifestPlaceholders` 로 주입되어 VCS 에 올라가지 않습니다.
+
+## 앱 내비게이션
+
+내비게이션은 두 개의 `NavHost` 로 나뉩니다.
+
+| 그래프 | 경로 | 설명 |
+| --- | --- | --- |
+| 루트 | `landing` → `signup` / `login` → `gate` / `preference` → `main` | 인증·온보딩 흐름. 로그인 상태면 `gate`, 아니면 `landing` 에서 시작 |
+| 메인(하단 탭) | `home`, `mission`, `add`(관리자), `ranking`, `profile` | `main` 진입 후 표시. 상세·수행·관리자 화면은 이 그래프의 하위 경로 |
+
+- `gate` 는 로그인된 기존 사용자의 `users/{uid}.preferences` 유무를 확인해 `main` 또는 `preference` 로 분기합니다. (조회 실패 시 앱을 막지 않고 `main` 으로 진행)
+- `admins/{uid}` 문서가 있는 사용자에게만 하단 탭에 **Admin** 항목이 보이고, 관리자 경로는 진입 시 권한을 재확인합니다.
+
 ## 프로젝트 구조
 
 ```text
 app/src/main/java/smu/ai/graduation_project
+├── MainActivity.kt # 루트/메인 NavHost, 하단 탭, 인증·권한 게이트
 ├── data/           # Repository 인터페이스·Firebase 구현, Supabase Storage 업로드
 ├── domain/         # Firebase 비의존 순수 로직 (거리·보상·완료·취향·추천 규칙)
 ├── model/          # Mission, UserRank 등 데이터 모델
@@ -90,7 +116,7 @@ app/src/main/java/smu/ai/graduation_project
 └── ui/
     ├── admin/      # 미션·사용자 관리 화면
     ├── components/ # 공통 Compose 컴포넌트
-    ├── screens/    # 랜딩·로그인·홈·미션·취향 선택·랭킹·프로필 화면 및 ViewModel
+    ├── screens/    # 랜딩·로그인·홈·미션 목록/상세/지도·수행·취향 선택·랭킹·프로필 및 ViewModel
     └── theme/      # 색상, 타이포그래피, 앱 테마
 
 app/src/test/java/smu/ai/graduation_project
@@ -123,11 +149,20 @@ app/src/test/java/smu/ai/graduation_project
 
 ### 요구 환경
 
-- Android Studio
-- JDK 11 이상 (Gradle 실행에는 JDK 17 이상 권장)
-- Android SDK 26 이상
+- Android Studio (AGP 9.2.0 / Gradle 9.4.1 지원 버전)
+- JDK 17 이상 (Gradle 실행용)
+- Android SDK 36 (`compileSdk 36`), 실행 기기·에뮬레이터는 Android 8.0(API 26) 이상
 - Email/Password 인증과 Firestore가 활성화된 Firebase 프로젝트
 - 사진 업로드용 Supabase 프로젝트 (무료 플랜, 결제 수단 불필요)
+- 네이버 클라우드 플랫폼 **Maps** 이용 신청 후 발급받은 Client ID (지도 화면용)
+
+### 필요 권한
+
+| 권한 | 용도 |
+| --- | --- |
+| `INTERNET` | Firebase·Supabase·지도 통신 |
+| `ACCESS_FINE_LOCATION` / `ACCESS_COARSE_LOCATION` | 1단계 GPS 위치 인증, 추천의 거리 근접도 |
+| `CAMERA` | 2단계 사진 인증 촬영 |
 
 ### 실행
 
@@ -146,12 +181,15 @@ cd graduation_project
    on storage.objects for insert to anon
    with check (bucket_id = 'mission-photos');
    ```
-6. `local.properties` 에 Supabase 설정을 추가합니다. (anon/publishable 키는 클라이언트 노출용이라 안전)
+6. 네이버 클라우드 플랫폼 콘솔에서 **Maps** 이용 신청 후 애플리케이션을 등록하고, Android 앱 패키지 이름 `smu.ai.graduation_project` 을 추가합니다.
+7. `local.properties` 에 Supabase·네이버 지도 설정을 추가합니다. (anon/publishable 키와 지도 Client ID 는 클라이언트 노출용이라 안전, `local.properties` 는 VCS 에 올라가지 않음)
    ```properties
    SUPABASE_URL=https://<프로젝트>.supabase.co
    SUPABASE_ANON_KEY=<anon 또는 publishable 키>
+   NAVER_MAP_CLIENT_ID=<네이버 클라우드 플랫폼 Maps Client ID>
    ```
-7. Gradle Sync 후 에뮬레이터 또는 Android 기기에서 앱을 실행합니다.
+   이 값들은 `app/build.gradle.kts` 에서 각각 `BuildConfig` 필드와 `manifestPlaceholders` 로 주입됩니다.
+8. Gradle Sync 후 에뮬레이터 또는 Android 기기에서 앱을 실행합니다. (터미널에서는 `./gradlew installDebug`)
 
 ### 단위 테스트
 
@@ -162,15 +200,22 @@ cd graduation_project
 > 사용자 홈 경로에 한글 등 비 ASCII 문자가 있으면 Gradle 테스트 워커가 실행되지 않습니다.
 > 이 경우 `GRADLE_USER_HOME` 을 ASCII 경로로 지정해 실행하세요. 예: `GRADLE_USER_HOME=D:\gradle-home ./gradlew :app:testDebugUnitTest`
 
+### 빌드 문제 해결
+
+- **`Gradle build daemon disappeared unexpectedly` / Sync 실패**: 빌드 스크립트 문제가 아니라 메모리 부족으로 데몬이 종료된 경우가 많습니다. Android Studio·브라우저 등을 정리해 RAM 을 확보한 뒤 다시 Sync 하세요. `gradle.properties` 는 저사양(RAM 8GB) 환경을 기준으로 데몬 힙(`-Xmx1536m`)과 동시 워커 수(`org.gradle.workers.max=2`)를 낮춰 두었습니다.
+- 데몬이 꼬였을 때는 `./gradlew --stop` 으로 모든 데몬을 정리한 뒤 다시 실행합니다.
+- IDE Gradle 설정(JDK·JVM 옵션)이 `gradle.properties` 보다 우선하므로, 값이 반영되지 않으면 Settings → Build Tools → Gradle 을 확인하세요.
+
 ## 구현 화면
 
 - 랜딩 및 로그인·회원가입
 - 여행 취향 선택
 - 홈(선호 기반 추천)과 미션 목록·상세
+- 미션 지도(네이버 지도, 마커 → 상세 이동)
 - GPS·사진 기반 미션 수행
 - 진행 중인 미션
 - 포인트 랭킹 및 프로필
-- 관리자 미션 관리
+- 관리자 미션 관리 (위치 좌표 입력 포함)
 - 관리자 사용자 관리
 
 ## 향후 개선 계획
