@@ -151,18 +151,33 @@ private fun PreferenceGate(
     onReady: () -> Unit
 ) {
     val uid = Firebase.auth.currentUser?.uid
+    // null = 판정 중, true = 메인으로, false = 취향 선택 필요
+    var isReady by remember { mutableStateOf<Boolean?>(null) }
+
     LaunchedEffect(uid) {
         if (uid == null) {
-            onReady()
+            isReady = true
             return@LaunchedEffect
         }
         Firebase.firestore.collection("users").document(uid).get()
             .addOnSuccessListener { doc ->
                 val prefs = doc.get("preferences") as? List<*>
-                if (doc.exists() && !prefs.isNullOrEmpty()) onReady() else onNeedsPreference()
+                isReady = doc.exists() && !prefs.isNullOrEmpty()
             }
-            .addOnFailureListener { onReady() }
+            .addOnFailureListener { isReady = true }
     }
+
+    // 내비게이션은 조회 콜백에서 바로 호출하지 않고 컴포지션이 안정된 뒤 수행한다.
+    // (초기 컴포지션 중 navigate 하면 gate 백스택 엔트리가 CREATED 에 도달하기 전에
+    //  파괴되어 IllegalStateException 이 발생한다.)
+    LaunchedEffect(isReady) {
+        when (isReady) {
+            true -> onReady()
+            false -> onNeedsPreference()
+            null -> Unit
+        }
+    }
+
     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         CircularProgressIndicator(color = MainPurple)
     }

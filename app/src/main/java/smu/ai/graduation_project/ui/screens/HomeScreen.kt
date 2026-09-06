@@ -105,7 +105,8 @@ fun HomeScreen(onNavigateToDetail: (String) -> Unit) {
                 if (snapshot != null && snapshot.exists()) {
                     points = snapshot.getLong("points") ?: 0L
                     userName = snapshot.getString("nickname") ?: user.displayName ?: "Traveler"
-                    level = snapshot.getLong("level")?.toInt() ?: 1
+                    // level 은 "Lv.1" 형태의 문자열로 저장된다 → 숫자 부분만 추출
+                    level = snapshot.getString("level")?.filter { it.isDigit() }?.toIntOrNull() ?: 1
                     @Suppress("UNCHECKED_CAST")
                     preferences = (snapshot.get("preferences") as? List<String>).orEmpty()
                 }
