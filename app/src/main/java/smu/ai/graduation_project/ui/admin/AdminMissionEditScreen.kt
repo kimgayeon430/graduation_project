@@ -33,6 +33,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.google.firebase.Firebase
+import com.google.firebase.firestore.FieldValue
+import com.google.firebase.firestore.GeoPoint
+import com.google.firebase.firestore.SetOptions
 import com.google.firebase.firestore.firestore
 import smu.ai.graduation_project.ui.theme.MainPurple
 
@@ -52,6 +55,8 @@ fun AdminMissionEditScreen(
     var category by remember { mutableStateOf("투어") }
     var points by remember { mutableIntStateOf(100) }
     var imageUrl by remember { mutableStateOf("") }
+    var latitude by remember { mutableStateOf("") }
+    var longitude by remember { mutableStateOf("") }
     var isSaving by remember { mutableStateOf(false) }
 
     LaunchedEffect(missionId) {
@@ -62,6 +67,10 @@ fun AdminMissionEditScreen(
                 category = doc.getString("category") ?: "투어"
                 points = doc.getLong("points")?.toInt() ?: 100
                 imageUrl = doc.getString("imageUrl").orEmpty()
+                doc.getGeoPoint("location")?.let {
+                    latitude = it.latitude.toString()
+                    longitude = it.longitude.toString()
+                }
             }
         }
     }
@@ -94,22 +103,42 @@ fun AdminMissionEditScreen(
             OutlinedTextField(points.toString(), { points = it.toIntOrNull() ?: 0 }, modifier = Modifier.fillMaxWidth(), label = { Text("포인트") })
             OutlinedTextField(imageUrl, { imageUrl = it }, modifier = Modifier.fillMaxWidth(), label = { Text("이미지 URL") })
 
+            Text("위치 (선택 — 거리 기반 추천에 사용)", fontWeight = FontWeight.Bold)
+            OutlinedTextField(latitude, { latitude = it }, modifier = Modifier.fillMaxWidth(), label = { Text("위도 latitude (예: 37.5559)") })
+            OutlinedTextField(longitude, { longitude = it }, modifier = Modifier.fillMaxWidth(), label = { Text("경도 longitude (예: 126.9707)") })
+
             Button(
                 onClick = {
                     if (title.isBlank() || desc.isBlank() || category.isBlank()) {
                         Toast.makeText(context, "필수 항목을 입력하세요.", Toast.LENGTH_SHORT).show()
                         return@Button
                     }
+                    val latText = latitude.trim()
+                    val lngText = longitude.trim()
+                    val lat = latText.toDoubleOrNull()
+                    val lng = lngText.toDoubleOrNull()
+                    val hasLocationInput = latText.isNotEmpty() || lngText.isNotEmpty()
+                    if (hasLocationInput &&
+                        (lat == null || lng == null || lat !in -90.0..90.0 || lng !in -180.0..180.0)
+                    ) {
+                        Toast.makeText(context, "위도/경도를 올바르게 입력하세요.", Toast.LENGTH_SHORT).show()
+                        return@Button
+                    }
                     isSaving = true
-                    val payload = mapOf(
-                        "title" to title.trim(),
-                        "desc" to desc.trim(),
-                        "category" to category.trim(),
-                        "points" to points,
-                        "imageUrl" to imageUrl.trim()
-                    )
+                    val payload = buildMap<String, Any> {
+                        put("title", title.trim())
+                        put("desc", desc.trim())
+                        put("category", category.trim())
+                        put("points", points)
+                        put("imageUrl", imageUrl.trim())
+                        when {
+                            lat != null && lng != null -> put("location", GeoPoint(lat, lng))
+                            isEdit -> put("location", FieldValue.delete())
+                        }
+                    }
                     val task = if (isEdit) {
-                        db.collection("missions").document(missionId!!).set(payload)
+                        // completionCount 등 다른 필드를 보존하도록 merge
+                        db.collection("missions").document(missionId!!).set(payload, SetOptions.merge())
                     } else {
                         db.collection("missions").add(payload)
                     }
