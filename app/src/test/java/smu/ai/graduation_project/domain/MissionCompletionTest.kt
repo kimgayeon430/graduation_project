@@ -48,6 +48,27 @@ class MissionCompletionTest {
         assertEquals("In Progress", outcome.newStatus)
         assertFalse(outcome.markCompleted)
         assertEquals(0, outcome.pointsToGrant)
+        assertFalse(outcome.countTowardPopularity)
+    }
+
+    // 처음 완료할 때만 인기도(completionCount) 를 올린다
+    @Test
+    fun popularityCountsOnlyOnFirstCompletion() {
+        val first = MissionCompletion.resolve(
+            currentStatus = "In Progress",
+            missionPoints = 250,
+            stage2AlreadyGranted = false,
+            uploadSucceeded = true
+        )
+        assertTrue(first.countTowardPopularity)
+
+        val again = MissionCompletion.resolve(
+            currentStatus = "Completed",
+            missionPoints = 250,
+            stage2AlreadyGranted = true,
+            uploadSucceeded = true
+        )
+        assertFalse(again.countTowardPopularity)
     }
 
     // 8. 완료 요청을 반복해도 포인트가 중복 지급되지 않음

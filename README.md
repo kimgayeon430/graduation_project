@@ -14,7 +14,7 @@
 - 회원가입 직후 여행 취향(투어·맛집·체험·쇼핑) 복수 선택 및 저장
 - 전체 미션 목록 조회 및 상세 정보 확인
 - 미션별 GPS 위치 인증 (목표 지점 반경 200m 이내)
-- 위치 인증 후 카메라 촬영 → 미리보기 → Firebase Storage 업로드로 사진 인증
+- 위치 인증 후 카메라 촬영 → 미리보기 → Supabase Storage 업로드로 사진 인증
 - 인증 단계별 포인트 지급 및 진행 상태 저장 (중복 지급 방지)
 - 진행 중인 미션 확인 및 이어서 수행
 - 홈에서 선호 카테고리를 우선한 규칙 기반 미션 추천 (완료한 미션 제외)
@@ -24,7 +24,7 @@
 ### 관리자
 
 - Firestore의 관리자 계정을 기반으로 사용자와 관리자 화면 분리
-- 미션 등록, 수정 및 삭제
+- 미션 등록, 수정 및 삭제 (제목·설명·카테고리·포인트·이미지·위치 좌표)
 - 전체 사용자와 미션 진행 현황 조회
 - 사용자별 포인트, 레벨, 완료·진행 미션 확인
 - 관리자 권한 부여 및 해제
@@ -36,7 +36,8 @@
 | Language | Kotlin |
 | UI | Jetpack Compose, Material 3 |
 | Navigation | Navigation Compose |
-| Backend | Firebase Authentication, Cloud Firestore, Cloud Storage |
+| Backend | Firebase Authentication, Cloud Firestore |
+| 이미지 저장 | Supabase Storage (public 버킷 + anon 업로드 정책) |
 | Image Loading | Coil |
 | Build | Gradle Kotlin DSL, Version Catalog |
 | Architecture | 미션 수행 기능을 ViewModel · Repository(인터페이스/Firebase 구현) · 순수 도메인 로직으로 분리 |
@@ -52,20 +53,29 @@
    - 1단계 보상 = `min(미션 포인트, 100)`
 2. **2단계 · 사진 인증**
    - 카메라로 사진을 촬영하고 미리보기로 확인합니다. (`FileProvider` + `TakePicture`)
-   - 사진을 `mission_photos/{missionId}/{uid}_{timestamp}.jpg` 로 업로드합니다.
-   - 업로드가 성공한 뒤에만 트랜잭션으로 미션을 `Completed` 처리하고 2단계 보상을 지급하며, `photoUrl`·`photoStoragePath`·`photoVerified`·`photoUploadedAt` 을 저장합니다.
+   - 사진을 Supabase Storage 버킷 `mission-photos` 의 `{missionId}/{uid}_{timestamp}.jpg` 로 업로드하고 공개 URL 을 받습니다. (`SupabaseStorage`, 백그라운드 스레드)
+   - 업로드가 성공한 뒤에만 트랜잭션으로 미션을 `Completed` 처리하고 2단계 보상을 지급하며, `photoUrl`(Supabase 공개 URL)·`photoStoragePath`·`photoVerified`·`photoUploadedAt` 을 저장합니다.
    - 2단계 보상 = `미션 포인트 - 1단계 보상`
    - 업로드나 저장이 실패하면 미션은 완료되지 않으며, 재시도해도 포인트는 한 번만 지급됩니다.
+   - 사용자가 처음 완료할 때 같은 트랜잭션에서 `missions/{id}.completionCount` 를 1 올립니다. (추천 인기도 신호)
 
 ## 개인화 추천 (규칙 기반)
 
-AI 모델 없이 현재 데이터만으로 설명 가능한 규칙으로 홈의 추천 미션을 계산합니다. (`MissionRecommender`)
+AI 모델 없이 현재 데이터만으로 설명 가능한 점수 규칙으로 홈의 추천 미션 상위 3건을 계산합니다. (`MissionScorer` + `MissionRecommender.recommendScored`)
 
 1. id가 없거나 이미 완료한 미션은 후보에서 제외합니다.
-2. 사용자의 선호 카테고리(`users/{uid}.preferences`)에 속한 미션을 먼저 배치합니다.
-3. 자리가 남으면 나머지 카테고리 미션으로 채웁니다.
-4. 진행 중인 미션이 있으면 추천 대신 해당 미션을 노출합니다.
-5. 추천 결과가 없거나 조회에 실패하면 빈 화면 대신 안내 카드를 표시합니다.
+2. 후보마다 기본 점수를 매깁니다.
+   - **명시적 취향**: 미션 카테고리가 `users/{uid}.preferences` 에 포함되면 가산
+   - **암묵적 취향**: 그 카테고리 미션을 완료한 비율만큼 가산
+   - **난이도 적합도**: 미션 포인트대가 사용자 레벨 기대치에 가까울수록 가산
+   - **거리 근접도**: 미션 목표 지점이 현재 위치에 가까울수록 가산 (위치 권한이 이미 허용된 경우에만)
+   - **인기도**: 다른 사용자의 완료 횟수(`missions/{id}.completionCount`)가 많을수록 가산
+3. "기본 점수 − 다양성 감점 × 이미 뽑힌 같은 카테고리 수" 가 가장 높은 미션을 하나씩 3건 선택합니다.
+4. 각 추천에는 점수에 기여한 근거(예: `맛집 취향`, `자주 하는 유형`, `가까운 미션`, `인기 미션`)를 칩으로 표시합니다.
+5. 진행 중인 미션이 있으면 추천 대신 해당 미션을 노출합니다.
+6. 추천 결과가 없거나 조회에 실패하면 빈 화면 대신 안내 카드를 표시합니다.
+
+가중치는 `RecommendationWeights` 에 모여 있어 오프라인 평가 후 조정할 수 있습니다.
 
 신규 가입자는 회원가입 직후 취향 선택 화면으로 이동하고, 기존 사용자는 `preferences` 가 없을 때만 이 화면을 거칩니다.
 
@@ -73,7 +83,7 @@ AI 모델 없이 현재 데이터만으로 설명 가능한 규칙으로 홈의 
 
 ```text
 app/src/main/java/smu/ai/graduation_project
-├── data/           # Repository 인터페이스와 Firebase 구현 (미션 수행 데이터 접근)
+├── data/           # Repository 인터페이스·Firebase 구현, Supabase Storage 업로드
 ├── domain/         # Firebase 비의존 순수 로직 (거리·보상·완료·취향·추천 규칙)
 ├── model/          # Mission, UserRank 등 데이터 모델
 ├── navigation/     # 화면 경로 및 내비게이션 정의
@@ -96,17 +106,18 @@ app/src/test/java/smu/ai/graduation_project
 | `MissionRewardPolicy` | 1·2단계 보상 계산과 중복 지급 방지 규칙 |
 | `MissionCompletion` | 사진 인증 가능 여부·완료 처리 결과(`resolve`) 계산 |
 | `TravelPreference` | 취향 카테고리 정의, 최소 1개 선택 규칙, 저장용 정규화 |
-| `MissionRecommender` | 선호 우선·완료 제외·부족분 보충 규칙 기반 추천 |
+| `MissionScorer` | 명시적·암묵적 취향, 난이도 적합도, 거리 근접도, 인기도로 미션 기본 점수 계산 (근거 포함) |
+| `MissionRecommender` | 후보 필터 + 점수 정렬 + 다양성 감점으로 상위 N건 추천 |
 
-## Firestore · Storage 데이터
+## Firestore · Supabase Storage 데이터
 
 | 경로 | 주요 필드 |
 | --- | --- |
 | `users/{uid}` | `nickname`, `mail`, `points`, `level`, `preferences[]` |
-| `missions/{id}` | `title`, `desc`, `category`, `points`, `imageUrl`, `location`(GeoPoint) |
+| `missions/{id}` | `title`, `desc`, `category`, `points`, `imageUrl`, `location`(GeoPoint), `completionCount` |
 | `user_missions/{id}` | `userId`, `missionId`, `status`, `progress`, `stage1RewardGranted`, `stage2RewardGranted`, `photoUrl`, `photoStoragePath`, `photoVerified`, `photoUploadedAt`, `completedAt` |
 | `admins/{uid}` | `email`, `name` |
-| Storage `mission_photos/{missionId}/{uid}_{timestamp}.jpg` | 사진 인증 이미지 |
+| Supabase Storage `mission-photos/{missionId}/{uid}_{timestamp}.jpg` | 사진 인증 이미지 (공개 URL 로 접근) |
 
 ## 실행 방법
 
@@ -115,7 +126,8 @@ app/src/test/java/smu/ai/graduation_project
 - Android Studio
 - JDK 11 이상 (Gradle 실행에는 JDK 17 이상 권장)
 - Android SDK 26 이상
-- Email/Password 인증, Firestore, Storage가 활성화된 Firebase 프로젝트
+- Email/Password 인증과 Firestore가 활성화된 Firebase 프로젝트
+- 사진 업로드용 Supabase 프로젝트 (무료 플랜, 결제 수단 불필요)
 
 ### 실행
 
@@ -125,11 +137,21 @@ cd graduation_project
 ```
 
 1. Android Studio에서 프로젝트 루트 폴더를 엽니다.
-2. Firebase Console에서 Android 앱을 등록하고 Authentication·Firestore·Storage를 활성화합니다.
+2. Firebase Console에서 Android 앱을 등록하고 Authentication·Firestore를 활성화합니다.
 3. 발급받은 `google-services.json`을 `app/` 폴더에 추가합니다.
-4. Storage 보안 규칙에서 인증된 사용자가 `mission_photos/` 경로에 이미지를 업로드할 수 있도록 허용합니다.
-5. Gradle Sync를 완료합니다.
-6. 에뮬레이터 또는 Android 기기에서 앱을 실행합니다.
+4. Supabase에서 프로젝트를 만들고 Storage에 **public 버킷** `mission-photos` 를 생성합니다.
+5. 그 버킷에 anon INSERT 정책을 추가합니다. (SQL Editor에서)
+   ```sql
+   create policy "anon upload mission-photos"
+   on storage.objects for insert to anon
+   with check (bucket_id = 'mission-photos');
+   ```
+6. `local.properties` 에 Supabase 설정을 추가합니다. (anon/publishable 키는 클라이언트 노출용이라 안전)
+   ```properties
+   SUPABASE_URL=https://<프로젝트>.supabase.co
+   SUPABASE_ANON_KEY=<anon 또는 publishable 키>
+   ```
+7. Gradle Sync 후 에뮬레이터 또는 Android 기기에서 앱을 실행합니다.
 
 ### 단위 테스트
 
@@ -154,7 +176,7 @@ cd graduation_project
 ## 향후 개선 계획
 
 - 사진 인증 부정 방지(촬영 시각·위치 메타데이터 검증)와 관리자 검수 흐름
-- 수행 이력·시간대·인기도까지 반영한 추천 고도화
+- 시간대·미션 간 동시출현(협업 필터링)까지 반영한 추천 고도화 및 오프라인 평가(hit@k)
 - ViewModel·Repository 패턴을 홈·목록·관리자 등 나머지 화면으로 확대
-- Firestore·Storage 보안 규칙 정비 및 서버 사이드 포인트 검증
+- Firestore 보안 규칙 정비, Supabase Storage 업로드 서버 검증, 서버 사이드 포인트 검증
 - Compose UI 테스트와 Repository 계약 테스트 추가

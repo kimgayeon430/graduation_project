@@ -50,13 +50,23 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import android.Manifest
+import android.content.Context
+import android.content.pm.PackageManager
+import android.location.LocationManager
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import com.google.firebase.Firebase
 import com.google.firebase.auth.auth
+import com.google.firebase.firestore.GeoPoint
 import com.google.firebase.firestore.firestore
+import smu.ai.graduation_project.domain.GeoDistance
 import smu.ai.graduation_project.domain.MissionRecommender
+import smu.ai.graduation_project.domain.MissionScorer
+import smu.ai.graduation_project.domain.RecommendationContext
 import smu.ai.graduation_project.model.Mission
 import smu.ai.graduation_project.ui.theme.CardGray
 import smu.ai.graduation_project.ui.theme.GradientEnd
@@ -67,6 +77,7 @@ import smu.ai.graduation_project.ui.theme.Orange
 
 @Composable
 fun HomeScreen(onNavigateToDetail: (String) -> Unit) {
+    val context = LocalContext.current
     val user = Firebase.auth.currentUser
     var points by remember { mutableLongStateOf(0L) }
     var userName by remember { mutableStateOf(user?.displayName ?: "Traveler") }
@@ -77,7 +88,29 @@ fun HomeScreen(onNavigateToDetail: (String) -> Unit) {
     var allMissions by remember { mutableStateOf<List<Mission>>(emptyList()) }
     var completedMissionIds by remember { mutableStateOf<Set<String>>(emptySet()) }
     var preferences by remember { mutableStateOf<List<String>>(emptyList()) }
+    var level by remember { mutableIntStateOf(1) }
+    var missionGeo by remember { mutableStateOf<Map<String, GeoPoint>>(emptyMap()) }
+    var completionCounts by remember { mutableStateOf<Map<String, Int>>(emptyMap()) }
+    var userLatLng by remember { mutableStateOf<Pair<Double, Double>?>(null) }
     var missionsLoaded by remember { mutableStateOf(false) }
+
+    // 위치 권한이 이미 허용돼 있으면 마지막 known location 을 읽는다. (홈에서 새로 팝업은 띄우지 않음)
+    LaunchedEffect(Unit) {
+        val granted = ContextCompat.checkSelfPermission(
+            context, Manifest.permission.ACCESS_FINE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED || ContextCompat.checkSelfPermission(
+            context, Manifest.permission.ACCESS_COARSE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED
+        if (!granted) return@LaunchedEffect
+        val lm = context.getSystemService(Context.LOCATION_SERVICE) as? LocationManager
+            ?: return@LaunchedEffect
+        val best = try {
+            lm.getProviders(true).mapNotNull { lm.getLastKnownLocation(it) }.maxByOrNull { it.time }
+        } catch (e: SecurityException) {
+            null
+        }
+        if (best != null) userLatLng = best.latitude to best.longitude
+    }
 
     LaunchedEffect(user?.uid) {
         // 추천 후보로 쓸 전체 미션 (읽기 전용 — 일반 미션 목록/관리자 기능과 무관)
@@ -93,6 +126,12 @@ fun HomeScreen(onNavigateToDetail: (String) -> Unit) {
                         category = doc.getString("category") ?: "투어"
                     )
                 }
+                missionGeo = snapshot.documents.mapNotNull { doc ->
+                    doc.getGeoPoint("location")?.let { doc.id to it }
+                }.toMap()
+                completionCounts = snapshot.documents.associate { doc ->
+                    doc.id to (doc.getLong("completionCount")?.toInt() ?: 0)
+                }
                 missionsLoaded = true
             }
             .addOnFailureListener { missionsLoaded = true }
@@ -102,6 +141,8 @@ fun HomeScreen(onNavigateToDetail: (String) -> Unit) {
                 if (snapshot != null && snapshot.exists()) {
                     points = snapshot.getLong("points") ?: 0L
                     userName = snapshot.getString("nickname") ?: user.displayName ?: "Traveler"
+                    // level 은 "Lv.1" 형태의 문자열로 저장된다 → 숫자 부분만 추출
+                    level = snapshot.getString("level")?.filter { it.isDigit() }?.toIntOrNull() ?: 1
                     @Suppress("UNCHECKED_CAST")
                     preferences = (snapshot.get("preferences") as? List<String>).orEmpty()
                 }
@@ -141,16 +182,37 @@ fun HomeScreen(onNavigateToDetail: (String) -> Unit) {
         }
     }
 
-    // 규칙 기반 추천: 진행 중 미션이 있으면 그것을, 없으면 선호 카테고리 우선 추천 1건
-    val recommendedMission = remember(allMissions, preferences, completedMissionIds) {
-        MissionRecommender.recommend(
-            missions = allMissions,
-            preferences = preferences,
-            completedMissionIds = completedMissionIds,
-            limit = 1
-        ).firstOrNull()
+    // 사용자 현재 위치 ↔ 각 미션 목표 지점 거리(m). 위치를 모르면 빈 맵.
+    val distances = remember(missionGeo, userLatLng) {
+        val loc = userLatLng
+        if (loc == null) emptyMap<String, Double>()
+        else missionGeo.mapValues { (_, geo) ->
+            GeoDistance.meters(loc.first, loc.second, geo.latitude, geo.longitude)
+        }
     }
-    val displayMission = activeMission ?: recommendedMission?.copy(status = "추천")
+
+    // 규칙 기반 추천: 진행 중 미션이 있으면 그것을 우선 표시, 없으면 점수 기반 추천 상위 3건.
+    // 점수 = 명시적 취향 + 암묵적 취향(완료 이력) + 난이도 적합도 + 거리 근접도 + 인기도 − 다양성 감점
+    val recommendations = remember(
+        allMissions, preferences, completedMissionIds, level, distances, completionCounts
+    ) {
+        MissionRecommender.recommendScored(
+            missions = allMissions,
+            context = RecommendationContext(
+                preferredCategories = preferences.toSet(),
+                completedCountByCategory = allMissions
+                    .filter { it.id in completedMissionIds }
+                    .groupingBy { it.category }
+                    .eachCount(),
+                userLevel = level,
+                distanceMetersByMissionId = distances,
+                completionCountByMissionId = completionCounts
+            ),
+            completedMissionIds = completedMissionIds,
+            limit = 3
+        )
+    }
+    val showRecommendations = activeMission == null && recommendations.isNotEmpty()
 
     Column(
         modifier = Modifier
@@ -257,7 +319,7 @@ fun HomeScreen(onNavigateToDetail: (String) -> Unit) {
             }
         }
 
-        displayMission?.let { mission ->
+        activeMission?.let { mission ->
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(containerColor = Color.White),
@@ -311,7 +373,18 @@ fun HomeScreen(onNavigateToDetail: (String) -> Unit) {
             }
         }
 
-        if (displayMission == null && missionsLoaded) {
+        if (showRecommendations) {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                recommendations.forEach { scored ->
+                    RecommendedMissionCard(
+                        scored = scored,
+                        onClick = { onNavigateToDetail(scored.mission.id) }
+                    )
+                }
+            }
+        }
+
+        if (activeMission == null && recommendations.isEmpty() && missionsLoaded) {
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(containerColor = CardGray),
@@ -356,5 +429,75 @@ fun HomeScreen(onNavigateToDetail: (String) -> Unit) {
         }
 
         Spacer(modifier = Modifier.height(80.dp))
+    }
+}
+
+/** 점수 기반 추천 미션 1건. 추천 이유(칩)를 함께 보여 준다. */
+@Composable
+private fun RecommendedMissionCard(
+    scored: MissionScorer.Scored,
+    onClick: () -> Unit
+) {
+    val mission = scored.mission
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        shape = RoundedCornerShape(16.dp)
+    ) {
+        Row(
+            modifier = Modifier.padding(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(100.dp)
+                    .background(LightPurple, RoundedCornerShape(12.dp)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(Icons.Default.Landscape, contentDescription = null, tint = MainPurple, modifier = Modifier.size(40.dp))
+            }
+            Column(modifier = Modifier.width(220.dp)) {
+                Surface(color = MainPurple, shape = RoundedCornerShape(4.dp)) {
+                    Text(
+                        "추천",
+                        color = Color.White,
+                        fontSize = 10.sp,
+                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                    )
+                }
+                Text(mission.title, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                if (scored.reasons.isNotEmpty()) {
+                    Row(
+                        modifier = Modifier.padding(top = 2.dp),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        scored.reasons.take(2).forEach { reason ->
+                            Surface(color = LightPurple, shape = RoundedCornerShape(4.dp)) {
+                                Text(
+                                    reason,
+                                    color = MainPurple,
+                                    fontSize = 10.sp,
+                                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("보상", fontSize = 12.sp)
+                    Icon(Icons.Default.Stars, contentDescription = null, tint = Orange, modifier = Modifier.size(14.dp))
+                    Text(" ${mission.points}P", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+                Button(
+                    onClick = onClick,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(containerColor = MainPurple)
+                ) {
+                    Text("미션 보기", fontSize = 12.sp)
+                }
+            }
+        }
     }
 }

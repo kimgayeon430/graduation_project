@@ -1,23 +1,24 @@
 package smu.ai.graduation_project.data
 
-import android.net.Uri
+import android.os.Handler
+import android.os.Looper
 import com.google.firebase.Firebase
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.SetOptions
 import com.google.firebase.firestore.firestore
-import com.google.firebase.storage.storage
 import smu.ai.graduation_project.domain.MissionCompletion
 import smu.ai.graduation_project.domain.MissionRewardPolicy
+import java.util.concurrent.Executors
 
 /**
- * [MissionRepository] 의 Firebase(Firestore + Storage) 구현.
- * 기존 [MissionPerformScreen] 에 인라인으로 있던 조회/트랜잭션/업로드 로직을 그대로 옮긴 것으로,
- * 읽고 쓰는 컬렉션·필드·값은 리팩터링 전과 동일하다.
+ * [MissionRepository] 의 구현. 미션/진행 상태 데이터는 Firestore, 사진 파일은 Supabase Storage 를 쓴다.
+ * 읽고 쓰는 Firestore 컬렉션·필드 구조는 이전과 동일하다.
  */
 class FirebaseMissionRepository : MissionRepository {
 
     private val db = Firebase.firestore
-    private val storage = Firebase.storage
+    private val uploadExecutor = Executors.newSingleThreadExecutor()
+    private val mainHandler = Handler(Looper.getMainLooper())
 
     override fun loadMissionInfo(
         missionId: String,
@@ -116,24 +117,34 @@ class FirebaseMissionRepository : MissionRepository {
         missionId: String,
         userMissionDocId: String,
         uid: String,
-        photoUri: Uri,
+        photoBytes: ByteArray,
         missionPoints: Int,
         onResult: (MissionRepository.CompleteResult) -> Unit,
         onError: (Exception) -> Unit
     ) {
-        val storagePath = "mission_photos/$missionId/${uid}_${System.currentTimeMillis()}.jpg"
-        val storageRef = storage.reference.child(storagePath)
+        val storagePath = "$missionId/${uid}_${System.currentTimeMillis()}.jpg"
         val userMissionRef = db.collection("user_missions").document(userMissionDocId)
         val userRef = db.collection("users").document(uid)
+        val missionRef = db.collection("missions").document(missionId)
 
-        storageRef.putFile(photoUri)
-            .continueWithTask { task ->
-                if (!task.isSuccessful) throw task.exception ?: RuntimeException("사진 업로드 실패")
-                storageRef.downloadUrl
+        // 1) Supabase Storage 업로드는 네트워크 호출이므로 백그라운드 스레드에서 수행한다.
+        uploadExecutor.execute {
+            val photoUrl = try {
+                SupabaseStorage.upload(storagePath, photoBytes)
+            } catch (e: Exception) {
+                mainHandler.post {
+                    onError(
+                        MissionRepository.MissionCompleteException(
+                            MissionRepository.MissionCompleteException.Stage.UPLOAD, e
+                        )
+                    )
+                }
+                return@execute
             }
-            .addOnSuccessListener { downloadUri ->
-                // 사진 업로드 성공 후에만 Firestore 트랜잭션으로 완료 처리 + 2단계 포인트 지급
-                db.runTransaction { transaction ->
+
+            // 2) 사진 업로드 성공 후에만 Firestore 트랜잭션으로 완료 처리 + 2단계 포인트 지급.
+            //    (runTransaction 의 성공/실패 콜백은 기본적으로 메인 스레드에서 실행된다.)
+            db.runTransaction { transaction ->
                     val missionSnapshot = transaction.get(userMissionRef)
                     val status = missionSnapshot.getString("status").orEmpty()
                     val alreadyCompleted = MissionCompletion.isCompleted(status)
@@ -151,7 +162,7 @@ class FirebaseMissionRepository : MissionRepository {
                             "status" to outcome.newStatus,
                             "progress" to 1f,
                             "locationVerified" to true,
-                            "photoUrl" to downloadUri.toString(),
+                            "photoUrl" to photoUrl,
                             "photoStoragePath" to storagePath,
                             "photoVerified" to true,
                             "photoUploadedAt" to FieldValue.serverTimestamp(),
@@ -167,30 +178,31 @@ class FirebaseMissionRepository : MissionRepository {
                             SetOptions.merge()
                         )
                     }
-                    Triple(outcome.pointsToGrant, alreadyCompleted, downloadUri.toString())
-                }.addOnSuccessListener { result ->
-                    onResult(
-                        MissionRepository.CompleteResult(
-                            rewardGranted = result.first,
-                            alreadyCompleted = result.second,
-                            photoUrl = result.third
+                    // 이 사용자가 처음 완료할 때만 미션 인기도(completionCount) 를 올린다.
+                    if (outcome.countTowardPopularity) {
+                        transaction.set(
+                            missionRef,
+                            mapOf("completionCount" to FieldValue.increment(1L)),
+                            SetOptions.merge()
                         )
+                    }
+                    Triple(outcome.pointsToGrant, alreadyCompleted, photoUrl)
+            }.addOnSuccessListener { result ->
+                onResult(
+                    MissionRepository.CompleteResult(
+                        rewardGranted = result.first,
+                        alreadyCompleted = result.second,
+                        photoUrl = result.third
                     )
-                }.addOnFailureListener { e ->
-                    // 사진은 올라갔지만 완료 처리 실패 → 재시도 가능 (포인트 중복 지급은 트랜잭션이 방지)
-                    onError(
-                        MissionRepository.MissionCompleteException(
-                            MissionRepository.MissionCompleteException.Stage.FINALIZE, e
-                        )
-                    )
-                }
-            }
-            .addOnFailureListener { e ->
+                )
+            }.addOnFailureListener { e ->
+                // 사진은 올라갔지만 완료 처리 실패 → 재시도 가능 (포인트 중복 지급은 트랜잭션이 방지)
                 onError(
                     MissionRepository.MissionCompleteException(
-                        MissionRepository.MissionCompleteException.Stage.UPLOAD, e
+                        MissionRepository.MissionCompleteException.Stage.FINALIZE, e
                     )
                 )
             }
+        }
     }
 }

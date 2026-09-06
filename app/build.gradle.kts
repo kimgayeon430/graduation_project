@@ -1,16 +1,7 @@
-import java.util.Properties
-
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
     id("com.google.gms.google-services")
-}
-
-val localProperties = Properties().apply {
-    val propertiesFile = rootProject.file("local.properties")
-    if (propertiesFile.exists()) {
-        propertiesFile.inputStream().use { load(it) }
-    }
 }
 
 android {
@@ -22,9 +13,6 @@ android {
     }
 
     defaultConfig {
-        manifestPlaceholders["NAVER_MAP_CLIENT_ID"] =
-            localProperties.getProperty("NAVER_MAP_CLIENT_ID", "")
-
         applicationId = "smu.ai.graduation_project"
         minSdk = 26
         targetSdk = 36
@@ -72,7 +60,6 @@ dependencies {
     androidTestImplementation(libs.androidx.junit)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
     debugImplementation(libs.androidx.compose.ui.tooling)
-    implementation("com.naver.maps:map-sdk:3.23.3")
 
     
     // Import the Firebase BoM

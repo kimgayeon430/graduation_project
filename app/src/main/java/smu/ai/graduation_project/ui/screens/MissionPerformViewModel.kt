@@ -163,7 +163,10 @@ class MissionPerformViewModel(
         uiState = uiState.copy(toastMessage = "사진 촬영이 취소되었습니다.")
     }
 
-    fun uploadPhotoAndComplete() {
+    /**
+     * @param photoBytes 화면에서 촬영본 Uri 를 읽어 넘긴 이미지 바이트. 읽지 못했으면 null.
+     */
+    fun uploadPhotoAndComplete(photoBytes: ByteArray?) {
         val state = uiState
         if (uid == null) {
             emitToast("로그인이 필요합니다.")
@@ -178,9 +181,12 @@ class MissionPerformViewModel(
             emitToast("먼저 위치 인증을 완료해주세요.")
             return
         }
-        val localUri = state.capturedPhotoUri
-        if (localUri == null) {
+        if (state.capturedPhotoUri == null) {
             emitToast("먼저 사진을 촬영해주세요.")
+            return
+        }
+        if (photoBytes == null || photoBytes.isEmpty()) {
+            emitToast("사진을 읽지 못했습니다. 다시 촬영해주세요.")
             return
         }
         if (state.missionCompleted || state.isUploading) return
@@ -191,7 +197,7 @@ class MissionPerformViewModel(
             missionId = missionId,
             userMissionDocId = docId,
             uid = uid!!,
-            photoUri = localUri,
+            photoBytes = photoBytes,
             missionPoints = state.missionPoints,
             onResult = { result ->
                 uiState = uiState.copy(
