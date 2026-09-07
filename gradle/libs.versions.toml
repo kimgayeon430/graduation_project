@@ -11,6 +11,7 @@ composeBom = "2026.02.01"
 navigationCompose = "2.8.5"
 firebaseBom = "34.14.0"
 coil = "2.7.0"
+onnxruntime = "1.29.0"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -37,6 +38,7 @@ firebase-firestore = { group = "com.google.firebase", name = "firebase-firestore
 firebase-analytics = { group = "com.google.firebase", name = "firebase-analytics" }
 firebase-storage = { group = "com.google.firebase", name = "firebase-storage" }
 coil-compose = { group = "io.coil-kt", name = "coil-compose", version.ref = "coil" }
+onnxruntime-android = { group = "com.microsoft.onnxruntime", name = "onnxruntime-android", version.ref = "onnxruntime" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

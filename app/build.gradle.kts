@@ -34,6 +34,12 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
+        // onnxruntime-android 가 모든 ABI 의 네이티브 라이브러리(.so)를 넣어 APK 가 커진다.
+        // 실기기(arm64) + 최신 에뮬레이터(x86_64) 만 남긴다.
+        ndk {
+            abiFilters += listOf("arm64-v8a", "x86_64")
+        }
+
         buildConfigField(
             "String", "SUPABASE_URL",
             "\"${localProperties.getProperty("SUPABASE_URL", "")}\""
@@ -92,6 +98,9 @@ dependencies {
     implementation(libs.firebase.auth)
     implementation(libs.firebase.firestore)
     implementation(libs.coil.compose)
+
+    // 사진 인증 온디바이스 추론 (assets/photo_verifier.onnx). 모델 파일이 없어도 앱은 동작한다.
+    implementation(libs.onnxruntime.android)
 
 
     // Add the dependencies for any other desired Firebase products

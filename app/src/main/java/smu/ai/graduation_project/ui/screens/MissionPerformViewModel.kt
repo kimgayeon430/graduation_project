@@ -1,14 +1,15 @@
 package smu.ai.graduation_project.ui.screens
 
+import android.app.Application
 import android.location.Location
 import android.net.Uri
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.lifecycle.ViewModel
-import smu.ai.graduation_project.data.FakePhotoVerifier
+import androidx.lifecycle.AndroidViewModel
 import smu.ai.graduation_project.data.FirebaseMissionRepository
 import smu.ai.graduation_project.data.MissionRepository
+import smu.ai.graduation_project.data.OnnxPhotoVerifier
 import smu.ai.graduation_project.data.PhotoVerifier
 import smu.ai.graduation_project.domain.LocationVerification
 import smu.ai.graduation_project.domain.MissionCompletion
@@ -20,19 +21,23 @@ import smu.ai.graduation_project.domain.PhotoVerificationConfig
  * 그 결과값(Location, 촬영 Uri)만 이 ViewModel 로 전달된다.
  */
 class MissionPerformViewModel(
+    application: Application,
     private val repository: MissionRepository,
     private val photoVerifier: PhotoVerifier,
     private val photoVerificationConfig: PhotoVerificationConfig
-) : ViewModel() {
+) : AndroidViewModel(application) {
 
     /**
-     * 프로덕션 기본값. 아직 사진 인증 모델(`assets/photo_verifier.onnx`)이 없어
-     * [FakePhotoVerifier] 가 항상 null 을 돌려주며, 모델이 없을 때는 통과시킨다.
-     * `OnnxPhotoVerifier` 연결 시 이 두 인자를 실제 구현·기본 설정([PhotoVerificationConfig.DEFAULT])으로 교체한다.
+     * 프로덕션 기본값. 사진은 [OnnxPhotoVerifier] 로 온디바이스 판정한다.
+     *
+     * `assets/photo_verifier.onnx` 가 아직 없으면 [OnnxPhotoVerifier.classify] 가 null 을 돌려주고,
+     * `passWhenModelUnavailable = true` 라 종전처럼 통과한다. 모델을 assets 에 넣고 오프라인 평가로
+     * 임계값을 정한 뒤에는 이 인자를 [PhotoVerificationConfig.DEFAULT] (모델 없으면 관리자 검수)로 바꾼다.
      */
-    constructor() : this(
+    constructor(application: Application) : this(
+        application,
         FirebaseMissionRepository(),
-        FakePhotoVerifier(),
+        OnnxPhotoVerifier(application),
         PhotoVerificationConfig(passWhenModelUnavailable = true)
     )
 
