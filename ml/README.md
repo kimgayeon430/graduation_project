@@ -15,6 +15,7 @@ HuggingFace 베이스 모델을 우리 미션 사진 데이터로 파인튜닝�
 | --- | --- |
 | `labels.json` | 분류 클래스 정의 (앱과 공유) |
 | `dataset_card.md` | 데이터셋 클래스·수집 출처·분할 규칙 |
+| `data/` | 데이터셋 구축 스크립트 (공개 데이터 수집 → 무효 합성 → 장소 단위 분할 → HF Hub 업로드). `data/README.md` 참고 |
 | `notebooks/train_photo_verifier.ipynb` | 데이터 로드 → CLIP 제로샷 베이스라인 → 헤드 학습 → 전체 파인튜닝 → 평가 → 임계값 선정 → HF Hub 업로드 |
 | `export_onnx.py` | 파인튜닝 모델을 ONNX 로 export (+ int8 양자화) |
 | `requirements.txt` | 학습·평가 의존성 |
@@ -38,8 +39,17 @@ HuggingFace 베이스 모델을 우리 미션 사진 데이터로 파인튜닝�
 ```bash
 cd ml
 pip install -r requirements.txt
-# notebooks/train_photo_verifier.ipynb 를 Colab 또는 Jupyter 에서 실행
-python export_onnx.py --model <HF_repo_or_local_dir> --out ../app/src/main/assets/photo_verifier.onnx
+
+# 1) 데이터셋 구축 (data/README.md 참고)
+cd data && python fetch_public.py --out raw --per-class 800
+python make_negatives.py --out raw/무효 --count 1200
+python build_dataset.py --raw raw --out travel-mission-photos
+python upload_hf.py --dir travel-mission-photos --repo <user>/travel-mission-photos && cd ..
+
+# 2) 학습 (notebooks/train_photo_verifier.ipynb 를 Colab/Jupyter 에서, DATASET_ID 교체)
+
+# 3) export
+python export_onnx.py --model <HF_repo_or_local_dir> --out ../app/src/main/assets/photo_verifier.onnx --quantize
 ```
 
 ## 평가 지표 (보고서용)

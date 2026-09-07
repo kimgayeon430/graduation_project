@@ -19,4 +19,7 @@ local.properties
 /ml/outputs/
 /ml/**/_onnx_export/
 /ml/**/.ipynb_checkpoints/
+/ml/data/raw/
+/ml/data/collected_invalid/
+/ml/data/travel-mission-photos/
 __pycache__/

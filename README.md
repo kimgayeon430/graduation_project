@@ -29,6 +29,7 @@
 - 미션 등록, 수정 및 삭제 (제목·설명·카테고리·포인트·이미지·위치 좌표)
 - 전체 사용자와 미션 진행 현황 조회
 - 사용자별 포인트, 레벨, 완료·진행 미션 확인
+- 사진 검수 큐: 자동 판정이 애매한(`photoNeedsReview`) 완료 건을 승인하거나 반려(2단계 보상 회수 후 재인증 요청)
 - 관리자 권한 부여 및 해제
 
 ## 기술 스택
@@ -131,9 +132,10 @@
 - [x] 추론 인터페이스 `data/PhotoVerifier` (+ 테스트용 `FakePhotoVerifier`)
 - [x] `ml/` 학습·평가·export 파이프라인 골격
 - [x] `MissionPerformViewModel` → `MissionRepository` 연결: 업로드 전 판정, `REJECT` 시 업로드 중단, 판정 결과를 `user_missions` 에 기록<br>(모델이 없는 현재는 `PhotoVerificationConfig(passWhenModelUnavailable = true)` 로 통과)
-- [ ] 데이터셋 수집 및 모델 학습
+- [x] 관리자 검수 큐 화면 `AdminPhotoReviewScreen` (`photoNeedsReview == true` 목록, 승인 / 반려·보상 회수)
+- [x] 데이터셋 구축 스크립트 `ml/data/` (공개 데이터셋 수집 · 무효 표본 합성 · 장소 단위 분할 · HF Hub 업로드)
+- [ ] 데이터셋 수집 실행 및 모델 학습
 - [ ] `OnnxPhotoVerifier` (onnxruntime-android 추론) — 완성 시 `MissionPerformViewModel` 의 기본 verifier·config 교체
-- [ ] 관리자 검수 큐 화면 (`photoNeedsReview == true` 목록)
 
 ## 미션 지도
 
@@ -167,7 +169,7 @@ app/src/main/java/smu/ai/graduation_project
 ├── model/          # Mission, UserRank 등 데이터 모델
 ├── navigation/     # 화면 경로 및 내비게이션 정의
 └── ui/
-    ├── admin/      # 미션·사용자 관리 화면
+    ├── admin/      # 미션·사용자 관리, 사진 검수(AdminPhotoReviewScreen) 화면
     ├── components/ # 공통 Compose 컴포넌트
     ├── screens/    # 랜딩·로그인·홈·미션 목록/상세/지도·수행·취향 선택·랭킹·프로필 및 ViewModel
     └── theme/      # 색상, 타이포그래피, 앱 테마
@@ -178,6 +180,7 @@ app/src/test/java/smu/ai/graduation_project
 ml/                 # 사진 인증 모델 학습·평가·ONNX export (Colab/로컬 GPU, 앱 빌드와 분리)
 ├── labels.json
 ├── dataset_card.md
+├── data/           # 데이터셋 구축 스크립트 (공개 데이터 수집·무효 합성·분할·HF 업로드)
 ├── notebooks/train_photo_verifier.ipynb
 └── export_onnx.py
 ```

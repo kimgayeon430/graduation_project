@@ -21,6 +21,7 @@ import androidx.compose.material.icons.filled.Assignment
 import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.People
+import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -41,7 +42,8 @@ import smu.ai.graduation_project.ui.theme.MainPurple
 @Composable
 fun AdminHomeScreen(
     onNavigateToMissionManagement: () -> Unit,
-    onNavigateToUserManagement: () -> Unit
+    onNavigateToUserManagement: () -> Unit,
+    onNavigateToPhotoReview: () -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -94,6 +96,13 @@ fun AdminHomeScreen(
             desc = "Review user activity.",
             icon = Icons.Default.People,
             onClick = onNavigateToUserManagement
+        )
+
+        AdminMenuCard(
+            title = "Photo review",
+            desc = "Approve or reject flagged mission photos.",
+            icon = Icons.Default.PhotoLibrary,
+            onClick = onNavigateToPhotoReview
         )
 
         AdminMenuCard(

@@ -44,6 +44,7 @@ import smu.ai.graduation_project.navigation.Screen
 import smu.ai.graduation_project.ui.admin.AdminMissionEditScreen
 import smu.ai.graduation_project.ui.admin.AdminHomeScreen
 import smu.ai.graduation_project.ui.admin.AdminMissionListScreen
+import smu.ai.graduation_project.ui.admin.AdminPhotoReviewScreen
 import smu.ai.graduation_project.ui.admin.AdminUserManagementScreen
 import smu.ai.graduation_project.ui.screens.HomeScreen
 import smu.ai.graduation_project.ui.screens.InProgressMissionScreen
@@ -261,7 +262,8 @@ private fun MainApp(onLogout: () -> Unit) {
                 if (isAdmin) {
                     AdminHomeScreen(
                         onNavigateToMissionManagement = { navController.navigate("admin/missions") },
-                        onNavigateToUserManagement = { navController.navigate("admin/users") }
+                        onNavigateToUserManagement = { navController.navigate("admin/users") },
+                        onNavigateToPhotoReview = { navController.navigate("admin/photo_review") }
                     )
                 } else {
                     LaunchedEffect(Unit) {
@@ -277,6 +279,18 @@ private fun MainApp(onLogout: () -> Unit) {
             composable("admin/users") {
                 if (isAdmin) {
                     AdminUserManagementScreen(
+                        onNavigateBack = { navController.popBackStack() }
+                    )
+                } else {
+                    LaunchedEffect(Unit) {
+                        android.widget.Toast.makeText(context, "관리자만 접근할 수 있습니다.", android.widget.Toast.LENGTH_SHORT).show()
+                        navController.popBackStack()
+                    }
+                }
+            }
+            composable("admin/photo_review") {
+                if (isAdmin) {
+                    AdminPhotoReviewScreen(
                         onNavigateBack = { navController.popBackStack() }
                     )
                 } else {
