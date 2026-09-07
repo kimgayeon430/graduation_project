@@ -13,3 +13,10 @@
 .externalNativeBuild
 .cxx
 local.properties
+
+# ML 학습 산출물 (체크포인트·데이터셋·중간 export 는 커밋하지 않음)
+# 최종 배포 모델 app/src/main/assets/photo_verifier.onnx 는 커밋 대상이다.
+/ml/outputs/
+/ml/**/_onnx_export/
+/ml/**/.ipynb_checkpoints/
+__pycache__/

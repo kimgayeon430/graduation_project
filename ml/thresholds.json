@@ -1,0 +1,12 @@
+{
+  "_comment": "train_photo_verifier.ipynb 7단계가 이 파일을 덮어씁니다. 값이 정해지면 app 의 PhotoVerificationConfig 기본값으로 옮기세요.",
+  "model_version": "mobilevit-small-headft-0",
+  "autoPassThreshold": 0.70,
+  "hardRejectThreshold": 0.30,
+  "invalidRejectThreshold": 0.60,
+  "eval": {
+    "invalid_recall": null,
+    "valid_false_reject_rate": null,
+    "macro_f1": null
+  }
+}

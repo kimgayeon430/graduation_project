@@ -41,6 +41,7 @@
 | Backend | Firebase Authentication(Email/Password), Cloud Firestore |
 | 지도 | 네이버 지도 SDK `com.naver.maps:map-sdk` (미션 위치 마커·정보창) |
 | 이미지 저장 | Supabase Storage (public 버킷 + anon 업로드 정책) |
+| AI (진행 중) | 사진 인증용 온디바이스 이미지 분류 — HuggingFace `apple/mobilevit-small` 파인튜닝 → ONNX (`ml/`). 판정 규칙은 순수 Kotlin `PhotoVerification` |
 | Image Loading | Coil |
 | Build | Gradle 9.4.1 (Kotlin DSL), Version Catalog, AGP 9.2.0, `compileSdk 36` / `minSdk 26` / `targetSdk 36` |
 | Architecture | 미션 수행 기능을 ViewModel · Repository(인터페이스/Firebase 구현) · 순수 도메인 로직으로 분리 |
@@ -64,7 +65,7 @@
 
 ## 개인화 추천 (규칙 기반)
 
-AI 모델 없이 현재 데이터만으로 설명 가능한 점수 규칙으로 홈의 추천 미션 상위 3건을 계산합니다. (`MissionScorer` + `MissionRecommender.recommendScored`)
+추천은 별도 AI 모델 없이 현재 데이터만으로 설명 가능한 점수 규칙으로 홈의 추천 미션 상위 3건을 계산합니다. (`MissionScorer` + `MissionRecommender.recommendScored`)
 
 1. id가 없거나 이미 완료한 미션은 후보에서 제외합니다.
 2. 후보마다 기본 점수를 매깁니다.
@@ -81,6 +82,57 @@ AI 모델 없이 현재 데이터만으로 설명 가능한 점수 규칙으로 
 가중치는 `RecommendationWeights` 에 모여 있어 오프라인 평가 후 조정할 수 있습니다.
 
 신규 가입자는 회원가입 직후 취향 선택 화면으로 이동하고, 기존 사용자는 `preferences` 가 없을 때만 이 화면을 거칩니다.
+
+## 사진 인증 모델 (온디바이스, 진행 중)
+
+2단계 사진 인증에서 "아무 사진이나 통과"되는 문제를 없애기 위해, 촬영본을 **온디바이스 이미지 분류 모델**로 1차 판정합니다. 학습 파이프라인은 `ml/` 폴더에 있으며, 판정 규칙은 Firebase·모델에 의존하지 않는 순수 Kotlin `PhotoVerification` 으로 분리해 단위 테스트합니다.
+
+### 접근
+
+- **베이스 모델**: HuggingFace `apple/mobilevit-small` (~5M 파라미터, 모바일용). 우리 미션 사진 데이터로 **헤드 학습 → 전체 파인튜닝** 순으로 적응시키고, 학습 없는 `CLIP` 제로샷을 비교 기준선으로 둡니다.
+- **클래스**: `투어 / 맛집 / 체험 / 쇼핑` 4개 미션 카테고리 + `무효`(셀카·스크린샷·무관 실내 등). 정의는 `ml/labels.json` 이 단일 소스이며 앱의 `PhotoVerification.INVALID_LABEL` 과 일치합니다.
+- **배포**: 파인튜닝 모델을 Optimum 으로 ONNX 로 export(`ml/export_onnx.py`)해 `app/src/main/assets/photo_verifier.onnx` 로 번들하고, `onnxruntime-android` 로 추론합니다. 학습·export 는 Colab/로컬 GPU 에서 수행하며 앱 빌드와 분리됩니다.
+
+### 판정 규칙 (`PhotoVerification`)
+
+모델이 낸 라벨별 점수와 미션이 기대하는 카테고리를 비교해 세 갈래로 판정합니다. 임계값은 `PhotoVerificationConfig` 에 모여 있고 오프라인 평가(PR 커브)로 정합니다.
+
+| 조건 | 판정 | 동작 |
+| --- | --- | --- |
+| `무효` 점수 ≥ `invalidRejectThreshold` | `REJECT` | 업로드 안 함, 재촬영 안내 |
+| 미션 카테고리 점수 < `hardRejectThreshold` | `REJECT` | 업로드 안 함, 재촬영 안내 |
+| 미션 카테고리 점수 ≥ `autoPassThreshold` | `PASS` | 기존 업로드·완료 흐름 진행 |
+| 그 사이(애매) | `NEEDS_REVIEW` | 미션은 완료하되 `photoNeedsReview` 표시 → 관리자 검수 큐 |
+
+모델을 불러오지 못하면 기본값은 `NEEDS_REVIEW`(관리자 확인) 입니다.
+
+### `ml/` 파이프라인
+
+| 파일 | 내용 |
+| --- | --- |
+| `ml/labels.json` | 분류 클래스 정의 (앱과 공유) |
+| `ml/dataset_card.md` | 클래스별 목표 규모, 수집 출처(Places365·Food-101·Landmarks + 크라우드소싱), 장소 단위 train/val/test 분할 |
+| `ml/notebooks/train_photo_verifier.ipynb` | 데이터 로드 → CLIP 제로샷 → 헤드 학습 → 전체 파인튜닝 → 평가(리포트·혼동행렬) → 임계값 선정 → HF Hub 업로드 |
+| `ml/export_onnx.py` | 파인튜닝 모델 → ONNX (+ int8 양자화), 전처리 상수·라벨 순서 함께 출력 |
+| `ml/thresholds.json` | 노트북이 생성. 값이 정해지면 `PhotoVerificationConfig` 기본값으로 반영 |
+
+### 평가 지표 (보고서용)
+
+- 클래스별 precision / recall / F1, confusion matrix
+- **무효 사진 차단율**(invalid recall)과 **정상 사진 오탐율**(정상 사진이 `REJECT` 되는 비율)
+- 카테고리 점수 PR 커브로 `autoPassThreshold` / `hardRejectThreshold` 선정
+- CLIP 제로샷 vs 헤드 학습 vs 전체 파인튜닝 비교
+- 온디바이스 모델 크기(MB)·추론 지연(ms)
+
+### 현재 상태
+
+- [x] 판정 도메인 로직 `PhotoVerification` + `PhotoVerificationConfig` + 단위 테스트
+- [x] 추론 인터페이스 `data/PhotoVerifier` (+ 테스트용 `FakePhotoVerifier`)
+- [x] `ml/` 학습·평가·export 파이프라인 골격
+- [ ] 데이터셋 수집 및 모델 학습
+- [ ] `OnnxPhotoVerifier` (onnxruntime-android 추론)
+- [ ] `MissionPerformViewModel` 연결 (업로드 전 판정)
+- [ ] 관리자 검수 큐 화면
 
 ## 미션 지도
 
@@ -109,8 +161,8 @@ AI 모델 없이 현재 데이터만으로 설명 가능한 점수 규칙으로 
 ```text
 app/src/main/java/smu/ai/graduation_project
 ├── MainActivity.kt # 루트/메인 NavHost, 하단 탭, 인증·권한 게이트
-├── data/           # Repository 인터페이스·Firebase 구현, Supabase Storage 업로드
-├── domain/         # Firebase 비의존 순수 로직 (거리·보상·완료·취향·추천 규칙)
+├── data/           # Repository 인터페이스·Firebase 구현, Supabase Storage 업로드, PhotoVerifier(사진 판정 추론)
+├── domain/         # Firebase 비의존 순수 로직 (거리·보상·완료·취향·추천 규칙, 사진 인증 판정)
 ├── model/          # Mission, UserRank 등 데이터 모델
 ├── navigation/     # 화면 경로 및 내비게이션 정의
 └── ui/
@@ -121,6 +173,12 @@ app/src/main/java/smu/ai/graduation_project
 
 app/src/test/java/smu/ai/graduation_project
 └── domain/         # 도메인 규칙 단위 테스트 (JUnit4)
+
+ml/                 # 사진 인증 모델 학습·평가·ONNX export (Colab/로컬 GPU, 앱 빌드와 분리)
+├── labels.json
+├── dataset_card.md
+├── notebooks/train_photo_verifier.ipynb
+└── export_onnx.py
 ```
 
 ### 주요 도메인 모듈
@@ -131,6 +189,7 @@ app/src/test/java/smu/ai/graduation_project
 | `LocationVerification` | 허용 반경(기본 200m) 이내 여부 판정 |
 | `MissionRewardPolicy` | 1·2단계 보상 계산과 중복 지급 방지 규칙 |
 | `MissionCompletion` | 사진 인증 가능 여부·완료 처리 결과(`resolve`) 계산 |
+| `PhotoVerification` | 온디바이스 모델의 라벨별 점수 → 통과 / 재촬영 / 관리자 검수 판정 |
 | `TravelPreference` | 취향 카테고리 정의, 최소 1개 선택 규칙, 저장용 정규화 |
 | `MissionScorer` | 명시적·암묵적 취향, 난이도 적합도, 거리 근접도, 인기도로 미션 기본 점수 계산 (근거 포함) |
 | `MissionRecommender` | 후보 필터 + 점수 정렬 + 다양성 감점으로 상위 N건 추천 |
@@ -141,7 +200,7 @@ app/src/test/java/smu/ai/graduation_project
 | --- | --- |
 | `users/{uid}` | `nickname`, `mail`, `points`, `level`, `preferences[]` |
 | `missions/{id}` | `title`, `desc`, `category`, `points`, `imageUrl`, `location`(GeoPoint), `completionCount` |
-| `user_missions/{id}` | `userId`, `missionId`, `status`, `progress`, `stage1RewardGranted`, `stage2RewardGranted`, `photoUrl`, `photoStoragePath`, `photoVerified`, `photoUploadedAt`, `completedAt` |
+| `user_missions/{id}` | `userId`, `missionId`, `status`, `progress`, `stage1RewardGranted`, `stage2RewardGranted`, `photoUrl`, `photoStoragePath`, `photoVerified`, `photoUploadedAt`, `completedAt`<br>사진 판정 모델 연결 후: `photoVerifyScore`, `photoVerifyLabel`, `photoVerifyModelVersion`, `photoNeedsReview` |
 | `admins/{uid}` | `email`, `name` |
 | Supabase Storage `mission-photos/{missionId}/{uid}_{timestamp}.jpg` | 사진 인증 이미지 (공개 URL 로 접근) |
 
@@ -191,6 +250,21 @@ cd graduation_project
    이 값들은 `app/build.gradle.kts` 에서 각각 `BuildConfig` 필드와 `manifestPlaceholders` 로 주입됩니다.
 8. Gradle Sync 후 에뮬레이터 또는 Android 기기에서 앱을 실행합니다. (터미널에서는 `./gradlew installDebug`)
 
+> 사진 인증 모델(`app/src/main/assets/photo_verifier.onnx`)이 없어도 앱은 동작합니다. 이때 판정은 `NEEDS_REVIEW` 로 처리됩니다.
+
+### 사진 인증 모델 (선택)
+
+앱 빌드와 분리된 파이프라인입니다. GPU가 있는 Colab/로컬에서 실행합니다.
+
+```bash
+cd ml
+pip install -r requirements.txt
+# notebooks/train_photo_verifier.ipynb 실행 → outputs/final/, thresholds.json 생성
+python export_onnx.py --model outputs/final --out ../app/src/main/assets/photo_verifier.onnx --quantize
+```
+
+이후 `thresholds.json` 값을 `PhotoVerificationConfig` 기본값으로, 전처리 상수를 `OnnxPhotoVerifier` 로 옮깁니다. 자세한 내용은 [`ml/README.md`](ml/README.md).
+
 ### 단위 테스트
 
 ```bash
@@ -220,7 +294,7 @@ cd graduation_project
 
 ## 향후 개선 계획
 
-- 사진 인증 부정 방지(촬영 시각·위치 메타데이터 검증)와 관리자 검수 흐름
+- 사진 인증 모델 학습·연결 완료(`ml/` 참고)와 관리자 검수 큐, 촬영 시각·위치 메타데이터 교차 검증
 - 시간대·미션 간 동시출현(협업 필터링)까지 반영한 추천 고도화 및 오프라인 평가(hit@k)
 - ViewModel·Repository 패턴을 홈·목록·관리자 등 나머지 화면으로 확대
 - Firestore 보안 규칙 정비, Supabase Storage 업로드 서버 검증, 서버 사이드 포인트 검증

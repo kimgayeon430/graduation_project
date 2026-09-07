@@ -1,0 +1,15 @@
+# 학습·평가 (Colab / 로컬 GPU)
+torch>=2.2
+transformers>=4.44
+datasets>=2.20
+accelerate>=0.33
+evaluate>=0.4
+scikit-learn>=1.4
+matplotlib>=3.8
+pillow>=10.0
+peft>=0.12            # (선택) LoRA 비교군
+
+# ONNX export / 양자화
+optimum[exporters]>=1.21
+onnx>=1.16
+onnxruntime>=1.18

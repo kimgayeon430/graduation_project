@@ -1,0 +1,19 @@
+{
+  "model_task": "travel-mission-photo-verification",
+  "invalid_label": "무효",
+  "labels": ["투어", "맛집", "체험", "쇼핑", "무효"],
+  "label_descriptions": {
+    "투어": "관광지·랜드마크·전망·거리 풍경 등 둘러보기 미션 사진",
+    "맛집": "음식·식당 내부·메뉴판 등 먹거리 미션 사진",
+    "체험": "액티비티·공방·전통 체험 등 참여형 미션 사진",
+    "쇼핑": "상점·시장·상품 진열 등 쇼핑 미션 사진",
+    "무효": "셀카, 스크린샷, 미션과 무관한 실내/사물, 흐릿하거나 캡션만 있는 사진"
+  },
+  "clip_prompts": {
+    "투어": ["a photo of a tourist landmark or scenic view", "관광지 사진"],
+    "맛집": ["a photo of food or a restaurant", "음식 또는 식당 사진"],
+    "체험": ["a photo of a hands-on activity or workshop", "체험 활동 사진"],
+    "쇼핑": ["a photo of a shop, market, or merchandise", "상점 또는 시장 사진"],
+    "무효": ["a selfie", "a screenshot", "a blurry unrelated indoor photo", "셀카 또는 스크린샷"]
+  }
+}
