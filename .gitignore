@@ -32,3 +32,4 @@ __pycache__/
 /.firebase/
 firebase-debug.log
 .firebaserc
+.claude/settings.local.json
