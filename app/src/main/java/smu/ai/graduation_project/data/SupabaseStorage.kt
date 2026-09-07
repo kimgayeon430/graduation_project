@@ -39,7 +39,9 @@ object SupabaseStorage {
             setRequestProperty("Authorization", "Bearer ${BuildConfig.SUPABASE_ANON_KEY}")
             setRequestProperty("apikey", BuildConfig.SUPABASE_ANON_KEY)
             setRequestProperty("Content-Type", contentType)
-            setRequestProperty("x-upsert", "true")
+            // objectPath 는 타임스탬프가 들어가 항상 유일하므로 새로 INSERT 한다.
+            // x-upsert=true 로 두면 Supabase 가 UPDATE 정책까지 요구해 anon INSERT 정책만 있으면 RLS 로 거부된다.
+            setRequestProperty("x-upsert", "false")
         }
         try {
             conn.outputStream.use { it.write(bytes) }

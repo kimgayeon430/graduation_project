@@ -127,7 +127,11 @@ class FirebaseMissionRepository : MissionRepository {
         onResult: (MissionRepository.CompleteResult) -> Unit,
         onError: (Exception) -> Unit
     ) {
-        val storagePath = "$missionId/${uid}_${System.currentTimeMillis()}.jpg"
+        // Supabase Storage 키는 ASCII 일부 문자만 허용한다. missionId 가 한글 제목인 경우가 있어
+        // (`InvalidKey` 400) 안전한 문자로 변환하고, 서로 다른 제목이 같은 폴더로 뭉치지 않도록 해시를 앞에 붙인다.
+        val missionKey = Integer.toHexString(missionId.hashCode()) +
+            "_" + missionId.replace(Regex("[^A-Za-z0-9._-]"), "_").take(48)
+        val storagePath = "$missionKey/${uid}_${System.currentTimeMillis()}.jpg"
         val userMissionRef = db.collection("user_missions").document(userMissionDocId)
         val userRef = db.collection("users").document(uid)
         val missionRef = db.collection("missions").document(missionId)
