@@ -57,8 +57,9 @@
    - 1단계 보상 = `min(미션 포인트, 100)`
 2. **2단계 · 사진 인증**
    - 카메라로 사진을 촬영하고 미리보기로 확인합니다. (`FileProvider` + `TakePicture`)
+   - 업로드 전에 온디바이스 모델(`PhotoVerifier`)로 사진을 분류하고 `PhotoVerification` 규칙으로 판정합니다. `REJECT` 면 업로드하지 않고 재촬영을 안내하며, `NEEDS_REVIEW` 면 완료는 진행하되 `photoNeedsReview` 플래그를 남깁니다. (자세한 내용은 "사진 인증 모델" 절)
    - 사진을 Supabase Storage 버킷 `mission-photos` 의 `{missionId}/{uid}_{timestamp}.jpg` 로 업로드하고 공개 URL 을 받습니다. (`SupabaseStorage`, 백그라운드 스레드)
-   - 업로드가 성공한 뒤에만 트랜잭션으로 미션을 `Completed` 처리하고 2단계 보상을 지급하며, `photoUrl`(Supabase 공개 URL)·`photoStoragePath`·`photoVerified`·`photoUploadedAt` 을 저장합니다.
+   - 업로드가 성공한 뒤에만 트랜잭션으로 미션을 `Completed` 처리하고 2단계 보상을 지급하며, `photoUrl`(Supabase 공개 URL)·`photoStoragePath`·`photoVerified`·`photoNeedsReview`·`photoVerifyScore`·`photoVerifyLabel`·`photoVerifyModelVersion`·`photoUploadedAt` 을 저장합니다.
    - 2단계 보상 = `미션 포인트 - 1단계 보상`
    - 업로드나 저장이 실패하면 미션은 완료되지 않으며, 재시도해도 포인트는 한 번만 지급됩니다.
    - 사용자가 처음 완료할 때 같은 트랜잭션에서 `missions/{id}.completionCount` 를 1 올립니다. (추천 인기도 신호)
@@ -129,10 +130,10 @@
 - [x] 판정 도메인 로직 `PhotoVerification` + `PhotoVerificationConfig` + 단위 테스트
 - [x] 추론 인터페이스 `data/PhotoVerifier` (+ 테스트용 `FakePhotoVerifier`)
 - [x] `ml/` 학습·평가·export 파이프라인 골격
+- [x] `MissionPerformViewModel` → `MissionRepository` 연결: 업로드 전 판정, `REJECT` 시 업로드 중단, 판정 결과를 `user_missions` 에 기록<br>(모델이 없는 현재는 `PhotoVerificationConfig(passWhenModelUnavailable = true)` 로 통과)
 - [ ] 데이터셋 수집 및 모델 학습
-- [ ] `OnnxPhotoVerifier` (onnxruntime-android 추론)
-- [ ] `MissionPerformViewModel` 연결 (업로드 전 판정)
-- [ ] 관리자 검수 큐 화면
+- [ ] `OnnxPhotoVerifier` (onnxruntime-android 추론) — 완성 시 `MissionPerformViewModel` 의 기본 verifier·config 교체
+- [ ] 관리자 검수 큐 화면 (`photoNeedsReview == true` 목록)
 
 ## 미션 지도
 
@@ -200,7 +201,7 @@ ml/                 # 사진 인증 모델 학습·평가·ONNX export (Colab/�
 | --- | --- |
 | `users/{uid}` | `nickname`, `mail`, `points`, `level`, `preferences[]` |
 | `missions/{id}` | `title`, `desc`, `category`, `points`, `imageUrl`, `location`(GeoPoint), `completionCount` |
-| `user_missions/{id}` | `userId`, `missionId`, `status`, `progress`, `stage1RewardGranted`, `stage2RewardGranted`, `photoUrl`, `photoStoragePath`, `photoVerified`, `photoUploadedAt`, `completedAt`<br>사진 판정 모델 연결 후: `photoVerifyScore`, `photoVerifyLabel`, `photoVerifyModelVersion`, `photoNeedsReview` |
+| `user_missions/{id}` | `userId`, `missionId`, `status`, `progress`, `stage1RewardGranted`, `stage2RewardGranted`, `photoUrl`, `photoStoragePath`, `photoVerified`, `photoUploadedAt`, `completedAt`, `photoNeedsReview`, `photoVerifyScore`, `photoVerifyLabel`, `photoVerifyModelVersion` |
 | `admins/{uid}` | `email`, `name` |
 | Supabase Storage `mission-photos/{missionId}/{uid}_{timestamp}.jpg` | 사진 인증 이미지 (공개 URL 로 접근) |
 

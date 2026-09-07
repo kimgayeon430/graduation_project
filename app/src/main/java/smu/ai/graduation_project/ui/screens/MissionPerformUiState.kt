@@ -11,6 +11,7 @@ import smu.ai.graduation_project.domain.MissionRewardPolicy
  */
 data class MissionPerformUiState(
     val missionTitle: String = "미션",
+    val missionCategory: String = "투어",
     val missionPoints: Int = 0,
     val missionLocation: GeoPoint? = null,
     val missionDocId: String? = null,

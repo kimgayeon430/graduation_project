@@ -6,10 +6,13 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
+import smu.ai.graduation_project.data.FakePhotoVerifier
 import smu.ai.graduation_project.data.FirebaseMissionRepository
 import smu.ai.graduation_project.data.MissionRepository
+import smu.ai.graduation_project.data.PhotoVerifier
 import smu.ai.graduation_project.domain.LocationVerification
 import smu.ai.graduation_project.domain.MissionCompletion
+import smu.ai.graduation_project.domain.PhotoVerificationConfig
 
 /**
  * 미션 수행 화면의 상태 보유 + Firebase 조회·위치 인증·사진 업로드·포인트 지급 흐름 조정.
@@ -17,10 +20,21 @@ import smu.ai.graduation_project.domain.MissionCompletion
  * 그 결과값(Location, 촬영 Uri)만 이 ViewModel 로 전달된다.
  */
 class MissionPerformViewModel(
-    private val repository: MissionRepository
+    private val repository: MissionRepository,
+    private val photoVerifier: PhotoVerifier,
+    private val photoVerificationConfig: PhotoVerificationConfig
 ) : ViewModel() {
 
-    constructor() : this(FirebaseMissionRepository())
+    /**
+     * 프로덕션 기본값. 아직 사진 인증 모델(`assets/photo_verifier.onnx`)이 없어
+     * [FakePhotoVerifier] 가 항상 null 을 돌려주며, 모델이 없을 때는 통과시킨다.
+     * `OnnxPhotoVerifier` 연결 시 이 두 인자를 실제 구현·기본 설정([PhotoVerificationConfig.DEFAULT])으로 교체한다.
+     */
+    constructor() : this(
+        FirebaseMissionRepository(),
+        FakePhotoVerifier(),
+        PhotoVerificationConfig(passWhenModelUnavailable = true)
+    )
 
     var uiState by mutableStateOf(MissionPerformUiState())
         private set
@@ -38,6 +52,7 @@ class MissionPerformViewModel(
             onResult = { info ->
                 uiState = uiState.copy(
                     missionTitle = info.title,
+                    missionCategory = info.category,
                     missionPoints = info.points,
                     missionLocation = info.location
                 )
@@ -195,19 +210,28 @@ class MissionPerformViewModel(
 
         repository.uploadPhotoAndComplete(
             missionId = missionId,
+            missionCategory = state.missionCategory,
             userMissionDocId = docId,
             uid = uid!!,
             photoBytes = photoBytes,
             missionPoints = state.missionPoints,
+            photoVerifier = photoVerifier,
+            photoVerificationConfig = photoVerificationConfig,
             onResult = { result ->
                 uiState = uiState.copy(
                     isUploading = false,
                     missionCompleted = true,
                     stage2RewardGranted = true,
                     photoUrl = result.photoUrl,
-                    verificationText = "위치 인증 완료 · 미션이 완료되었습니다.",
+                    verificationText = if (result.needsReview) {
+                        "사진 업로드 완료 · 관리자 검수 후 최종 확정됩니다."
+                    } else {
+                        "위치 인증 완료 · 미션이 완료되었습니다."
+                    },
                     toastMessage = when {
                         result.alreadyCompleted -> "이미 완료 처리된 미션입니다."
+                        result.needsReview && result.rewardGranted > 0 ->
+                            "사진 업로드 완료. ${result.rewardGranted}P 지급 · 관리자 검수 예정입니다."
                         result.rewardGranted > 0 -> "사진 인증 완료. ${result.rewardGranted}P가 지급되었습니다."
                         else -> "사진 인증 완료."
                     },
@@ -215,22 +239,25 @@ class MissionPerformViewModel(
                 )
             },
             onError = { error ->
-                val finalizeFailed =
-                    (error as? MissionRepository.MissionCompleteException)?.stage ==
-                        MissionRepository.MissionCompleteException.Stage.FINALIZE
-                uiState = uiState.copy(
-                    isUploading = false,
-                    uploadError = if (finalizeFailed) {
-                        "완료 처리에 실패했습니다. 다시 시도해주세요."
-                    } else {
-                        "사진 업로드에 실패했습니다. 네트워크를 확인하고 다시 시도해주세요."
-                    },
-                    toastMessage = if (finalizeFailed) {
-                        "완료 처리에 실패했습니다."
-                    } else {
-                        "사진 업로드에 실패했습니다."
-                    }
-                )
+                val exception = error as? MissionRepository.MissionCompleteException
+                uiState = when (exception?.stage) {
+                    MissionRepository.MissionCompleteException.Stage.VERIFY -> uiState.copy(
+                        isUploading = false,
+                        uploadError = exception?.reason
+                            ?: "사진이 미션과 맞지 않아요. 미션 장소·대상을 다시 촬영해 주세요.",
+                        toastMessage = "사진이 미션과 맞지 않아 인증하지 못했어요."
+                    )
+                    MissionRepository.MissionCompleteException.Stage.FINALIZE -> uiState.copy(
+                        isUploading = false,
+                        uploadError = "완료 처리에 실패했습니다. 다시 시도해주세요.",
+                        toastMessage = "완료 처리에 실패했습니다."
+                    )
+                    else -> uiState.copy(
+                        isUploading = false,
+                        uploadError = "사진 업로드에 실패했습니다. 네트워크를 확인하고 다시 시도해주세요.",
+                        toastMessage = "사진 업로드에 실패했습니다."
+                    )
+                }
             }
         )
     }

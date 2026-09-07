@@ -8,6 +8,8 @@ import com.google.firebase.firestore.SetOptions
 import com.google.firebase.firestore.firestore
 import smu.ai.graduation_project.domain.MissionCompletion
 import smu.ai.graduation_project.domain.MissionRewardPolicy
+import smu.ai.graduation_project.domain.PhotoVerification
+import smu.ai.graduation_project.domain.PhotoVerificationConfig
 import java.util.concurrent.Executors
 
 /**
@@ -30,6 +32,7 @@ class FirebaseMissionRepository : MissionRepository {
                 onResult(
                     MissionRepository.MissionInfo(
                         title = doc.getString("title") ?: "미션",
+                        category = doc.getString("category") ?: "투어",
                         points = doc.getLong("points")?.toInt() ?: 0,
                         location = doc.getGeoPoint("location")
                     )
@@ -115,10 +118,13 @@ class FirebaseMissionRepository : MissionRepository {
 
     override fun uploadPhotoAndComplete(
         missionId: String,
+        missionCategory: String,
         userMissionDocId: String,
         uid: String,
         photoBytes: ByteArray,
         missionPoints: Int,
+        photoVerifier: PhotoVerifier,
+        photoVerificationConfig: PhotoVerificationConfig,
         onResult: (MissionRepository.CompleteResult) -> Unit,
         onError: (Exception) -> Unit
     ) {
@@ -127,8 +133,29 @@ class FirebaseMissionRepository : MissionRepository {
         val userRef = db.collection("users").document(uid)
         val missionRef = db.collection("missions").document(missionId)
 
-        // 1) Supabase Storage 업로드는 네트워크 호출이므로 백그라운드 스레드에서 수행한다.
+        // 모델 추론·업로드는 무거운 호출이므로 백그라운드 스레드에서 수행한다.
         uploadExecutor.execute {
+            // 0) 온디바이스 모델로 사진을 1차 판정한다. (업로드 전)
+            val classification = try {
+                photoVerifier.classify(photoBytes)
+            } catch (e: Exception) {
+                null
+            }
+            val verdict = PhotoVerification.verify(missionCategory, classification, photoVerificationConfig)
+            if (verdict.verdict == PhotoVerification.Verdict.REJECT) {
+                mainHandler.post {
+                    onError(
+                        MissionRepository.MissionCompleteException(
+                            MissionRepository.MissionCompleteException.Stage.VERIFY,
+                            reason = verdict.reason
+                        )
+                    )
+                }
+                return@execute
+            }
+            val needsReview = verdict.verdict == PhotoVerification.Verdict.NEEDS_REVIEW
+
+            // 1) Supabase Storage 업로드
             val photoUrl = try {
                 SupabaseStorage.upload(storagePath, photoBytes)
             } catch (e: Exception) {
@@ -142,7 +169,7 @@ class FirebaseMissionRepository : MissionRepository {
                 return@execute
             }
 
-            // 2) 사진 업로드 성공 후에만 Firestore 트랜잭션으로 완료 처리 + 2단계 포인트 지급.
+            // 2) 사진 업로드 성공 후에만 Firestore 트랜잭션으로 완료 처리 + 2단계 포인트 지급 + 판정 결과 기록.
             //    (runTransaction 의 성공/실패 콜백은 기본적으로 메인 스레드에서 실행된다.)
             db.runTransaction { transaction ->
                     val missionSnapshot = transaction.get(userMissionRef)
@@ -164,7 +191,11 @@ class FirebaseMissionRepository : MissionRepository {
                             "locationVerified" to true,
                             "photoUrl" to photoUrl,
                             "photoStoragePath" to storagePath,
-                            "photoVerified" to true,
+                            "photoVerified" to !needsReview,
+                            "photoNeedsReview" to needsReview,
+                            "photoVerifyScore" to verdict.matchScore,
+                            "photoVerifyLabel" to (classification?.topLabel ?: ""),
+                            "photoVerifyModelVersion" to photoVerifier.modelVersion,
                             "photoUploadedAt" to FieldValue.serverTimestamp(),
                             "stage2RewardGranted" to true,
                             "stage2RewardPoints" to MissionRewardPolicy.stage2Reward(missionPoints),
@@ -192,7 +223,8 @@ class FirebaseMissionRepository : MissionRepository {
                     MissionRepository.CompleteResult(
                         rewardGranted = result.first,
                         alreadyCompleted = result.second,
-                        photoUrl = result.third
+                        photoUrl = result.third,
+                        needsReview = needsReview
                     )
                 )
             }.addOnFailureListener { e ->
