@@ -66,7 +66,8 @@ import smu.ai.graduation_project.ui.theme.Orange
 @Composable
 fun ProfileScreen(
     onLogout: () -> Unit,
-    onNavigateToInProgressMissions: () -> Unit
+    onNavigateToInProgressMissions: () -> Unit,
+    onNavigateToPointHistory: () -> Unit
 ) {
     val currentUser = Firebase.auth.currentUser
     val db = Firebase.firestore
@@ -199,7 +200,8 @@ fun ProfileScreen(
                     title = "보유 포인트",
                     value = String.format("%,dP", points),
                     icon = Icons.Default.Stars,
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.weight(1f),
+                    onClick = onNavigateToPointHistory
                 )
                 StatCard(
                     title = "내 랭킹",

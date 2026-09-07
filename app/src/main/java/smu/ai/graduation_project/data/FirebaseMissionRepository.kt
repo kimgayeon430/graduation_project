@@ -89,19 +89,21 @@ class FirebaseMissionRepository : MissionRepository {
                 isNearEnough = isNearEnough,
                 alreadyGranted = alreadyRewarded
             )
-            transaction.update(
-                userMissionRef,
-                mapOf(
-                    "locationVerified" to isNearEnough,
-                    "verifiedLatitude" to latitude,
-                    "verifiedLongitude" to longitude,
-                    "distanceToTargetMeters" to distanceMeters,
-                    "progress" to if (isNearEnough) 0.5f else 0f,
-                    "status" to MissionCompletion.STATUS_IN_PROGRESS,
-                    "stage1RewardGranted" to (alreadyRewarded || isNearEnough),
-                    "stage1RewardPoints" to MissionRewardPolicy.stage1Reward(missionPoints)
-                )
+            val updates = mutableMapOf<String, Any>(
+                "locationVerified" to isNearEnough,
+                "verifiedLatitude" to latitude,
+                "verifiedLongitude" to longitude,
+                "distanceToTargetMeters" to distanceMeters,
+                "progress" to if (isNearEnough) 0.5f else 0f,
+                "status" to MissionCompletion.STATUS_IN_PROGRESS,
+                "stage1RewardGranted" to (alreadyRewarded || isNearEnough),
+                "stage1RewardPoints" to MissionRewardPolicy.stage1Reward(missionPoints)
             )
+            // 포인트 내역(마이페이지)에서 1단계 보상 시점을 보여주기 위해 지급될 때만 기록한다.
+            if (rewardToGrant > 0) {
+                updates["stage1VerifiedAt"] = FieldValue.serverTimestamp()
+            }
+            transaction.update(userMissionRef, updates)
             if (rewardToGrant > 0) {
                 transaction.set(
                     userRef,
