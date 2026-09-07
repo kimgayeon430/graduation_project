@@ -23,3 +23,8 @@ local.properties
 /ml/data/collected_invalid/
 /ml/data/travel-mission-photos/
 __pycache__/
+
+# Firebase CLI
+/.firebase/
+firebase-debug.log
+.firebaserc

@@ -108,6 +108,8 @@
 
 모델을 불러오지 못하면 기본값은 `NEEDS_REVIEW`(관리자 확인) 입니다.
 
+추론(`PhotoVerifier`) + 판정(`PhotoVerification`)을 묶은 "업로드 전 결정"은 `data/PhotoGate` 로 분리했습니다. Firebase·Android 비의존이라 `FakePhotoVerifier` 로 전 경로를 단위 테스트하며(`PhotoGateTest`), `FirebaseMissionRepository` 는 `PhotoGate.decide()` 결과(`Reject` / `Proceed(needsReview)`)에 따라 업로드/거부만 합니다.
+
 ### `ml/` 파이프라인
 
 | 파일 | 내용 |
@@ -129,11 +131,12 @@
 ### 현재 상태
 
 - [x] 판정 도메인 로직 `PhotoVerification` + `PhotoVerificationConfig` + 단위 테스트
-- [x] 추론 인터페이스 `data/PhotoVerifier` (+ 테스트용 `FakePhotoVerifier`)
+- [x] 추론 인터페이스 `data/PhotoVerifier` (+ `FakePhotoVerifier`), 업로드 전 결정 `data/PhotoGate` + 단위 테스트
 - [x] `ml/` 학습·평가·export 파이프라인 골격
 - [x] `MissionPerformViewModel` → `MissionRepository` 연결: 업로드 전 판정, `REJECT` 시 업로드 중단, 판정 결과를 `user_missions` 에 기록<br>(모델이 없는 현재는 `PhotoVerificationConfig(passWhenModelUnavailable = true)` 로 통과)
 - [x] 관리자 검수 큐 화면 `AdminPhotoReviewScreen` (`photoNeedsReview == true` 목록, 승인 / 반려·보상 회수)
 - [x] 데이터셋 구축 스크립트 `ml/data/` (공개 데이터셋 수집 · 무효 표본 합성 · 장소 단위 분할 · HF Hub 업로드)
+- [x] Firestore 보안 규칙 `firestore.rules` (소유권·관리자 권한 강제, 사용자의 `photoNeedsReview` 임의 해제 차단)
 - [ ] 데이터셋 수집 실행 및 모델 학습
 - [ ] `OnnxPhotoVerifier` (onnxruntime-android 추론) — 완성 시 `MissionPerformViewModel` 의 기본 verifier·config 교체
 
@@ -164,7 +167,7 @@
 ```text
 app/src/main/java/smu/ai/graduation_project
 ├── MainActivity.kt # 루트/메인 NavHost, 하단 탭, 인증·권한 게이트
-├── data/           # Repository 인터페이스·Firebase 구현, Supabase Storage 업로드, PhotoVerifier(사진 판정 추론)
+├── data/           # Repository 인터페이스·Firebase 구현, Supabase Storage 업로드, PhotoVerifier·PhotoGate(사진 판정)
 ├── domain/         # Firebase 비의존 순수 로직 (거리·보상·완료·취향·추천 규칙, 사진 인증 판정)
 ├── model/          # Mission, UserRank 등 데이터 모델
 ├── navigation/     # 화면 경로 및 내비게이션 정의
@@ -175,7 +178,12 @@ app/src/main/java/smu/ai/graduation_project
     └── theme/      # 색상, 타이포그래피, 앱 테마
 
 app/src/test/java/smu/ai/graduation_project
-└── domain/         # 도메인 규칙 단위 테스트 (JUnit4)
+├── domain/         # 도메인 규칙 단위 테스트 (JUnit4)
+└── data/           # PhotoGate 등 데이터 계층 순수 로직 테스트
+
+firestore.rules     # Firestore 보안 규칙
+firebase.json       # Firebase CLI 설정 (규칙 배포)
+docs/               # 보고서 등 문서
 
 ml/                 # 사진 인증 모델 학습·평가·ONNX export (Colab/로컬 GPU, 앱 빌드와 분리)
 ├── labels.json
@@ -253,6 +261,13 @@ cd graduation_project
    ```
    이 값들은 `app/build.gradle.kts` 에서 각각 `BuildConfig` 필드와 `manifestPlaceholders` 로 주입됩니다.
 8. Gradle Sync 후 에뮬레이터 또는 Android 기기에서 앱을 실행합니다. (터미널에서는 `./gradlew installDebug`)
+9. (선택) Firestore 보안 규칙을 배포합니다.
+   ```bash
+   npm i -g firebase-tools
+   firebase login
+   firebase use <Firebase 프로젝트 ID>
+   firebase deploy --only firestore:rules
+   ```
 
 > 사진 인증 모델(`app/src/main/assets/photo_verifier.onnx`)이 없어도 앱은 동작합니다. 이때 판정은 `NEEDS_REVIEW` 로 처리됩니다.
 
@@ -298,8 +313,8 @@ python export_onnx.py --model outputs/final --out ../app/src/main/assets/photo_v
 
 ## 향후 개선 계획
 
-- 사진 인증 모델 학습·연결 완료(`ml/` 참고)와 관리자 검수 큐, 촬영 시각·위치 메타데이터 교차 검증
+- 사진 인증 모델 데이터 수집·학습 실행, `OnnxPhotoVerifier` 연결, 촬영 시각·위치 메타데이터 교차 검증
 - 시간대·미션 간 동시출현(협업 필터링)까지 반영한 추천 고도화 및 오프라인 평가(hit@k)
 - ViewModel·Repository 패턴을 홈·목록·관리자 등 나머지 화면으로 확대
-- Firestore 보안 규칙 정비, Supabase Storage 업로드 서버 검증, 서버 사이드 포인트 검증
-- Compose UI 테스트와 Repository 계약 테스트 추가
+- 서버 사이드 포인트 검증(Cloud Functions), Supabase Storage 업로드 서버 검증
+- Robolectric 기반 ViewModel/Compose UI 테스트와 Repository 계약 테스트 추가

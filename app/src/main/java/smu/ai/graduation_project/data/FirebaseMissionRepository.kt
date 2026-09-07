@@ -8,7 +8,6 @@ import com.google.firebase.firestore.SetOptions
 import com.google.firebase.firestore.firestore
 import smu.ai.graduation_project.domain.MissionCompletion
 import smu.ai.graduation_project.domain.MissionRewardPolicy
-import smu.ai.graduation_project.domain.PhotoVerification
 import smu.ai.graduation_project.domain.PhotoVerificationConfig
 import java.util.concurrent.Executors
 
@@ -136,24 +135,20 @@ class FirebaseMissionRepository : MissionRepository {
         // 모델 추론·업로드는 무거운 호출이므로 백그라운드 스레드에서 수행한다.
         uploadExecutor.execute {
             // 0) 온디바이스 모델로 사진을 1차 판정한다. (업로드 전)
-            val classification = try {
-                photoVerifier.classify(photoBytes)
-            } catch (e: Exception) {
-                null
-            }
-            val verdict = PhotoVerification.verify(missionCategory, classification, photoVerificationConfig)
-            if (verdict.verdict == PhotoVerification.Verdict.REJECT) {
+            val decision = PhotoGate.decide(photoBytes, missionCategory, photoVerifier, photoVerificationConfig)
+            if (decision is PhotoGate.Decision.Reject) {
                 mainHandler.post {
                     onError(
                         MissionRepository.MissionCompleteException(
                             MissionRepository.MissionCompleteException.Stage.VERIFY,
-                            reason = verdict.reason
+                            reason = decision.reason
                         )
                     )
                 }
                 return@execute
             }
-            val needsReview = verdict.verdict == PhotoVerification.Verdict.NEEDS_REVIEW
+            val proceed = decision as PhotoGate.Decision.Proceed
+            val needsReview = proceed.needsReview
 
             // 1) Supabase Storage 업로드
             val photoUrl = try {
@@ -193,9 +188,9 @@ class FirebaseMissionRepository : MissionRepository {
                             "photoStoragePath" to storagePath,
                             "photoVerified" to !needsReview,
                             "photoNeedsReview" to needsReview,
-                            "photoVerifyScore" to verdict.matchScore,
-                            "photoVerifyLabel" to (classification?.topLabel ?: ""),
-                            "photoVerifyModelVersion" to photoVerifier.modelVersion,
+                            "photoVerifyScore" to proceed.matchScore,
+                            "photoVerifyLabel" to proceed.topLabel,
+                            "photoVerifyModelVersion" to proceed.modelVersion,
                             "photoUploadedAt" to FieldValue.serverTimestamp(),
                             "stage2RewardGranted" to true,
                             "stage2RewardPoints" to MissionRewardPolicy.stage2Reward(missionPoints),

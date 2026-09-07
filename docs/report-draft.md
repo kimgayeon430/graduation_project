@@ -97,7 +97,11 @@ app/src/main/java/smu/ai/graduation_project
 
 ml/                   # 사진 인증 모델 학습·평가·ONNX export (앱 빌드와 분리)
 docs/                 # 보고서 등 문서
+firestore.rules       # Firestore 보안 규칙
+firebase.json         # Firebase CLI 설정 (규칙 배포)
 ```
+
+`data/` 계층 주요 요소: `MissionRepository`(인터페이스)·`FirebaseMissionRepository`(구현), `SupabaseStorage`(사진 업로드), `PhotoVerifier`(추론 인터페이스)·`PhotoGate`(업로드 전 결정).
 
 ### 3.2 주요 도메인 모듈
 
@@ -141,6 +145,18 @@ docs/                 # 보고서 등 문서
 | `INTERNET` | Firebase·Supabase·지도 통신 |
 | `ACCESS_FINE_LOCATION` / `ACCESS_COARSE_LOCATION` | 1단계 GPS 위치 인증, 추천의 거리 근접도 |
 | `CAMERA` | 2단계 사진 인증 촬영 |
+
+### 3.6 Firestore 보안 규칙
+
+클라이언트에서 직접 Firestore 를 읽고 쓰므로 `firestore.rules` 로 접근을 제한한다.
+
+- **읽기**: 로그인 사용자에게 허용(미션은 게스트도 읽음). 목록·랭킹은 앱이 클라이언트에서 구성한다.
+- **쓰기**: 소유권과 문서 형태를 강제한다.
+  - `admins/{uid}`·`missions` 생성/삭제: 관리자(`admins/{uid}` 문서 존재)만
+  - `missions` 의 `completionCount` 필드만은 로그인 사용자가 갱신 가능(완료 시 인기도 신호)
+  - `users/{uid}`: 본인 또는 관리자만 수정, 삭제 불가
+  - `user_missions/{id}`: 생성은 본인 문서만, **사용자는 자기 `photoNeedsReview` 를 true→false 로 되돌릴 수 없음**(검수 승인은 관리자만)
+- **한계**: 서버(Cloud Functions)가 없어 포인트 지급/회수의 값 자체는 검증하지 못한다. 서버측 포인트 검증은 향후 과제다. (10장)
 
 ---
 
@@ -257,6 +273,7 @@ PhotoVerification (domain/, 순수 Kotlin)  ── 점수 + 미션 카테고리 
 
 - 모델 의존(추론)은 `data/` 계층에, 판정 규칙은 순수 Kotlin(`domain/PhotoVerification`)으로 분리해 단위 테스트한다. 기존 `LocationVerification`·`MissionCompletion` 과 동일한 설계 원칙.
 - `PhotoVerifier` 는 인터페이스이며 구현체(`OnnxPhotoVerifier`, 테스트용 `FakePhotoVerifier`)를 교체할 수 있다.
+- 추론(`PhotoVerifier`) + 판정(`PhotoVerification`)을 묶은 "업로드 전 결정"은 `data/PhotoGate` 로 분리했다. Firebase·Android 에 의존하지 않아 `FakePhotoVerifier` 로 전 경로를 단위 테스트한다. `FirebaseMissionRepository` 는 `PhotoGate.decide()` 결과(`Reject` / `Proceed(needsReview)`)에 따라 업로드/거부만 수행한다.
 
 ### 6.3 데이터셋
 
@@ -318,17 +335,20 @@ PhotoVerification (domain/, 순수 Kotlin)  ── 점수 + 미션 카테고리 
 - [x] 앱 전체 기능: 인증·온보딩, 미션 목록·지도, 2단계 인증 흐름, 포인트·랭킹, 규칙 기반 추천, 관리자 기능
 - [x] 순수 도메인 로직 분리 + 단위 테스트 (`GeoDistance`, `LocationVerification`, `MissionRewardPolicy`, `MissionCompletion`, `TravelPreference`, `MissionScorer`, `MissionRecommender`, `PhotoVerification`)
 - [x] 사진 인증 판정 로직 `PhotoVerification` + `PhotoVerificationConfig` + 테스트 7건
-- [x] 추론 인터페이스 `PhotoVerifier` (+ `FakePhotoVerifier`)
+- [x] 추론 인터페이스 `PhotoVerifier` (+ `FakePhotoVerifier`), 업로드 전 결정 `PhotoGate` + 테스트 7건
 - [x] 미션 완료 흐름 연결 (업로드 전 판정, 결과 기록, `REJECT`/`NEEDS_REVIEW` UX 분기)
 - [x] 관리자 사진 검수 큐 화면
 - [x] 데이터셋 구축 스크립트 `ml/data/`, 학습 노트북, ONNX export 스크립트
+- [x] Firestore 보안 규칙 `firestore.rules`
 
 ### 7.2 남은 작업
 
 - [ ] 데이터셋 수집 실행 (목표 규모 확보)
 - [ ] 모델 학습 및 임계값 확정 (`thresholds.json` → `PhotoVerificationConfig` 반영)
 - [ ] `OnnxPhotoVerifier` 구현 (ONNX Runtime Mobile) 및 기본 verifier 교체
-- [ ] Compose UI 테스트, Firestore 보안 규칙 정비 `[선택]`
+- [ ] `firestore.rules` 배포 및 규칙 시뮬레이터 검증
+- [ ] Robolectric 기반 ViewModel/Compose UI 테스트 `[선택]`
+- [ ] 서버측 포인트 검증(Cloud Functions) `[선택]`
 
 ---
 
@@ -337,6 +357,8 @@ PhotoVerification (domain/, 순수 Kotlin)  ── 점수 + 미션 카테고리 
 ### 8.1 도메인 규칙
 
 - JUnit4 단위 테스트로 거리·보상·완료·취향·추천·사진 판정 규칙을 검증한다. (경계값 포함)
+- 사진 인증 관련: `PhotoVerificationTest`(임계값별 PASS/REJECT/NEEDS_REVIEW, 경계값, 모델 부재), `PhotoGateTest`(정상/무효/애매 분기, 모델 부재·추론 예외 처리).
+- ViewModel 레벨 테스트는 `android.net.Uri`·`android.location.Location` 의존으로 순수 JUnit 에서 불가하며, Robolectric 도입은 향후 과제로 둔다.
 
 ### 8.2 사진 인증 모델
 
@@ -376,9 +398,13 @@ PhotoVerification (domain/, 순수 Kotlin)  ── 점수 + 미션 카테고리 
 
 ## 11. 참고 문헌
 
-1. `[Transfer learning survey — TODO]`
-2. Mehta & Rastegari, *MobileViT: Light-weight, General-purpose, and Mobile-friendly Vision Transformer*, ICLR 2022. `[정확한 서지 TODO]`
-3. Radford et al., *Learning Transferable Visual Models From Natural Language Supervision (CLIP)*, ICML 2021. `[TODO]`
-4. Hu et al., *LoRA: Low-Rank Adaptation of Large Language Models*, ICLR 2022. `[TODO]`
-5. Zhou et al., *Places: A 10 million Image Database for Scene Recognition*, TPAMI 2017. `[TODO]`
-6. Bossard et al., *Food-101 – Mining Discriminative Components with Random Forests*, ECCV 2014. `[TODO]`
+> 서지 형식은 학과 양식에 맞춰 최종 정리한다.
+
+1. S. J. Pan and Q. Yang, "A Survey on Transfer Learning," *IEEE Transactions on Knowledge and Data Engineering*, vol. 22, no. 10, 2010.
+2. S. Mehta and M. Rastegari, "MobileViT: Light-weight, General-purpose, and Mobile-friendly Vision Transformer," *ICLR*, 2022.
+3. A. Radford et al., "Learning Transferable Visual Models From Natural Language Supervision," *ICML*, 2021.
+4. E. J. Hu et al., "LoRA: Low-Rank Adaptation of Large Language Models," *ICLR*, 2022.
+5. B. Zhou et al., "Places: A 10 Million Image Database for Scene Recognition," *IEEE Transactions on Pattern Analysis and Machine Intelligence*, vol. 40, no. 6, 2018.
+6. L. Bossard, M. Guillaumin, and L. Van Gool, "Food-101 – Mining Discriminative Components with Random Forests," *ECCV*, 2014.
+7. ONNX Runtime, *https://onnxruntime.ai* (온디바이스 추론 런타임).
+8. Hugging Face Optimum, *https://huggingface.co/docs/optimum* (ONNX 변환·양자화).
