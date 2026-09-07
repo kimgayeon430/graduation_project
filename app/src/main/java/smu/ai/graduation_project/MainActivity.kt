@@ -46,6 +46,7 @@ import smu.ai.graduation_project.ui.admin.AdminHomeScreen
 import smu.ai.graduation_project.ui.admin.AdminMissionListScreen
 import smu.ai.graduation_project.ui.admin.AdminPhotoReviewScreen
 import smu.ai.graduation_project.ui.admin.AdminUserManagementScreen
+import smu.ai.graduation_project.ui.screens.CompletedMissionScreen
 import smu.ai.graduation_project.ui.screens.HomeScreen
 import smu.ai.graduation_project.ui.screens.InProgressMissionScreen
 import smu.ai.graduation_project.ui.screens.LandingScreen
@@ -348,7 +349,14 @@ private fun MainApp(onLogout: () -> Unit) {
                 ProfileScreen(
                     onLogout = onLogout,
                     onNavigateToInProgressMissions = { navController.navigate("profile/in-progress") },
+                    onNavigateToCompletedMissions = { navController.navigate("profile/completed") },
                     onNavigateToPointHistory = { navController.navigate("profile/points") }
+                )
+            }
+            composable("profile/completed") {
+                CompletedMissionScreen(
+                    onNavigateBack = { navController.popBackStack() },
+                    onViewMission = { navController.navigate("mission_detail/$it") }
                 )
             }
             composable("profile/points") {

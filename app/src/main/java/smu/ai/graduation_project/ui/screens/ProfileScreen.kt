@@ -67,6 +67,7 @@ import smu.ai.graduation_project.ui.theme.Orange
 fun ProfileScreen(
     onLogout: () -> Unit,
     onNavigateToInProgressMissions: () -> Unit,
+    onNavigateToCompletedMissions: () -> Unit,
     onNavigateToPointHistory: () -> Unit
 ) {
     val currentUser = Firebase.auth.currentUser
@@ -226,7 +227,8 @@ fun ProfileScreen(
                     title = "완료한 미션",
                     value = completedCount.toString(),
                     icon = Icons.Default.Flag,
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.weight(1f),
+                    onClick = onNavigateToCompletedMissions
                 )
             }
 
