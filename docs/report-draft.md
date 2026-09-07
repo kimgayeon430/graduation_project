@@ -42,7 +42,7 @@ Android 애플리케이션을 개발한다. 사용자는 취향에 맞는 미션
 | 이미지 로딩 | Coil |
 | Build | Gradle 9.4.1 (Kotlin DSL), Version Catalog, AGP 9.2.0, `compileSdk 36` / `minSdk 26` / `targetSdk 36` |
 | AI 학습 | Python, HuggingFace `transformers`/`datasets`/`peft`, Colab GPU |
-| AI 추론 | ONNX Runtime Mobile (온디바이스) `[예정]` |
+| AI 추론 | ONNX Runtime (`com.microsoft.onnxruntime:onnxruntime-android` 1.29.0), `abiFilters` 로 `arm64-v8a`/`x86_64` 만 포함 |
 | 협업 | 맥(코드 편집) ↔ 윈도우(빌드·학습), GitHub 동기화 |
 
 ---
@@ -59,6 +59,7 @@ Android 애플리케이션을 개발한다. 사용자는 취향에 맞는 미션
 - 인증 단계별 포인트 지급 및 진행 상태 저장(중복 지급 방지), 진행 중 미션 이어서 수행
 - 홈에서 선호 카테고리를 우선한 규칙 기반 미션 추천(완료한 미션 제외)
 - 누적 포인트 기반 사용자 랭킹, 프로필에서 포인트·레벨·미션 현황 확인
+- 마이페이지에서 **보유 포인트를 누르면 적립 내역**(미션별 위치·사진 인증 보상)을 확인
 
 ### 2.2 관리자 기능
 
@@ -85,14 +86,14 @@ Android 애플리케이션을 개발한다. 사용자는 취향에 맞는 미션
 ```text
 app/src/main/java/smu/ai/graduation_project
 ├── MainActivity.kt   # 루트/메인 NavHost, 하단 탭, 인증·권한 게이트
-├── data/             # Repository 인터페이스·Firebase 구현, Supabase Storage, PhotoVerifier
+├── data/             # Repository 인터페이스·Firebase 구현, Supabase Storage, PhotoVerifier·OnnxPhotoVerifier
 ├── domain/           # 거리·보상·완료·취향·추천·사진 인증 판정 (순수 로직)
 ├── model/            # Mission, UserRank 등 데이터 모델
 ├── navigation/       # 화면 경로·내비게이션 정의
 └── ui/
     ├── admin/        # 미션·사용자 관리, 사진 검수 화면
     ├── components/   # 공통 Compose 컴포넌트
-    ├── screens/      # 랜딩·로그인·홈·미션·수행·취향·랭킹·프로필 및 ViewModel
+    ├── screens/      # 랜딩·로그인·홈·미션·수행·취향·랭킹·프로필·포인트 내역 및 ViewModel
     └── theme/        # 색상·타이포그래피·테마
 
 ml/                   # 사진 인증 모델 학습·평가·ONNX export (앱 빌드와 분리)
@@ -101,7 +102,7 @@ firestore.rules       # Firestore 보안 규칙
 firebase.json         # Firebase CLI 설정 (규칙 배포)
 ```
 
-`data/` 계층 주요 요소: `MissionRepository`(인터페이스)·`FirebaseMissionRepository`(구현), `SupabaseStorage`(사진 업로드), `PhotoVerifier`(추론 인터페이스)·`PhotoGate`(업로드 전 결정).
+`data/` 계층 주요 요소: `MissionRepository`(인터페이스)·`FirebaseMissionRepository`(구현), `SupabaseStorage`(사진 업로드), `PhotoVerifier`(추론 인터페이스)·`OnnxPhotoVerifier`(ONNX Runtime 구현)·`PhotoGate`(업로드 전 결정).
 
 ### 3.2 주요 도메인 모듈
 
@@ -134,9 +135,9 @@ firebase.json         # Firebase CLI 설정 (규칙 배포)
 | --- | --- |
 | `users/{uid}` | `nickname`, `mail`, `points`, `level`, `preferences[]` |
 | `missions/{id}` | `title`, `desc`, `category`, `points`, `imageUrl`, `location`(GeoPoint), `completionCount` |
-| `user_missions/{id}` | `userId`, `missionId`, `status`, `progress`, `stage1RewardGranted`, `stage2RewardGranted`, `photoUrl`, `photoStoragePath`, `photoVerified`, `photoUploadedAt`, `completedAt`, `photoNeedsReview`, `photoVerifyScore`, `photoVerifyLabel`, `photoVerifyModelVersion` |
+| `user_missions/{id}` | `userId`, `missionId`, `status`, `progress`, `stage1RewardGranted`, `stage1RewardPoints`, `stage1VerifiedAt`, `stage2RewardGranted`, `stage2RewardPoints`, `photoUrl`, `photoStoragePath`, `photoVerified`, `photoUploadedAt`, `completedAt`, `photoNeedsReview`, `photoVerifyScore`, `photoVerifyLabel`, `photoVerifyModelVersion` |
 | `admins/{uid}` | `email`, `name` |
-| Supabase `mission-photos/{missionId}/{uid}_{timestamp}.jpg` | 사진 인증 이미지 (공개 URL) |
+| Supabase `mission-photos/<missionKey>/{uid}_{timestamp}.jpg` | 사진 인증 이미지 (공개 URL). `missionKey` 는 `missionId` 를 Supabase 스토리지 키 규칙에 맞춰 ASCII 로 정규화한 값(4.3절) |
 
 ### 3.5 필요 권한
 
@@ -196,10 +197,16 @@ firebase.json         # Firebase CLI 설정 (규칙 배포)
 - 업로드나 저장이 실패하면 미션은 완료되지 않으며, 재시도해도 포인트는 한 번만 지급된다.
 - 사용자가 처음 완료할 때 같은 트랜잭션에서 `missions/{id}.completionCount` 를 1 올린다. (추천 인기도 신호)
 
+**Supabase Storage 연동 시 해결한 문제** (7.3절)
+
+- 스토리지 객체 키는 ASCII 일부 문자만 허용한다. 미션 문서 ID 가 한글 제목인 경우 `InvalidKey` 로 업로드가 거부되어, 경로의 미션 폴더명을 `해시_ASCII정규화` 형태(`missionKey`)로 변환했다.
+- 업로드 요청의 `x-upsert` 헤더를 켜면 Supabase 가 `UPDATE` 정책까지 요구해, anon `INSERT` 정책만 있는 버킷에서 RLS 로 거부된다. 객체 경로에 타임스탬프가 들어가 항상 유일하므로 `x-upsert` 를 끄고 새로 `INSERT` 한다.
+
 ### 4.4 포인트 · 레벨 · 랭킹
 
 - 보상 계산과 중복 지급 방지는 `MissionRewardPolicy` 에 모여 있으며, 포인트 지급은 Firestore 트랜잭션으로 원자적으로 처리된다.
 - 누적 포인트 기준 사용자 랭킹을 제공하고, 프로필에서 포인트·레벨·완료/진행 미션 수를 보여 준다.
+- **포인트 적립 내역**(`PointHistoryScreen`): 마이페이지의 보유 포인트를 누르면 미션별 위치·사진 인증 보상 내역을 최신순으로 보여 준다. 별도 원장 컬렉션 없이 `user_missions` 의 `stage1RewardGranted`/`stage1RewardPoints`/`stage1VerifiedAt`, `stage2RewardGranted`/`stage2RewardPoints`/`completedAt` 에서 재구성하며, 미션명은 `missions/{id}` 에서 조회한다. (`firestore.rules` 미배포 상태에서 새 컬렉션 추가 시 규칙 누락으로 리워드 트랜잭션이 깨질 위험을 피하기 위한 선택. 서버측 포인트 검증 도입 시 실제 원장으로 교체 — 10장)
 
 ### 4.5 개인화 추천 (규칙 기반)
 
@@ -302,7 +309,7 @@ PhotoVerification (domain/, 순수 Kotlin)  ── 점수 + 미션 카테고리 
 
 - 학습·평가 파이프라인: `ml/notebooks/train_photo_verifier.ipynb` (Colab).
 - 최종 모델은 HuggingFace Optimum 으로 ONNX 변환(+ int8 양자화) 후 `app/src/main/assets/photo_verifier.onnx` 로 번들.
-- 전처리 상수(리사이즈 크기, 정규화 mean/std)는 학습·export·Android 추론에서 동일하게 유지한다.
+- 전처리 상수(리사이즈 크기, 정규화 mean/std, 채널 순서)는 export 시 함께 나오는 `preprocessor_config.json` 을 `assets/photo_verifier_preprocessor.json` 으로 번들하고, `OnnxPhotoVerifier` 가 이를 런타임에 읽어 학습·export·추론 전처리를 자동으로 일치시킨다. (키가 없으면 MobileViT 기본값)
 
 ### 6.5 판정 규칙 (`PhotoVerification`)
 
@@ -321,6 +328,9 @@ PhotoVerification (domain/, 순수 Kotlin)  ── 점수 + 미션 카테고리 
 
 ### 6.6 앱 통합
 
+- **추론기**: `OnnxPhotoVerifier`(`PhotoVerifier` 구현)가 `assets/photo_verifier.onnx` 를 ONNX Runtime 으로 로드해 `Bitmap` 전처리 → 추론 → softmax → 라벨별 점수를 낸다. 라벨 순서는 `photo_verifier_labels.json`, 전처리는 `photo_verifier_preprocessor.json` 에서 읽는다. **모델 파일이 없거나 로드·추론에 실패하면 `classify()` 가 `null` 을 반환**해 앱은 종전대로 동작한다(판정은 `PhotoVerificationConfig` 에 위임).
+- **주입**: `MissionPerformViewModel` 을 `AndroidViewModel` 로 두어 `OnnxPhotoVerifier(application)` 를 기본 verifier 로 주입한다. 모델·임계값이 확정되면 `PhotoVerificationConfig.DEFAULT`(모델 부재 시 `NEEDS_REVIEW`)로 전환한다.
+- **APK 영향**: `onnxruntime-android` 네이티브 라이브러리가 모든 ABI 를 포함해 APK 가 크게 늘어나므로, `abiFilters` 로 `arm64-v8a`/`x86_64` 만 남겨 증가량을 억제한다(8.2절).
 - **업로드 전 판정**: `FirebaseMissionRepository.uploadPhotoAndComplete` 가 백그라운드 스레드에서 `classify → verify` 를 먼저 수행하고, `REJECT` 면 업로드하지 않는다. 트래픽·저장 비용을 아낀다.
 - **기록**: `user_missions` 에 `photoVerified`, `photoNeedsReview`, `photoVerifyScore`, `photoVerifyLabel`, `photoVerifyModelVersion` 을 트랜잭션으로 저장.
 - **관리자 검수 큐**(`AdminPhotoReviewScreen`): `photoNeedsReview == true` 건을 사진·판정 근거와 함께 목록화.
@@ -343,14 +353,25 @@ PhotoVerification (domain/, 순수 Kotlin)  ── 점수 + 미션 카테고리 
 - [x] `OnnxPhotoVerifier` (ONNX Runtime Mobile) 구현 — `assets/` 의 모델·전처리·라벨 json 을 읽어 추론, 모델 없으면 `null` 반환해 앱 무영향
 - [x] Firestore 보안 규칙 `firestore.rules`
 - [x] Supabase Storage 사진 업로드 (InvalidKey·RLS 이슈 수정 후 실기기 동작 확인)
+- [x] 마이페이지 포인트 적립 내역 화면 (`PointHistoryScreen`)
 
 ### 7.2 남은 작업
 
 - [ ] 실제 데이터셋 수집 (목표 규모 확보) 및 학습 실행
 - [ ] `thresholds.json` 값을 `PhotoVerificationConfig` 기본값으로 반영, `photo_verifier.onnx` 를 `assets/` 에 커밋
+- [ ] 모델 확정 후 기본 config 를 `PhotoVerificationConfig.DEFAULT`(모델 부재 시 `NEEDS_REVIEW`)로 전환
 - [ ] `firestore.rules` 배포 및 규칙 시뮬레이터 검증
 - [ ] Robolectric 기반 ViewModel/Compose UI 테스트 `[선택]`
 - [ ] 서버측 포인트 검증(Cloud Functions) `[선택]`
+
+### 7.3 구현 중 해결한 문제
+
+| 문제 | 원인 | 해결 |
+| --- | --- | --- |
+| 사진 업로드가 항상 `400 InvalidKey` | 미션 문서 ID 가 한글 제목이라 Supabase 스토리지 키 규칙 위반 | 경로의 미션 폴더명을 `해시_ASCII정규화`(`missionKey`)로 변환 |
+| 사진 업로드가 `403` RLS 거부 | `x-upsert: true` 가 `UPDATE` 정책을 요구하나 anon 은 `INSERT` 정책만 보유 | 항상 유일한 경로이므로 `x-upsert` 를 끄고 새로 `INSERT` |
+| 저사양(RAM 8GB) 환경에서 Gradle sync 중 데몬 강제 종료 | 데몬 힙(2GB) + IDE 메모리 압박 | `gradle.properties` 데몬 힙 1.5GB, `org.gradle.workers.max=2` |
+| `onnxruntime-android` 도입 후 APK +120MB | 모든 ABI 네이티브 라이브러리 포함 | `abiFilters` 로 `arm64-v8a`/`x86_64` 만 (+20MB 수준) |
 
 ---
 
@@ -373,6 +394,7 @@ PhotoVerification (domain/, 순수 Kotlin)  ── 점수 + 미션 카테고리 
 | 온디바이스 비용 | 모델 크기(MB), 평균 추론 지연(ms), APK 증가량 |
 
 - 테스트셋은 학습에 쓰지 않은 장소로만 구성한다.
+- APK 증가량(중간 측정): `onnxruntime-android` 도입 시 디버그 APK 약 +120MB(전 ABI) → `abiFilters`(arm64-v8a/x86_64) 적용 후 약 +20MB. 모델 파일 크기는 별도.
 - `[결과 표 TODO]`
 
 ---
@@ -388,6 +410,10 @@ PhotoVerification (domain/, 순수 Kotlin)  ── 점수 + 미션 카테고리 
   - `fc53e3a` 관리자 사진 검수 큐 + 데이터셋 구축 스크립트
   - `3cb2647` 보고서 초안(전체 프로젝트)
   - `823eec3` Firestore 보안 규칙 + 업로드 전 판정 게이트(`PhotoGate`) 분리
+  - `f3dcaa6` Supabase 업로드 실패 수정(스토리지 키 정규화, `x-upsert`/RLS)
+  - `e46e7cf` 온디바이스 추론기 `OnnxPhotoVerifier` 연결(`onnxruntime-android`)
+  - `afaeb33` 마이페이지 포인트 적립 내역 화면
+  - `f0e001e` `ml/` 파이프라인 스모크 테스트 + 최신 라이브러리 대응(transformers 5.x / optimum 2.x)
 
 ---
 
