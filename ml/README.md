@@ -16,10 +16,22 @@ HuggingFace 베이스 모델을 우리 미션 사진 데이터로 파인튜닝�
 | `labels.json` | 분류 클래스 정의 (앱과 공유) |
 | `dataset_card.md` | 데이터셋 클래스·수집 출처·분할 규칙 |
 | `data/` | 데이터셋 구축 스크립트 (공개 데이터 수집 → 무효 합성 → 장소 단위 분할 → HF Hub 업로드). `data/README.md` 참고 |
-| `notebooks/train_photo_verifier.ipynb` | 데이터 로드 → CLIP 제로샷 베이스라인 → 헤드 학습 → 전체 파인튜닝 → 평가 → 임계값 선정 → HF Hub 업로드 |
-| `export_onnx.py` | 파인튜닝 모델을 ONNX 로 export (+ int8 양자화) |
+| `data/make_smoke_dataset.py` | 파이프라인 스모크 테스트용 더미 imagefolder 생성 |
+| `notebooks/train_photo_verifier.ipynb` | 데이터 로드 → CLIP 제로샷 베이스라인 → 헤드 학습 → 전체 파인튜닝 → 평가 → 임계값 선정 → 모델 저장 |
+| `export_onnx.py` | 파인튜닝 모델을 ONNX 로 export (+ int8 양자화, 전처리·라벨 함께 출력) |
 | `requirements.txt` | 학습·평가 의존성 |
-| `thresholds.json` | 노트북이 생성하는 임계값. 앱의 `PhotoVerificationConfig` 기본값으로 옮긴다 |
+| `thresholds.json` | 노트북 7단계가 생성하는 임계값. 앱의 `PhotoVerificationConfig` 기본값으로 옮긴다 |
+
+## 노트북 환경변수
+
+`train_photo_verifier.ipynb` 는 환경변수로 데이터셋·에폭을 바꿀 수 있습니다.
+
+| 변수 | 기본값 | 설명 |
+| --- | --- | --- |
+| `TMP_DATASET_ID` | `<user>/travel-mission-photos` | HF Hub id **또는 로컬 imagefolder 경로**. 로컬 경로면 자동으로 "스모크 모드"(CPU 강제) |
+| `TMP_EPOCHS_HEAD` / `TMP_EPOCHS_FULL` | 8 / 6 | 헤드 학습 · 전체 파인튜닝 에폭 |
+
+Colab GPU 에서 실제 학습 시엔 환경변수 없이 `DATASET_ID` 상수만 바꾸면 됩니다.
 
 ## 클래스
 
@@ -38,19 +50,44 @@ HuggingFace 베이스 모델을 우리 미션 사진 데이터로 파인튜닝�
 
 ```bash
 cd ml
-pip install -r requirements.txt
+python -m venv .venv && .venv/bin/pip install -r requirements.txt
 
-# 1) 데이터셋 구축 (data/README.md 참고)
-cd data && python fetch_public.py --out raw --per-class 800
-python make_negatives.py --out raw/무효 --count 1200
-python build_dataset.py --raw raw --out travel-mission-photos
-python upload_hf.py --dir travel-mission-photos --repo <user>/travel-mission-photos && cd ..
+# 0) (선택) 파이프라인 스모크 테스트 — 더미 데이터로 노트북이 끝까지 도는지 확인
+.venv/bin/python data/make_smoke_dataset.py --out /tmp/smoke --per-class 20
+.venv/bin/python -m ipykernel install --user --name tm     # 최초 1회
+TMP_DATASET_ID=/tmp/smoke TMP_EPOCHS_HEAD=1 TMP_EPOCHS_FULL=1 \
+  .venv/bin/jupyter nbconvert --to notebook --execute \
+  --ExecutePreprocessor.kernel_name=tm --output /tmp/smoke_run.ipynb \
+  notebooks/train_photo_verifier.ipynb
+.venv/bin/python export_onnx.py --model outputs/final \
+  --out /tmp/photo_verifier.onnx --quantize
 
-# 2) 학습 (notebooks/train_photo_verifier.ipynb 를 Colab/Jupyter 에서, DATASET_ID 교체)
+# 1) 실제 데이터셋 구축 (data/README.md 참고)
+cd data
+../.venv/bin/python fetch_public.py --out raw --per-class 800
+../.venv/bin/python make_negatives.py --out raw/무효 --count 1200
+../.venv/bin/python build_dataset.py --raw raw --out travel-mission-photos
+../.venv/bin/python upload_hf.py --dir travel-mission-photos --repo <user>/travel-mission-photos
+cd ..
 
-# 3) export
-python export_onnx.py --model <HF_repo_or_local_dir> --out ../app/src/main/assets/photo_verifier.onnx --quantize
+# 2) 학습: Colab GPU 에서 notebooks/train_photo_verifier.ipynb, DATASET_ID 를 위 repo 로 교체
+
+# 3) export → app/src/main/assets/ 에 커밋
+.venv/bin/python export_onnx.py --model outputs/final \
+  --out ../app/src/main/assets/photo_verifier.onnx --quantize
 ```
+
+## 산출 모델 규격 (Android `OnnxPhotoVerifier` 참고)
+
+- 입력: `pixel_values`, `float32`, `[batch, 3, 256, 256]` (동적 축)
+- 출력: `logits`, `[batch, 5]` — **로짓**. 앱에서 softmax 를 적용해 확률로 변환한 뒤 판정한다.
+- 라벨 순서: `photo_verifier_labels.json` (= `labels.json` 의 `labels` 순서)
+- 전처리 (MobileViT, `photo_verifier_preprocessor.json`):
+  1. 짧은 변을 `size.shortest_edge`(288)로 리사이즈 (BILINEAR)
+  2. 가운데 `crop_size`(256×256) 크롭
+  3. `rescale_factor`(1/255) 곱 → 0~1
+  4. `do_flip_channel_order = true` → **RGB 채널을 BGR 로 뒤집는다**
+  5. `do_normalize` 없음 → mean/std 정규화 안 함
 
 ## 평가 지표 (보고서용)
 

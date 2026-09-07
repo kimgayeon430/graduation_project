@@ -5,9 +5,9 @@
 
 - **프로젝트명**: Travel Mission — 온디바이스 사진 인증을 적용한 여행지 미션 게이미피케이션 앱
 - **소속**: 숙명여자대학교 인공지능공학부
-- **작성자**: 김가연 `[학번]`
-- **지도교수**: `[교수명]`
-- **개발 기간**: `[YYYY.MM ~ YYYY.MM]`
+- **작성자**: 김가연 (2210723), 강규린 (2215987)
+- **지도교수**: 김철연
+- **개발 기간**: 2026.03 ~ 2026.09
 
 ---
 
@@ -273,6 +273,7 @@ PhotoVerification (domain/, 순수 Kotlin)  ── 점수 + 미션 카테고리 
 
 - 모델 의존(추론)은 `data/` 계층에, 판정 규칙은 순수 Kotlin(`domain/PhotoVerification`)으로 분리해 단위 테스트한다. 기존 `LocationVerification`·`MissionCompletion` 과 동일한 설계 원칙.
 - `PhotoVerifier` 는 인터페이스이며 구현체(`OnnxPhotoVerifier`, 테스트용 `FakePhotoVerifier`)를 교체할 수 있다.
+- `OnnxPhotoVerifier` 는 전처리 상수를 하드코딩하지 않고 `photo_verifier_preprocessor.json`(export 산출물)에서 읽어 학습·추론 전처리를 자동 정합시킨다. 모델 입력은 `pixel_values [1,3,256,256]` float32, 출력은 로짓 `[1,5]` 이며 앱에서 softmax 후 판정한다. MobileViT 전처리는 짧은 변 288 리사이즈 → 256 center-crop → ×(1/255) → RGB→BGR 채널 순서 반전(정규화 없음).
 - 추론(`PhotoVerifier`) + 판정(`PhotoVerification`)을 묶은 "업로드 전 결정"은 `data/PhotoGate` 로 분리했다. Firebase·Android 에 의존하지 않아 `FakePhotoVerifier` 로 전 경로를 단위 테스트한다. `FirebaseMissionRepository` 는 `PhotoGate.decide()` 결과(`Reject` / `Proceed(needsReview)`)에 따라 업로드/거부만 수행한다.
 
 ### 6.3 데이터셋
@@ -338,14 +339,15 @@ PhotoVerification (domain/, 순수 Kotlin)  ── 점수 + 미션 카테고리 
 - [x] 추론 인터페이스 `PhotoVerifier` (+ `FakePhotoVerifier`), 업로드 전 결정 `PhotoGate` + 테스트 7건
 - [x] 미션 완료 흐름 연결 (업로드 전 판정, 결과 기록, `REJECT`/`NEEDS_REVIEW` UX 분기)
 - [x] 관리자 사진 검수 큐 화면
-- [x] 데이터셋 구축 스크립트 `ml/data/`, 학습 노트북, ONNX export 스크립트
+- [x] 데이터셋 구축 스크립트 `ml/data/`, 학습 노트북, ONNX export 스크립트 — 더미 데이터로 파이프라인 전 구간(데이터 로드 → CLIP 제로샷 → 학습 → 평가 → 임계값 → ONNX export) 스모크 테스트 완료
+- [x] `OnnxPhotoVerifier` (ONNX Runtime Mobile) 구현 — `assets/` 의 모델·전처리·라벨 json 을 읽어 추론, 모델 없으면 `null` 반환해 앱 무영향
 - [x] Firestore 보안 규칙 `firestore.rules`
+- [x] Supabase Storage 사진 업로드 (InvalidKey·RLS 이슈 수정 후 실기기 동작 확인)
 
 ### 7.2 남은 작업
 
-- [ ] 데이터셋 수집 실행 (목표 규모 확보)
-- [ ] 모델 학습 및 임계값 확정 (`thresholds.json` → `PhotoVerificationConfig` 반영)
-- [ ] `OnnxPhotoVerifier` 구현 (ONNX Runtime Mobile) 및 기본 verifier 교체
+- [ ] 실제 데이터셋 수집 (목표 규모 확보) 및 학습 실행
+- [ ] `thresholds.json` 값을 `PhotoVerificationConfig` 기본값으로 반영, `photo_verifier.onnx` 를 `assets/` 에 커밋
 - [ ] `firestore.rules` 배포 및 규칙 시뮬레이터 검증
 - [ ] Robolectric 기반 ViewModel/Compose UI 테스트 `[선택]`
 - [ ] 서버측 포인트 검증(Cloud Functions) `[선택]`

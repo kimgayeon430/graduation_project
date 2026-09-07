@@ -1,5 +1,8 @@
-# 학습·평가 (Colab / 로컬 GPU)
+# 학습·평가 (Colab / 로컬 GPU·MPS·CPU)
+# 로컬 스모크 테스트 검증 환경: Python 3.11, macOS(arm64),
+#   torch 2.14 / transformers 5.16 / datasets 5.0 / optimum 2.3
 torch>=2.2
+torchvision>=0.17
 transformers>=4.44
 datasets>=2.20
 accelerate>=0.33
@@ -7,9 +10,15 @@ evaluate>=0.4
 scikit-learn>=1.4
 matplotlib>=3.8
 pillow>=10.0
-peft>=0.12            # (선택) LoRA 비교군
+peft>=0.12                # (선택) LoRA 비교군
+
+# 노트북을 스크립트로 실행할 때 (Colab 은 불필요)
+jupyter>=1.0
+nbconvert>=7.0
+ipykernel>=6.0
 
 # ONNX export / 양자화
-optimum[exporters]>=1.21
+optimum>=1.21
+optimum-onnx>=0.1        # optimum 2.x 는 ORTModel* 을 이 패키지로 분리했다
 onnx>=1.16
 onnxruntime>=1.18
