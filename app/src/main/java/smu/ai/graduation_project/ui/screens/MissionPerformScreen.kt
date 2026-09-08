@@ -5,8 +5,7 @@ import android.content.pm.PackageManager
 import android.location.Location
 import android.location.LocationManager
 import android.net.Uri
-import android.os.Build
-import android.os.CancellationSignal
+import android.os.SystemClock
 import android.widget.Toast
 import java.io.File
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -61,6 +60,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
+import androidx.core.location.LocationManagerCompat
+import androidx.core.os.CancellationSignal
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.google.firebase.Firebase
@@ -68,6 +69,18 @@ import com.google.firebase.auth.auth
 import smu.ai.graduation_project.ui.theme.CardGray
 import smu.ai.graduation_project.ui.theme.LightPurple
 import smu.ai.graduation_project.ui.theme.MainPurple
+
+/**
+ * 위치 인증에 쓸 수 있는 좌표의 최대 나이. 이보다 오래된 값은 "현재 위치" 로 보지 않는다.
+ *
+ * `getCurrentLocation` 도 아주 최근이면 캐시를 그대로 돌려줄 수 있어, 낡은 좌표로 조용히
+ * 오판하지 않도록 한 번 더 거른다.
+ */
+private const val MAX_LOCATION_AGE_MILLIS = 2 * 60 * 1000L
+
+/** 단조 시계 기준 좌표 나이(ms). 기기 시각을 바꿔도 영향받지 않는다. */
+private fun locationAgeMillis(location: Location): Long =
+    (SystemClock.elapsedRealtimeNanos() - location.elapsedRealtimeNanos) / 1_000_000
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -104,6 +117,32 @@ fun MissionPerformScreen(
     }
 
     // ---- 위치(GPS) 획득: Android 프레임워크 영역 ----
+
+    /**
+     * [provider] 로 **새 위치를 한 번 요청**한다. 못 받으면 [fallback] 으로 한 번 더 시도한다.
+     *
+     * `getLastKnownLocation` 은 쓰지 않는다. 그건 GPS 를 켜지 않고 마지막으로 저장된 값만
+     * 돌려주므로, 실내이거나 오랜만에 실행하면 몇 시간 전 다른 동네 좌표가 그대로 나온다.
+     * (실제로 목표 지점에 서 있는데 24km 떨어졌다고 나오던 원인)
+     *
+     * [LocationManagerCompat] 는 API 30 의 `getCurrentLocation` 을 구버전까지 backport 한다.
+     */
+    fun requestFreshLocation(provider: String, fallback: String?) {
+        val lm = locationManager ?: return viewModel.onLocationResult(null)
+        // null 은 두 CancellationSignal 오버로드 사이에서 모호하므로 타입을 못 박는다.
+        LocationManagerCompat.getCurrentLocation(
+            lm, provider, null as CancellationSignal?, ContextCompat.getMainExecutor(context)
+        ) { location: Location? ->
+            val fresh = location != null && locationAgeMillis(location) <= MAX_LOCATION_AGE_MILLIS
+            when {
+                fresh -> viewModel.onLocationResult(location)
+                // GPS 는 실내에서 자주 실패한다. 그때는 network(와이파이·기지국) 로 넘어간다.
+                fallback != null -> requestFreshLocation(fallback, null)
+                else -> viewModel.onLocationResult(null)
+            }
+        }
+    }
+
     fun requestLocation() {
         if (Firebase.auth.currentUser == null) {
             Toast.makeText(context, "로그인이 필요합니다.", Toast.LENGTH_SHORT).show()
@@ -121,15 +160,14 @@ fun MissionPerformScreen(
         }
 
         viewModel.onLocationRequestStarted()
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            val provider = if (gpsEnabled) LocationManager.GPS_PROVIDER else LocationManager.NETWORK_PROVIDER
-            locationManager.getCurrentLocation(provider, CancellationSignal(), context.mainExecutor) { location ->
-                viewModel.onLocationResult(location)
-            }
+        // GPS 가 정확하므로 먼저 쓰고, 실패하면 network 로 폴백한다.
+        if (gpsEnabled) {
+            requestFreshLocation(
+                LocationManager.GPS_PROVIDER,
+                fallback = if (networkEnabled) LocationManager.NETWORK_PROVIDER else null,
+            )
         } else {
-            val location = locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER)
-                ?: locationManager.getLastKnownLocation(LocationManager.NETWORK_PROVIDER)
-            viewModel.onLocationResult(location)
+            requestFreshLocation(LocationManager.NETWORK_PROVIDER, fallback = null)
         }
     }
 
