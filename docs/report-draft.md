@@ -159,6 +159,7 @@ firebase.json         # Firebase CLI 설정 (규칙 배포)
   - `missions` 의 `completionCount` 필드만은 로그인 사용자가 갱신 가능(완료 시 인기도 신호)
   - `users/{uid}`: 본인 또는 관리자만 수정, 삭제 불가
   - `user_missions/{id}`: 생성은 본인 문서만, **사용자는 자기 `photoNeedsReview` 를 true→false 로 되돌릴 수 없음**(검수 승인은 관리자만)
+- **테스트**: `firestore-tests/` 에서 에뮬레이터 + `@firebase/rules-unit-testing` 으로 20건 검증(8.1절).
 - **한계**: 서버(Cloud Functions)가 없어 포인트 지급/회수의 값 자체는 검증하지 못한다. 서버측 포인트 검증은 향후 과제다. (10장)
 
 ---
@@ -369,10 +370,10 @@ scene 다양성: 투어 107 · 맛집 101 · 체험 53 · 쇼핑 28 · 무효 2(
 - [x] 추론 인터페이스 `PhotoVerifier` (+ `FakePhotoVerifier`), 업로드 전 결정 `PhotoGate` + 테스트 7건
 - [x] 미션 완료 흐름 연결 (업로드 전 판정, 결과 기록, `REJECT`/`NEEDS_REVIEW` UX 분기)
 - [x] 관리자 사진 검수 큐 화면
+- [x] Firestore 보안 규칙 `firestore.rules` + 에뮬레이터 테스트 20건 (`firestore-tests/`)
 - [x] 데이터셋 구축 스크립트 `ml/data/`, 학습 노트북, ONNX export 스크립트 — 더미 데이터로 파이프라인 전 구간(데이터 로드 → CLIP 제로샷 → 학습 → 평가 → 임계값 → ONNX export) 스모크 테스트 완료
 - [x] 실제 데이터셋 구축 (5,300장, HF Hub `kimgayeon430/travel-mission-photos`) — 6.3절
 - [x] `OnnxPhotoVerifier` (ONNX Runtime Mobile) 구현 — `assets/` 의 모델·전처리·라벨 json 을 읽어 추론, 모델 없으면 `null` 반환해 앱 무영향
-- [x] Firestore 보안 규칙 `firestore.rules`
 - [x] Supabase Storage 사진 업로드 (InvalidKey·RLS 이슈 수정 후 실기기 동작 확인)
 - [x] 마이페이지 포인트 적립 내역 화면 (`PointHistoryScreen`)
 - [x] Colab T4 에서 파인튜닝 → `photo_verifier.onnx`(20MB) 를 `assets/` 에 번들, 임계값을 `PhotoVerificationConfig.DEFAULT` 로 반영, 기본 verifier 를 `OnnxPhotoVerifier`·`DEFAULT` config 로 전환 (test macro-F1 0.82)
@@ -383,7 +384,7 @@ scene 다양성: 투어 107 · 맛집 101 · 체험 53 · 쇼핑 28 · 무효 2(
 - [ ] 실기기에서 사진 인증 전체 루프 확인 (PASS/REJECT/NEEDS_REVIEW → 관리자 승인/반려), 추론 지연 측정
 - [ ] 크라우드소싱 사진으로 각 클래스 보강(특히 체험) 후 재학습
 - [ ] `user_missions` 로그로 추천 re-ranker 재학습(`--from-firestore`), 시뮬레이터 학습본 대체
-- [ ] `firestore.rules` 배포 및 규칙 시뮬레이터 검증
+- [ ] `firestore.rules` 배포 (`firebase deploy --only firestore:rules` — 규칙 테스트 20건은 통과)
 - [ ] Robolectric 기반 ViewModel/Compose UI 테스트 `[선택]`
 - [ ] 서버측 포인트 검증(Cloud Functions) `[선택]`
 
@@ -405,10 +406,10 @@ scene 다양성: 투어 107 · 맛집 101 · 체험 53 · 쇼핑 28 · 무효 2(
 
 ## 8. 평가 계획
 
-### 8.1 도메인 규칙
+### 8.1 도메인 규칙 · 보안 규칙
 
-- JUnit4 단위 테스트로 거리·보상·완료·취향·추천·사진 판정 규칙을 검증한다. (경계값 포함)
-- 사진 인증 관련: `PhotoVerificationTest`(임계값별 PASS/REJECT/NEEDS_REVIEW, 경계값, 모델 부재), `PhotoGateTest`(정상/무효/애매 분기, 모델 부재·추론 예외 처리).
+- **JUnit4 단위 테스트**로 거리·보상·완료·취향·추천·사진 판정 규칙을 검증한다(경계값 포함). 사진 인증: `PhotoVerificationTest`, `PhotoGateTest`. 추천: `MissionFeaturesTest`, `LearnedRerankerTest`, `MissionRecommenderRerankedTest`.
+- **Firestore 보안 규칙 테스트** (`firestore-tests/`, `@firebase/rules-unit-testing` + 에뮬레이터, 20건): 게스트/일반/관리자 컨텍스트로 `admins`·`missions`·`users`·`user_missions` 의 읽기·쓰기 허용/거부를 검증한다. 핵심: 일반 사용자가 `missions.completionCount` 외 필드를 못 바꾸고, 자기 `photoNeedsReview` 를 true→false 로 못 되돌린다.
 - ViewModel 레벨 테스트는 `android.net.Uri`·`android.location.Location` 의존으로 순수 JUnit 에서 불가하며, Robolectric 도입은 향후 과제로 둔다.
 
 ### 8.2 사진 인증 모델

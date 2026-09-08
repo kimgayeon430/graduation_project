@@ -31,7 +31,6 @@ __pycache__/
 # Firebase CLI
 /.firebase/
 firebase-debug.log
-.firebaserc
 .claude/settings.local.json
 /ml/*.onnx
 /ml/*.data
@@ -39,3 +38,8 @@ firebase-debug.log
 /ml/sym_shape_infer_temp.onnx
 /ml/reco/rows.csv
 /ml/reco/*.csv
+/firestore-tests/node_modules/
+/.firebase/
+firestore-debug.log
+firebase-debug.log
+ui-debug.log

@@ -1,0 +1,14 @@
+{
+  "name": "firestore-rules-tests",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "firestore.rules 단위 테스트 (Firestore 에뮬레이터 + @firebase/rules-unit-testing)",
+  "scripts": {
+    "test": "firebase emulators:exec --only firestore --project grad-proj-5e09c \"node --test\""
+  },
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "^4.0.1",
+    "firebase": "^11.10.0"
+  }
+}
