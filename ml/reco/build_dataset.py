@@ -20,6 +20,28 @@ def _completed_status(s: str) -> bool:
     return "완료" in (s or "") or (s or "").lower() == "completed"
 
 
+_KST_OFFSET = 9  # 서버 타임스탬프는 UTC, 사용자는 한국 → KST(UTC+9) 로 변환
+
+
+def _hour_of(um: dict):
+    """user_missions 문서의 완료/갱신 시각에서 KST 기준 0~23시를 뽑는다.
+    없으면 None(시간대 신호 미사용). 재현성을 위해 로컬 타임존이 아닌 고정 KST 오프셋을 쓴다."""
+    for key in ("completedAt", "updatedAt", "timestamp", "createdAt"):
+        v = um.get(key)
+        if isinstance(v, dict):                       # Firestore export: {"_seconds": ...}
+            v = v.get("_seconds") or v.get("seconds")
+        if isinstance(v, (int, float)):
+            import datetime
+            utc = datetime.datetime.fromtimestamp(v, datetime.timezone.utc)
+            return (utc.hour + _KST_OFFSET) % 24
+        if isinstance(v, str) and "T" in v:           # ISO8601 (UTC 'Z' 가정)
+            try:
+                return (int(v.split("T", 1)[1][:2]) + _KST_OFFSET) % 24
+            except ValueError:
+                pass
+    return None
+
+
 def from_firestore(path: str, neg_per_pos: int = 4, seed: int = 0) -> list[dict]:
     """실제 로그. 상호작용한 미션 = user_missions 행, 완료면 positive.
     본 적 없는 미션에서 무작위로 implicit negative 를 뽑는다(비율 neg_per_pos).
@@ -37,7 +59,7 @@ def from_firestore(path: str, neg_per_pos: int = 4, seed: int = 0) -> list[dict]
         uid, mid = um.get("userId"), um.get("missionId")
         if uid not in users or mid not in missions:
             continue
-        per_user.setdefault(uid, {})[mid] = _completed_status(um.get("status"))
+        per_user.setdefault(uid, {})[mid] = (_completed_status(um.get("status")), _hour_of(um))
         if _completed_status(um.get("status")):
             comp_count[mid] = comp_count.get(mid, 0) + 1
     max_c = max(comp_count.values(), default=0)
@@ -46,25 +68,30 @@ def from_firestore(path: str, neg_per_pos: int = 4, seed: int = 0) -> list[dict]
     for uid, seen in per_user.items():
         u = users[uid]
         done_cats: dict = {}
-        for mid, done in seen.items():
+        for mid, (done, _h) in seen.items():
             if done:
                 c = missions[mid].get("category", "투어")
                 done_cats[c] = done_cats.get(c, 0) + 1
+        # 미본 미션(negative)의 시각은 알 수 없으므로 이 사용자의 대표 접속 시각(최빈)을 쓴다.
+        hours = [h for _d, h in seen.values() if h is not None]
+        default_hour = max(set(hours), key=hours.count) if hours else None
         uctx = {
             "preferred": set(u.get("preferences", []) or []),
             "level": _level_int(u.get("level")),
             "completed_by_cat": done_cats,
+            "hour": default_hour,
         }
 
-        def row(mid: str, label: int):
+        def row(mid: str, label: int, hour=None):
             m = missions[mid]
             mm = {"category": m.get("category", "투어"), "points": int(m.get("points", 0)),
                   "distance_m": None, "completion_count": comp_count.get(mid, 0)}
+            uctx["hour"] = hour if hour is not None else default_hour
             return {"user_id": uid, "mission_id": mid,
                     "features": signals(mm, uctx, max_c), "label": label}
 
-        for mid, done in seen.items():
-            rows.append(row(mid, 1 if done else 0))
+        for mid, (done, hour) in seen.items():
+            rows.append(row(mid, 1 if done else 0, hour))
         unseen = [mid for mid in missions if mid not in seen]
         rng.shuffle(unseen)
         for mid in unseen[: max(1, len(seen) * neg_per_pos)]:

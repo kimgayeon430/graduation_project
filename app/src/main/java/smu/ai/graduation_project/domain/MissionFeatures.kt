@@ -16,6 +16,7 @@ object MissionFeatures {
     /** feature 벡터 순서. `ml/reco/` 학습 스크립트와 일치해야 한다. */
     val NAMES: List<String> = listOf(
         "explicit_pref", "implicit_affinity", "difficulty_fit", "proximity", "popularity",
+        "time_of_day_fit",
     )
 
     /** 근접도 만점 거리(m). */
@@ -23,6 +24,33 @@ object MissionFeatures {
 
     /** 근접도 0 거리(m). */
     private const val FAR_METERS = 15_000.0
+
+    /**
+     * 카테고리별 "하기 좋은" 시간대(0~23시, 양끝 포함). `ml/reco/features.py` 와 동일하게 유지.
+     * 표에 없는 카테고리는 시간대 신호를 쓰지 않는다(0).
+     */
+    private val TIME_WINDOWS: Map<String, List<IntRange>> = mapOf(
+        "맛집" to listOf(11..14, 17..21),   // 점심·저녁
+        "투어" to listOf(9..17),            // 낮
+        "체험" to listOf(10..18),           // 낮
+        "쇼핑" to listOf(13..21),           // 오후~저녁
+    )
+
+    /** 활동 시간대에서 이만큼(시간) 벗어나면 시간대 적합도가 0 이 된다. */
+    private const val TIME_DECAY_HOURS = 4.0
+
+    /**
+     * 현재 시각([hour], 0~23)이 미션 [category] 의 활동 시간대에 얼마나 맞는지 (0~1).
+     * 시간대 안이면 1, 밖이면 가장 가까운 경계까지의 시간 차로 선형 감소(24시 순환).
+     */
+    fun timeOfDayFit(category: String, hour: Int): Double {
+        val windows = TIME_WINDOWS[category] ?: return 0.0
+        if (windows.any { hour in it }) return 1.0
+        val nearestEdgeDist = windows
+            .flatMap { listOf(it.first, it.last) }
+            .minOf { edge -> abs(hour - edge).let { d -> minOf(d, 24 - d) } }
+        return (1.0 - nearestEdgeDist / TIME_DECAY_HOURS).coerceIn(0.0, 1.0)
+    }
 
     data class Signals(
         /** 미션 카테고리가 명시적 취향에 포함되면 1, 아니면 0. */
@@ -35,9 +63,11 @@ object MissionFeatures {
         val proximity: Double,
         /** 다른 사용자 완료 횟수 기반 인기도 (0~1). 신호 없으면 0. */
         val popularity: Double,
+        /** 현재 시각이 미션 카테고리의 활동 시간대에 맞는 정도 (0~1). 시각을 모르면 0. */
+        val timeOfDayFit: Double,
     ) {
         fun asVector(): DoubleArray =
-            doubleArrayOf(explicitPref, implicitAffinity, difficultyFit, proximity, popularity)
+            doubleArrayOf(explicitPref, implicitAffinity, difficultyFit, proximity, popularity, timeOfDayFit)
     }
 
     /**
@@ -62,6 +92,8 @@ object MissionFeatures {
         val popularity = if (maxCompletionCount <= 0) 0.0
         else (context.completionCount(mission.id).toDouble() / maxCompletionCount).coerceIn(0.0, 1.0)
 
-        return Signals(explicit, affinity, fit, proximity, popularity)
+        val timeFit = context.currentHour?.let { timeOfDayFit(mission.category, it) } ?: 0.0
+
+        return Signals(explicit, affinity, fit, proximity, popularity, timeFit)
     }
 }

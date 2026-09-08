@@ -15,7 +15,9 @@ data class RecommendationContext(
     /** 미션 id → 사용자 현재 위치로부터의 거리(m). 위치를 모르면 비어 있다. */
     val distanceMetersByMissionId: Map<String, Double> = emptyMap(),
     /** 미션 id → 지금까지 완료된 횟수 (인기도 신호). */
-    val completionCountByMissionId: Map<String, Int> = emptyMap()
+    val completionCountByMissionId: Map<String, Int> = emptyMap(),
+    /** 추천을 만드는 현재 시각(0~23시). null 이면 시간대 적합도 신호를 쓰지 않는다. */
+    val currentHour: Int? = null
 ) {
     /** 지금까지 완료한 전체 미션 수. */
     val totalCompleted: Int get() = completedCountByCategory.values.sum()

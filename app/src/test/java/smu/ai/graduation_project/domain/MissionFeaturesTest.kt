@@ -24,7 +24,7 @@ class MissionFeaturesTest {
         for (v in s.asVector()) {
             assert(v in 0.0..1.0) { "신호가 0..1 범위를 벗어남: $v" }
         }
-        assertEquals(5, s.asVector().size)
+        assertEquals(6, s.asVector().size)
         assertEquals(MissionFeatures.NAMES.size, s.asVector().size)
     }
 
@@ -63,5 +63,33 @@ class MissionFeaturesTest {
     fun affinityMatchesCompletionRatio() {
         val ctx = RecommendationContext(completedCountByCategory = mapOf("맛집" to 3, "투어" to 1))
         assertEquals(0.75, MissionFeatures.of(mission("a", "맛집"), ctx).implicitAffinity, 1e-9)
+    }
+
+    @Test
+    fun timeOfDayFitIsZeroWhenHourUnknown() {
+        val ctx = RecommendationContext(preferredCategories = setOf("맛집"))
+        assertEquals(0.0, MissionFeatures.of(mission("a", "맛집"), ctx).timeOfDayFit, 0.0)
+    }
+
+    @Test
+    fun timeOfDayFitPeaksInsideCategoryWindow() {
+        // 맛집: 점심 11~14시. 정오는 만점, 새벽 3시는 0.
+        val lunch = RecommendationContext(currentHour = 12)
+        val night = RecommendationContext(currentHour = 3)
+        assertEquals(1.0, MissionFeatures.of(mission("a", "맛집"), lunch).timeOfDayFit, 1e-9)
+        assertEquals(0.0, MissionFeatures.of(mission("a", "맛집"), night).timeOfDayFit, 1e-9)
+    }
+
+    @Test
+    fun timeOfDayFitDecaysOutsideWindow() {
+        // 투어: 9~17시. 18시는 경계에서 1시간 → 1 - 1/4 = 0.75.
+        val ctx = RecommendationContext(currentHour = 18)
+        assertEquals(0.75, MissionFeatures.of(mission("a", "투어"), ctx).timeOfDayFit, 1e-9)
+    }
+
+    @Test
+    fun timeOfDayFitIsZeroForUnknownCategory() {
+        val ctx = RecommendationContext(currentHour = 12)
+        assertEquals(0.0, MissionFeatures.of(mission("a", "기타"), ctx).timeOfDayFit, 0.0)
     }
 }

@@ -17,6 +17,8 @@ data class RecommendationWeights(
     val proximity: Double = 1.5,
     /** 다른 사용자가 많이 완료한 미션에 주는 가산치. */
     val popularity: Double = 1.0,
+    /** 지금 시각이 미션 카테고리의 활동 시간대에 맞을수록 주는 가산치. */
+    val timeOfDayFit: Double = 1.0,
     /** 추천 목록에 같은 카테고리가 하나 쌓일 때마다 빼는 감점치 (다양성). */
     val diversityPenalty: Double = 2.0
 ) {

@@ -32,7 +32,7 @@ class MissionRecommenderRerankedTest {
             completedCountByCategory = mapOf("투어" to 2),
         )
         val model = LearnedReranker.Model(
-            weights = doubleArrayOf(-9.0, -9.0, -9.0, -9.0, -9.0), bias = 0.0, blend = 0.0,
+            weights = doubleArrayOf(-9.0, -9.0, -9.0, -9.0, -9.0, -9.0), bias = 0.0, blend = 0.0,
         )
         val ruled = MissionRecommender.recommendScored(missions, ctx, emptyList(), limit = 4)
         val reranked = MissionRecommender.recommendReranked(missions, ctx, emptyList(), model, limit = 4)
@@ -45,7 +45,7 @@ class MissionRecommenderRerankedTest {
         // 규칙상 아무 신호 없음 → 입력 순서(tour 먼저). 학습 모델이 "맛집 명시취향" 을 강하게 선호.
         val ctx = RecommendationContext(preferredCategories = setOf("맛집"))
         val model = LearnedReranker.Model(
-            weights = doubleArrayOf(10.0, 0.0, 0.0, 0.0, 0.0), bias = -5.0, blend = 1.0,
+            weights = doubleArrayOf(10.0, 0.0, 0.0, 0.0, 0.0, 0.0), bias = -5.0, blend = 1.0,
         )
         val top = MissionRecommender.recommendReranked(missions, ctx, emptyList(), model, limit = 1)
         assertEquals("food", top.single().mission.id)
@@ -54,7 +54,7 @@ class MissionRecommenderRerankedTest {
     @Test
     fun reasonsFromRulesArePreserved() {
         val ctx = RecommendationContext(preferredCategories = setOf("맛집"))
-        val model = LearnedReranker.Model(weights = DoubleArray(5), bias = 0.0, blend = 0.5)
+        val model = LearnedReranker.Model(weights = DoubleArray(6), bias = 0.0, blend = 0.5)
         val reranked = MissionRecommender.recommendReranked(missions, ctx, emptyList(), model, limit = 4)
         val food = reranked.first { it.mission.id == "food" }
         assertEquals(true, food.reasons.any { it.contains("취향") })
@@ -63,7 +63,7 @@ class MissionRecommenderRerankedTest {
     @Test
     fun completedMissionsExcluded() {
         val ctx = RecommendationContext()
-        val model = LearnedReranker.Model(weights = DoubleArray(5), bias = 0.0, blend = 0.5)
+        val model = LearnedReranker.Model(weights = DoubleArray(6), bias = 0.0, blend = 0.5)
         val reranked = MissionRecommender.recommendReranked(missions, ctx, listOf("tour", "food"), model, limit = 4)
         assertEquals(setOf("shop", "exp"), reranked.map { it.mission.id }.toSet())
     }

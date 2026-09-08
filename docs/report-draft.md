@@ -113,7 +113,7 @@ firebase.json         # Firebase CLI 설정 (규칙 배포)
 | `MissionRewardPolicy` | 1·2단계 보상 계산과 중복 지급 방지 |
 | `MissionCompletion` | 사진 인증 가능 여부·완료 처리 결과(`resolve`) 계산 |
 | `TravelPreference` | 취향 카테고리 정의, 최소 1개 선택 규칙, 저장용 정규화 |
-| `MissionFeatures` | 미션 추천 신호 5개(0~1 정규화) 계산. 규칙·학습이 공유 |
+| `MissionFeatures` | 미션 추천 신호 6개(0~1 정규화) 계산. 규칙·학습이 공유 |
 | `MissionScorer` | 신호를 `RecommendationWeights` 로 가중합 + 근거 문구 (규칙 점수) |
 | `LearnedReranker` | 완료 로그로 학습한 로지스틱 회귀로 완료 확률 추정 |
 | `MissionRecommender` | 후보 필터 + 점수 정렬 + 다양성 감점으로 상위 N건 추천 |
@@ -216,7 +216,7 @@ firebase.json         # Firebase CLI 설정 (규칙 배포)
 홈의 추천 미션 상위 3건은 **규칙 점수를 완료 로그로 학습한 re-ranker 로 다시 매겨** 만든다.
 학습 모델(`assets/reranker.json`)이 없으면 규칙 점수만으로 정렬한다(콜드스타트).
 
-**신호 5개** (`MissionFeatures`, 0~1 정규화 — 규칙·학습이 공유)
+**신호 6개** (`MissionFeatures`, 0~1 정규화 — 규칙·학습이 공유)
 
 | 신호 | 의미 |
 | --- | --- |
@@ -225,6 +225,7 @@ firebase.json         # Firebase CLI 설정 (규칙 배포)
 | `difficulty_fit` | 미션 포인트대가 사용자 레벨 기대치에 가까운 정도 |
 | `proximity` | 현재 위치로부터의 근접도 (위치를 알 때만) |
 | `popularity` | 다른 사용자 완료 횟수 기반 인기도 |
+| `time_of_day_fit` | 현재 시각이 미션 카테고리 활동 시간대(맛집=점심·저녁, 투어/체험=낮, 쇼핑=오후~저녁)에 맞는 정도 |
 
 1. id 가 없거나 완료한 미션은 후보에서 제외한다.
 2. 후보마다 **규칙 점수**(`MissionScorer`, `RecommendationWeights` 가중합 + 근거 칩)와
@@ -377,7 +378,7 @@ scene 다양성: 투어 107 · 맛집 101 · 체험 53 · 쇼핑 28 · 무효 2(
 - [x] Supabase Storage 사진 업로드 (InvalidKey·RLS 이슈 수정 후 실기기 동작 확인)
 - [x] 마이페이지 포인트 적립 내역 화면 (`PointHistoryScreen`)
 - [x] Colab T4 에서 파인튜닝 → `photo_verifier.onnx`(20MB) 를 `assets/` 에 번들, 임계값을 `PhotoVerificationConfig.DEFAULT` 로 반영, 기본 verifier 를 `OnnxPhotoVerifier`·`DEFAULT` config 로 전환 (test macro-F1 0.82)
-- [x] 학습된 추천 re-ranker: `MissionFeatures`·`LearnedReranker`·`MissionRecommender.recommendReranked` + `ml/reco/` 파이프라인 + `assets/reranker.json`. 시뮬레이터 학습본으로 규칙 대비 AUC 0.950→0.960, NDCG@5 0.894→0.958 (8.3절)
+- [x] 학습된 추천 re-ranker: `MissionFeatures`·`LearnedReranker`·`MissionRecommender.recommendReranked` + `ml/reco/` 파이프라인 + `assets/reranker.json`. 신호 6개(시간대 적합도 포함), 시뮬레이터 학습본으로 규칙 대비 AUC 0.949→0.960, NDCG@5 0.914→0.953 (8.3절)
 
 ### 7.2 남은 작업
 
@@ -442,27 +443,28 @@ scene 다양성: 투어 107 · 맛집 101 · 체험 53 · 쇼핑 28 · 무효 2(
 ### 8.3 학습된 추천 re-ranker
 
 규칙 점수(`MissionScorer`, 손튜닝 가중치)에 완료 로그로 학습한 **로지스틱 회귀 re-ranker** 를 얹은
-하이브리드(4.5절). 신호 5개는 규칙·학습이 공유한다(`MissionFeatures`).
+하이브리드(4.5절). 신호 6개는 규칙·학습이 공유한다(`MissionFeatures`).
 
 - **파이프라인**(`ml/reco/`): `build_dataset.py`(로그 → 학습행) → `train_reranker.py`(로지스틱 회귀 → `reranker.json`) → `evaluate_reco.py`(규칙 vs 학습 비교). 앱은 `assets/reranker.json` 이 없으면 규칙 기반으로 폴백한다.
-- **데이터**: 실제 `user_missions` 로그가 없어 시뮬레이터(`sim.py`)로 학습했다(`reranker-lr-sim-2`). 시뮬레이터의 참 선호는 규칙 고정 가중치와 다르게 설정했다(인기도·거리를 규칙은 크게 잡지만 실제로는 거의 무의미, 난이도 적합도는 규칙보다 훨씬 중요). 완료율은 현실적으로 낮게(28%) 두어 "상위 3건" 정렬이 실제로 변별되도록 했다. 로그가 쌓이면 `--from-firestore` 로 교체한다.
+- **데이터**: 실제 `user_missions` 로그가 없어 시뮬레이터(`sim.py`)로 학습했다(`reranker-lr-sim-3`). 시뮬레이터의 참 선호는 규칙 고정 가중치와 다르게 설정했다(인기도·거리를 규칙은 크게 잡지만 실제로는 거의 무의미, 난이도 적합도와 시간대 적합도는 규칙 가정보다 훨씬 중요). 사용자마다 앱을 여는 시각을 아침·점심·저녁에 몰리게 두고, 완료율은 현실적으로 낮게(31%) 두어 "상위 3건" 정렬이 실제로 변별되도록 했다. 로그가 쌓이면 `--from-firestore` 로 교체한다(완료 시각에서 KST 기준 시간대 신호를 복원).
 - **평가**: 사용자 800·미션 300, 사용자 단위 7:3 분리. `evaluate_reco.py` 를 인자 없이 실행하면 재현된다(blend λ=0.6).
 
 | 지표 (test, 사용자 분리) | 규칙 | 학습 | blend λ=0.6 |
 | --- | ---: | ---: | ---: |
-| ROC-AUC (완료 예측) | 0.950 | **0.960** | — |
-| precision@3 | 0.893 | **0.960** | 0.947 |
-| NDCG@5 | 0.894 | **0.958** | 0.948 |
-| NDCG@10 | 0.888 | **0.942** | 0.932 |
-| MRR | 0.960 | **0.988** | 0.968 |
-| MAP | 0.862 | **0.896** | 0.890 |
+| ROC-AUC (완료 예측) | 0.949 | **0.960** | — |
+| precision@3 | 0.914 | **0.951** | 0.947 |
+| NDCG@5 | 0.914 | **0.953** | 0.947 |
+| NDCG@10 | 0.908 | **0.947** | 0.940 |
+| MRR | 0.967 | **0.987** | 0.983 |
+| MAP | 0.873 | **0.904** | 0.899 |
 
 hit@3 는 세 방식 모두 0.99+ 로 포화하므로 precision@3·NDCG·MRR 로 본다. 학습 모델은 규칙 대비
-NDCG@5 +0.065, MAP +0.034; 앱이 실제로 쓰는 blend(콜드스타트 안전을 위해 규칙을 40% 섞음)도
-NDCG@5 +0.054 로 이득의 대부분을 가져온다.
+NDCG@5 +0.039, MAP +0.030; 앱이 실제로 쓰는 blend(콜드스타트 안전을 위해 규칙을 40% 섞음)도
+NDCG@5 +0.033 으로 이득의 대부분을 가져온다.
 
-학습 가중치가 규칙의 손튜닝 오류를 교정한다: `proximity` 1.5→0.21, `popularity` 1.0→−0.07,
-`difficulty_fit` 1.0→2.95, `implicit_affinity` 2.0→3.60.
+학습 가중치가 규칙의 손튜닝 오류를 교정한다: `proximity` 1.5→0.21, `popularity` 1.0→−0.06,
+`difficulty_fit` 1.0→3.16, `implicit_affinity` 2.0→3.95, `time_of_day_fit` 1.0→2.46
+(규칙이 시간대·난이도를 과소평가한다).
 
 ---
 

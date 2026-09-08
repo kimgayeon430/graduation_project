@@ -5,8 +5,8 @@ import smu.ai.graduation_project.model.Mission
 /**
  * 미션 1건의 추천 기본 점수를 설명 가능한 규칙으로 계산한다. (학습 모델 없음)
  *
- * 신호 5개는 [MissionFeatures] 에서 계산하고, 여기서는 [RecommendationWeights] 로 가중합 + 근거 문구를 붙인다.
- * 기본 점수 = 명시적 취향 + 암묵적 취향 + 난이도 적합도 + 거리 근접도 + 인기도
+ * 신호 6개는 [MissionFeatures] 에서 계산하고, 여기서는 [RecommendationWeights] 로 가중합 + 근거 문구를 붙인다.
+ * 기본 점수 = 명시적 취향 + 암묵적 취향 + 난이도 적합도 + 거리 근접도 + 인기도 + 시간대 적합도
  *
  * 다양성 감점은 추천 목록을 만드는 순서에 의존하므로 여기서 계산하지 않고
  * [MissionRecommender] 의 그리디 선택 단계에서 적용한다.
@@ -60,6 +60,10 @@ object MissionScorer {
         if (f.popularity > 0.0) {
             score += weights.popularity * f.popularity
             if (f.popularity >= SIGNAL_REASON_THRESHOLD) reasons += "인기 미션"
+        }
+        if (f.timeOfDayFit > 0.0) {
+            score += weights.timeOfDayFit * f.timeOfDayFit
+            if (f.timeOfDayFit >= SIGNAL_REASON_THRESHOLD) reasons += "지금 하기 좋은 시간"
         }
 
         return Scored(mission, score, reasons)

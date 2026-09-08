@@ -118,7 +118,7 @@ def main() -> None:
     print(f"  학습 모델  ROC-AUC = {roc_auc_score(yt, [learned(r['features']) for r in test]):.3f}")
 
     print("\n규칙 가중치 vs 학습 가중치:")
-    rule_w = [3.0, 2.0, 1.0, 1.5, 1.0]
+    rule_w = [3.0, 2.0, 1.0, 1.5, 1.0, 1.0]
     for i, nm in enumerate(FEATURE_NAMES):
         print(f"  {nm:18} 규칙 {rule_w[i]:>5.2f}   학습 {w[i]:>6.2f}")
     print(f"  {'(bias)':18}               학습 {b:>6.2f}")

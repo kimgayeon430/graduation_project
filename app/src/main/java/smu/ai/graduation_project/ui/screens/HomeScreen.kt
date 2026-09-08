@@ -211,7 +211,8 @@ fun HomeScreen(onNavigateToDetail: (String) -> Unit) {
                     .eachCount(),
                 userLevel = level,
                 distanceMetersByMissionId = distances,
-                completionCountByMissionId = completionCounts
+                completionCountByMissionId = completionCounts,
+                currentHour = java.time.LocalTime.now().hour
             ),
             completedMissionIds = completedMissionIds,
             model = rerankerModel,

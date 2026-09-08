@@ -69,13 +69,14 @@
 
 홈의 추천 미션 상위 3건은 **규칙 점수를 완료 로그로 학습한 re-ranker 로 다시 매겨** 만듭니다. 학습 모델(`assets/reranker.json`)이 없으면 규칙 점수만으로 정렬합니다(콜드스타트).
 
-**신호 5개** (`MissionFeatures`, 0~1 정규화 — 규칙·학습이 공유)
+**신호 6개** (`MissionFeatures`, 0~1 정규화 — 규칙·학습이 공유)
 
 - **명시적 취향**: 미션 카테고리가 `users/{uid}.preferences` 에 포함되면 1
 - **암묵적 취향**: 그 카테고리 미션을 완료한 비율
 - **난이도 적합도**: 미션 포인트대가 사용자 레벨 기대치에 가까운 정도
 - **거리 근접도**: 현재 위치로부터의 근접도 (위치 권한이 허용된 경우에만)
 - **인기도**: 다른 사용자의 완료 횟수(`missions/{id}.completionCount`) 기반
+- **시간대 적합도**: 현재 시각이 미션 카테고리 활동 시간대(맛집=점심·저녁, 투어·체험=낮, 쇼핑=오후~저녁)에 맞는 정도
 
 1. id가 없거나 완료한 미션은 후보에서 제외합니다.
 2. 후보마다 **규칙 점수**(`MissionScorer`, `RecommendationWeights` 가중합 + 근거 칩)와 **학습된 완료 확률**(`LearnedReranker`, 로지스틱 회귀)을 구합니다.
@@ -84,7 +85,7 @@
 5. 근거 칩(`맛집 취향`, `자주 하는 유형`, `가까운 미션` 등)은 규칙 점수 것을 그대로 표시합니다.
 6. 진행 중인 미션이 있으면 추천 대신 노출합니다. 결과가 없으면 안내 카드.
 
-학습·평가 파이프라인은 `ml/reco/` (`build_dataset.py` → `train_reranker.py` → `evaluate_reco.py`). 현재 모델은 실제 로그가 없어 시뮬레이터로 학습(`reranker-lr-sim-2`); `user_missions` 로그가 쌓이면 `--from-firestore` 로 재학습합니다.
+학습·평가 파이프라인은 `ml/reco/` (`build_dataset.py` → `train_reranker.py` → `evaluate_reco.py`). 현재 모델은 실제 로그가 없어 시뮬레이터로 학습(`reranker-lr-sim-3`); `user_missions` 로그가 쌓이면 `--from-firestore` 로 재학습합니다.
 
 신규 가입자는 회원가입 직후 취향 선택 화면으로 이동하고, 기존 사용자는 `preferences` 가 없을 때만 이 화면을 거칩니다.
 
@@ -139,11 +140,11 @@
 
 | | 규칙 | 학습 |
 | --- | ---: | ---: |
-| ROC-AUC (완료 예측, test) | 0.950 | 0.960 |
-| precision@3 | 0.893 | 0.960 |
-| NDCG@5 / MAP | 0.894 / 0.862 | 0.958 / 0.896 |
+| ROC-AUC (완료 예측, test) | 0.949 | 0.960 |
+| precision@3 | 0.914 | 0.951 |
+| NDCG@5 / MAP | 0.914 / 0.873 | 0.953 / 0.904 |
 
-현재 모델은 실제 로그가 없어 시뮬레이터(`ml/reco/sim.py`)로 학습(`reranker-lr-sim-2`). `user_missions` 로그가 쌓이면 `build_dataset.py --from-firestore` 로 재학습.
+현재 모델은 실제 로그가 없어 시뮬레이터(`ml/reco/sim.py`)로 학습(`reranker-lr-sim-3`). `user_missions` 로그가 쌓이면 `build_dataset.py --from-firestore` 로 재학습.
 
 ## 미션 지도
 
@@ -207,7 +208,7 @@ ml/                 # 모델 학습·평가 (Colab/로컬, 앱 빌드와 분리)
 | `MissionCompletion` | 사진 인증 가능 여부·완료 처리 결과(`resolve`) 계산 |
 | `PhotoVerification` | 온디바이스 모델의 라벨별 점수 → 통과 / 재촬영 / 관리자 검수 판정 |
 | `TravelPreference` | 취향 카테고리 정의, 최소 1개 선택 규칙, 저장용 정규화 |
-| `MissionFeatures` | 미션 추천 신호 5개(0~1 정규화) 계산. 규칙·학습이 공유 (`ml/reco/features.py` 와 일치) |
+| `MissionFeatures` | 미션 추천 신호 6개(0~1 정규화) 계산. 규칙·학습이 공유 (`ml/reco/features.py` 와 일치) |
 | `MissionScorer` | 신호를 `RecommendationWeights` 로 가중합 + 근거 문구 (규칙 점수) |
 | `LearnedReranker` | 완료 로그로 학습한 로지스틱 회귀로 완료 확률 추정 (`assets/reranker.json`) |
 | `MissionRecommender` | 후보 필터 → 규칙/학습 점수 블렌드 → 다양성 감점으로 상위 N건 |
@@ -320,7 +321,7 @@ python export_onnx.py --model outputs/final --out ../app/src/main/assets/photo_v
 ## 향후 개선 계획
 
 - 사진 인증 모델 데이터 수집·학습 실행, `OnnxPhotoVerifier` 연결, 촬영 시각·위치 메타데이터 교차 검증
-- 시간대·미션 간 동시출현(협업 필터링)까지 반영한 추천 고도화 및 오프라인 평가(hit@k)
+- 미션 간 동시출현(협업 필터링) 신호까지 반영한 추천 고도화 (시간대 적합도·오프라인 평가는 반영 완료)
 - ViewModel·Repository 패턴을 홈·목록·관리자 등 나머지 화면으로 확대
 - 서버 사이드 포인트 검증(Cloud Functions), Supabase Storage 업로드 서버 검증
 - Robolectric 기반 ViewModel/Compose UI 테스트와 Repository 계약 테스트 추가

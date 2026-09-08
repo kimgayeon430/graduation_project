@@ -18,10 +18,13 @@ import random
 CATEGORIES = ["투어", "맛집", "체험", "쇼핑"]
 from features import signals  # noqa: E402
 
-# 데이터의 "실제" 신호 중요도 — 규칙 가중치(3/2/1/1.5/1)와 다르게 설정
-#   규칙 가중치(3/2/1/1.5/1)와 다르다: 인기도·거리를 규칙은 크게(1.0/1.5) 잡지만
-#   데이터상 거의 무의미(0.1/0.2). 대신 난이도 적합도가 규칙 가정(1.0)보다 훨씬 중요(3.4).
-_TRUE_WEIGHTS = [4.2, 3.6, 3.4, 0.2, 0.1]
+# 데이터의 "실제" 신호 중요도 — 규칙 가중치(3/2/1/1.5/1/1)와 다르게 설정
+#   인기도·거리를 규칙은 크게(1.0/1.5) 잡지만 데이터상 거의 무의미(0.1/0.2).
+#   난이도 적합도(3.4)와 시간대 적합도(2.8)는 규칙 가정(1.0)보다 훨씬 중요.
+_TRUE_WEIGHTS = [4.2, 3.6, 3.4, 0.2, 0.1, 2.8]
+
+# 사용자가 앱을 여는 시간대 분포 (아침·점심·저녁에 몰림).
+_SESSION_HOURS = ([8, 9, 10] * 2) + ([12, 13] * 3) + ([18, 19, 20, 21] * 3) + [15, 16, 22]
 
 
 def _sigmoid(x: float) -> float:
@@ -47,8 +50,9 @@ def make_users(n: int, rng: random.Random) -> list[dict]:
             "preferred": set(rng.sample(CATEGORIES, rng.randint(1, 2))),
             "level": rng.randint(1, 5),
             "completed_by_cat": {},
+            "hour": rng.choice(_SESSION_HOURS),   # 이 사용자가 앱을 여는 시각
             "_latent": latent,
-            "_bias": rng.gauss(-6.8, 0.6),   # 낮은 기본 완료율(현실적으로 완료는 드묾)
+            "_bias": rng.gauss(-8.6, 0.6),   # 낮은 기본 완료율(현실적으로 완료는 드묾)
         })
     return users
 
