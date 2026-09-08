@@ -316,13 +316,12 @@ scene 다양성: 투어 107 · 맛집 101 · 체험 53 · 쇼핑 28 · 무효 2(
 
 | 단계 | 모델 | 학습 |
 | --- | --- | --- |
-| 베이스라인 | `openai/clip-vit-base-patch32` (또는 한국어 CLIP) | 없음 (제로샷) |
-| 본 모델 A | `apple/mobilevit-small` | 백본 동결, 분류 헤드만 학습 (linear probe) |
-| 본 모델 B | `apple/mobilevit-small` | 전체 파인튜닝 |
-| 비교군 | `apple/mobilevit-small` + LoRA | 저랭크 어댑터만 학습 |
+| 베이스라인 | `openai/clip-vit-base-patch32` | 없음 (제로샷) |
+| 채택 모델 | `apple/mobilevit-small` | 헤드 학습(8ep) → **전체 파인튜닝(6ep)** — 후자를 채택 |
+| 비교군(선택) | `apple/mobilevit-small` + LoRA | 코드만 준비, 미수행 |
 
-- 학습·평가 파이프라인: `ml/notebooks/train_photo_verifier.ipynb` (Colab).
-- 최종 모델은 HuggingFace Optimum 으로 ONNX 변환(+ int8 양자화) 후 `app/src/main/assets/photo_verifier.onnx` 로 번들.
+- 학습·평가 파이프라인: `ml/notebooks/train_photo_verifier.ipynb` (Colab T4, 약 30분). CLIP 제로샷으로 베이스라인을 먼저 측정한다.
+- 최종 모델은 `torch.onnx` 로 ONNX(opset 18) 변환 후 `app/src/main/assets/photo_verifier.onnx` 로 번들(약 20MB). (Optimum 은 Colab 의 `diffusers`/`huggingface_hub` 버전 충돌로 사용 불가 → `torch.onnx` 직접 export)
 - 전처리 상수(리사이즈 크기, 정규화 mean/std, 채널 순서)는 export 시 함께 나오는 `preprocessor_config.json` 을 `assets/photo_verifier_preprocessor.json` 으로 번들하고, `OnnxPhotoVerifier` 가 이를 런타임에 읽어 학습·export·추론 전처리를 자동으로 일치시킨다. (키가 없으면 MobileViT 기본값)
 
 ### 6.5 판정 규칙 (`PhotoVerification`)
@@ -369,13 +368,12 @@ scene 다양성: 투어 107 · 맛집 101 · 체험 53 · 쇼핑 28 · 무효 2(
 - [x] Firestore 보안 규칙 `firestore.rules`
 - [x] Supabase Storage 사진 업로드 (InvalidKey·RLS 이슈 수정 후 실기기 동작 확인)
 - [x] 마이페이지 포인트 적립 내역 화면 (`PointHistoryScreen`)
+- [x] Colab T4 에서 파인튜닝 → `photo_verifier.onnx`(20MB) 를 `assets/` 에 번들, 임계값을 `PhotoVerificationConfig.DEFAULT` 로 반영, 기본 verifier 를 `OnnxPhotoVerifier`·`DEFAULT` config 로 전환 (test macro-F1 0.82)
 
 ### 7.2 남은 작업
 
-- [ ] 구축한 데이터셋으로 Colab GPU 에서 파인튜닝 실행 (예상 ~30분)
-- [ ] `thresholds.json` 값을 `PhotoVerificationConfig` 기본값으로 반영, `photo_verifier.onnx` 를 `assets/` 에 커밋
-- [ ] 크라우드소싱 사진으로 각 클래스 보강 (공개 데이터는 실제 촬영본과 도메인 차이)
-- [ ] 모델 확정 후 기본 config 를 `PhotoVerificationConfig.DEFAULT`(모델 부재 시 `NEEDS_REVIEW`)로 전환
+- [ ] 실기기에서 사진 인증 전체 루프 확인 (PASS/REJECT/NEEDS_REVIEW → 관리자 승인/반려), 추론 지연 측정
+- [ ] 크라우드소싱 사진으로 각 클래스 보강(특히 체험) 후 재학습
 - [ ] `firestore.rules` 배포 및 규칙 시뮬레이터 검증
 - [ ] Robolectric 기반 ViewModel/Compose UI 테스트 `[선택]`
 - [ ] 서버측 포인트 검증(Cloud Functions) `[선택]`
@@ -391,6 +389,8 @@ scene 다양성: 투어 107 · 맛집 101 · 체험 53 · 쇼핑 28 · 무효 2(
 | 학습 노트북이 `transformers` 5.x 에서 학습 실패(`KeyError: 'image'`) | `Trainer` 가 `with_transform` 데이터셋의 컬럼을 제거 | `TrainingArguments(remove_unused_columns=False)`, 전처리를 `AutoImageProcessor` 에 위임(export·앱 전처리와 자동 정합) |
 | 공개 데이터 수집 시 투어 3 scene·쇼핑 1 scene 만 확보 | `datasets` 스트리밍이 클래스 정렬 상태라 shuffle 버퍼가 몇 개 클래스만 담음 | 스트리밍 대신 Places365/Food-101 **validation 셋을 통째로 받아** scene 별로 표본 (투어 107·체험 53·쇼핑 28 scene 확보) |
 | 일부 scene(`market/indoor` 등)이 한 그룹으로 뭉침 | 파일명 생성 시 `scene.split('/')[-1]` 로 접미어만 사용 | 전체 scene 경로를 정규화(`canonical_scene`)해 그룹 키로 사용 |
+| Colab 에서 `optimum` ONNX export 실패 | `optimum.exporters` 가 `diffusers` 를 import 하는데 Colab 의 `diffusers`/`huggingface_hub` 버전 불일치 | `torch.onnx.export`(레거시, `dynamo=False`, opset 18) 로 직접 변환. int8 양자화는 shape inference 오류로 생략하고 fp32(20MB) 채택 |
+| `torch.onnx` 가 가중치를 `photo_verifier.onnx.data` 로 분리 저장 | 새 torch 의 external-data 기본 동작 | `onnx.save(..., save_as_external_data=False)` 로 단일 파일화 (앱은 `.onnx` bytes 만 로드) |
 
 ---
 
@@ -404,17 +404,30 @@ scene 다양성: 투어 107 · 맛집 101 · 체험 53 · 쇼핑 28 · 무효 2(
 
 ### 8.2 사진 인증 모델
 
-| 항목 | 지표 |
-| --- | --- |
-| 분류 성능 | 클래스별 precision / recall / F1, macro-F1, confusion matrix |
-| 인증 신뢰도 | **무효 사진 차단율**(무효 recall), **정상 사진 오탐율**(정상이 `REJECT` 되는 비율) |
-| 임계값 선정 | 카테고리 점수 PR 커브, 무효 점수 ROC |
-| 비교 실험 | CLIP 제로샷 vs 헤드 학습 vs 전체 파인튜닝 vs LoRA |
-| 온디바이스 비용 | 모델 크기(MB), 평균 추론 지연(ms), APK 증가량 |
+**학습 결과** (Colab T4, `mobilevit-small-fullft-1`, test 셋 779장. train↔test scene 겹침 0)
 
-- 테스트셋은 학습에 쓰지 않은 scene 으로만 구성한다(공개 데이터 4개 클래스는 train↔test scene 겹침 0). test 셋 779장.
-- APK 증가량(중간 측정): `onnxruntime-android` 도입 시 디버그 APK 약 +120MB(전 ABI) → `abiFilters`(arm64-v8a/x86_64) 적용 후 약 +20MB. 모델 파일: fp32 ONNX 약 20MB, int8 양자화본 약 5.6MB(스모크 기준).
-- `[학습 후 결과 표 TODO]`
+| 모델 | test accuracy | test macro-F1 |
+| --- | ---: | ---: |
+| CLIP 제로샷 (`clip-vit-base-patch32`, 학습 없음) | 0.639 | 0.631 |
+| MobileViT-small 전체 파인튜닝 | **0.829** | **0.816** |
+
+클래스별 F1: 투어 0.80 · 맛집 0.93 · **체험 0.64** · 쇼핑 0.76 · 무효 0.95.
+체험이 가장 약함(recall 0.57) — 공개 데이터가 실제 "체험 미션 사진"과 도메인이 다르고 카테고리 경계가 모호. 크라우드소싱 사진 보강이 향후 과제.
+
+**임계값 선정** (`ml/thresholds.json`, test 셋 임계값 스윕)
+
+| 임계값 | 값 | 근거 |
+| --- | ---: | --- |
+| `invalidRejectThreshold` | 0.55 | 무효 사진 차단율 0.92, 정상 사진 오탐 0.005 |
+| `hardRejectThreshold` | 0.22 | 정상 사진 오탐(0.30일 때 0.18)을 낮추는 방향. 애매한 사진은 `REJECT` 대신 `NEEDS_REVIEW` 로 |
+| `autoPassThreshold` | 0.65 | 정상 사진의 약 71%가 자동 통과 |
+
+**온디바이스 비용**
+
+- 모델: fp32 ONNX 약 20MB (int8 양자화는 Colab 라이브러리 충돌로 미적용, fp32 채택).
+- `onnxruntime-android` 도입 시 디버그 APK 약 +120MB(전 ABI) → `abiFilters`(arm64-v8a/x86_64) 적용 후 약 +20MB.
+- 추론 지연(ms): `[실기기 측정 TODO]`
+- 전처리·라벨·모델버전은 export 산출물(`photo_verifier_preprocessor.json` / `_labels.json` / `_version.txt`)에서 `OnnxPhotoVerifier` 가 읽어 자동 정합.
 
 ---
 

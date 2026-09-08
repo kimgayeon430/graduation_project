@@ -33,3 +33,7 @@ __pycache__/
 firebase-debug.log
 .firebaserc
 .claude/settings.local.json
+/ml/*.onnx
+/ml/*.data
+/ml/**/*.onnx.data
+/ml/sym_shape_infer_temp.onnx

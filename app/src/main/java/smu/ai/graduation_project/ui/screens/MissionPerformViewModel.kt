@@ -28,17 +28,16 @@ class MissionPerformViewModel(
 ) : AndroidViewModel(application) {
 
     /**
-     * 프로덕션 기본값. 사진은 [OnnxPhotoVerifier] 로 온디바이스 판정한다.
-     *
-     * `assets/photo_verifier.onnx` 가 아직 없으면 [OnnxPhotoVerifier.classify] 가 null 을 돌려주고,
-     * `passWhenModelUnavailable = true` 라 종전처럼 통과한다. 모델을 assets 에 넣고 오프라인 평가로
-     * 임계값을 정한 뒤에는 이 인자를 [PhotoVerificationConfig.DEFAULT] (모델 없으면 관리자 검수)로 바꾼다.
+     * 프로덕션 기본값. 사진은 [OnnxPhotoVerifier] 로 `assets/photo_verifier.onnx`
+     * (`mobilevit-small-fullft-1`) 를 써 온디바이스 판정한다. 임계값은
+     * [PhotoVerificationConfig.DEFAULT] (`ml/thresholds.json` 에서 선정).
+     * 모델 로드에 실패하면 판정을 `NEEDS_REVIEW` 로 보내 관리자 검수를 거친다.
      */
     constructor(application: Application) : this(
         application,
         FirebaseMissionRepository(),
         OnnxPhotoVerifier(application),
-        PhotoVerificationConfig(passWhenModelUnavailable = true)
+        PhotoVerificationConfig.DEFAULT
     )
 
     var uiState by mutableStateOf(MissionPerformUiState())

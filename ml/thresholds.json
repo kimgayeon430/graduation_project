@@ -1,12 +1,17 @@
 {
-  "_comment": "train_photo_verifier.ipynb 7단계가 이 파일을 덮어씁니다. 값이 정해지면 app 의 PhotoVerificationConfig 기본값으로 옮기세요.",
-  "model_version": "mobilevit-small-headft-0",
-  "autoPassThreshold": 0.70,
-  "hardRejectThreshold": 0.30,
-  "invalidRejectThreshold": 0.60,
+  "_comment": "train_photo_verifier.ipynb 결과로 선정. app/domain/PhotoVerificationConfig.kt 기본값과 동기화되어 있어야 함.",
+  "model_version": "mobilevit-small-fullft-1",
+  "autoPassThreshold": 0.65,
+  "hardRejectThreshold": 0.22,
+  "invalidRejectThreshold": 0.55,
   "eval": {
-    "invalid_recall": null,
-    "valid_false_reject_rate": null,
-    "macro_f1": null
+    "base_model": "apple/mobilevit-small",
+    "test_accuracy": 0.829,
+    "test_macro_f1": 0.816,
+    "clip_zeroshot_macro_f1": 0.631,
+    "per_class_f1": { "투어": 0.804, "맛집": 0.927, "체험": 0.644, "쇼핑": 0.757, "무효": 0.946 },
+    "invalid_recall_at_0.55": 0.918,
+    "valid_false_reject_at_0.30": 0.183,
+    "note": "체험 recall 0.57 로 약함(공개 데이터 도메인 차이). 크라우드소싱 사진으로 보강 필요."
   }
 }
