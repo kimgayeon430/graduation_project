@@ -377,7 +377,7 @@ scene 다양성: 투어 107 · 맛집 101 · 체험 53 · 쇼핑 28 · 무효 2(
 - [x] Supabase Storage 사진 업로드 (InvalidKey·RLS 이슈 수정 후 실기기 동작 확인)
 - [x] 마이페이지 포인트 적립 내역 화면 (`PointHistoryScreen`)
 - [x] Colab T4 에서 파인튜닝 → `photo_verifier.onnx`(20MB) 를 `assets/` 에 번들, 임계값을 `PhotoVerificationConfig.DEFAULT` 로 반영, 기본 verifier 를 `OnnxPhotoVerifier`·`DEFAULT` config 로 전환 (test macro-F1 0.82)
-- [x] 학습된 추천 re-ranker: `MissionFeatures`·`LearnedReranker`·`MissionRecommender.recommendReranked` + `ml/reco/` 파이프라인 + `assets/reranker.json`. 시뮬레이터 학습본으로 규칙 대비 AUC 0.918→0.937 (8.3절)
+- [x] 학습된 추천 re-ranker: `MissionFeatures`·`LearnedReranker`·`MissionRecommender.recommendReranked` + `ml/reco/` 파이프라인 + `assets/reranker.json`. 시뮬레이터 학습본으로 규칙 대비 AUC 0.950→0.960, NDCG@5 0.894→0.958 (8.3절)
 
 ### 7.2 남은 작업
 
@@ -445,16 +445,24 @@ scene 다양성: 투어 107 · 맛집 101 · 체험 53 · 쇼핑 28 · 무효 2(
 하이브리드(4.5절). 신호 5개는 규칙·학습이 공유한다(`MissionFeatures`).
 
 - **파이프라인**(`ml/reco/`): `build_dataset.py`(로그 → 학습행) → `train_reranker.py`(로지스틱 회귀 → `reranker.json`) → `evaluate_reco.py`(규칙 vs 학습 비교). 앱은 `assets/reranker.json` 이 없으면 규칙 기반으로 폴백한다.
-- **데이터**: 실제 `user_missions` 로그가 없어 시뮬레이터(`sim.py`)로 학습했다(`reranker-lr-sim-1`). 시뮬레이터의 참 선호는 규칙 고정 가중치와 다르게 설정했다(인기도·거리를 규칙은 크게 잡지만 실제로는 거의 무의미, 난이도 적합도는 규칙보다 훨씬 중요). 로그가 쌓이면 `--from-firestore` 로 교체한다.
+- **데이터**: 실제 `user_missions` 로그가 없어 시뮬레이터(`sim.py`)로 학습했다(`reranker-lr-sim-2`). 시뮬레이터의 참 선호는 규칙 고정 가중치와 다르게 설정했다(인기도·거리를 규칙은 크게 잡지만 실제로는 거의 무의미, 난이도 적합도는 규칙보다 훨씬 중요). 완료율은 현실적으로 낮게(28%) 두어 "상위 3건" 정렬이 실제로 변별되도록 했다. 로그가 쌓이면 `--from-firestore` 로 교체한다.
+- **평가**: 사용자 800·미션 300, 사용자 단위 7:3 분리. `evaluate_reco.py` 를 인자 없이 실행하면 재현된다(blend λ=0.6).
 
-| 지표 (test, 사용자 분리) | 규칙 | 학습 |
-| --- | ---: | ---: |
-| ROC-AUC (완료 예측) | 0.918 | **0.937** |
-| NDCG@10 | 0.977 | **0.990** |
-| MAP | 0.907 | **0.927** |
+| 지표 (test, 사용자 분리) | 규칙 | 학습 | blend λ=0.6 |
+| --- | ---: | ---: | ---: |
+| ROC-AUC (완료 예측) | 0.950 | **0.960** | — |
+| precision@3 | 0.893 | **0.960** | 0.947 |
+| NDCG@5 | 0.894 | **0.958** | 0.948 |
+| NDCG@10 | 0.888 | **0.942** | 0.932 |
+| MRR | 0.960 | **0.988** | 0.968 |
+| MAP | 0.862 | **0.896** | 0.890 |
 
-학습 가중치가 규칙의 손튜닝 오류를 교정한다: `proximity` 1.5→0.15, `popularity` 1.0→0.03,
-`difficulty_fit` 1.0→3.31, `implicit_affinity` 2.0→5.01.
+hit@3 는 세 방식 모두 0.99+ 로 포화하므로 precision@3·NDCG·MRR 로 본다. 학습 모델은 규칙 대비
+NDCG@5 +0.065, MAP +0.034; 앱이 실제로 쓰는 blend(콜드스타트 안전을 위해 규칙을 40% 섞음)도
+NDCG@5 +0.054 로 이득의 대부분을 가져온다.
+
+학습 가중치가 규칙의 손튜닝 오류를 교정한다: `proximity` 1.5→0.21, `popularity` 1.0→−0.07,
+`difficulty_fit` 1.0→2.95, `implicit_affinity` 2.0→3.60.
 
 ---
 

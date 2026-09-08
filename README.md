@@ -84,7 +84,7 @@
 5. 근거 칩(`맛집 취향`, `자주 하는 유형`, `가까운 미션` 등)은 규칙 점수 것을 그대로 표시합니다.
 6. 진행 중인 미션이 있으면 추천 대신 노출합니다. 결과가 없으면 안내 카드.
 
-학습·평가 파이프라인은 `ml/reco/` (`build_dataset.py` → `train_reranker.py` → `evaluate_reco.py`). 현재 모델은 실제 로그가 없어 시뮬레이터로 학습(`reranker-lr-sim-1`); `user_missions` 로그가 쌓이면 `--from-firestore` 로 재학습합니다.
+학습·평가 파이프라인은 `ml/reco/` (`build_dataset.py` → `train_reranker.py` → `evaluate_reco.py`). 현재 모델은 실제 로그가 없어 시뮬레이터로 학습(`reranker-lr-sim-2`); `user_missions` 로그가 쌓이면 `--from-firestore` 로 재학습합니다.
 
 신규 가입자는 회원가입 직후 취향 선택 화면으로 이동하고, 기존 사용자는 `preferences` 가 없을 때만 이 화면을 거칩니다.
 
@@ -139,10 +139,11 @@
 
 | | 규칙 | 학습 |
 | --- | ---: | ---: |
-| ROC-AUC (완료 예측, test) | 0.918 | 0.937 |
-| NDCG@10 / MAP | 0.977 / 0.907 | 0.990 / 0.927 |
+| ROC-AUC (완료 예측, test) | 0.950 | 0.960 |
+| precision@3 | 0.893 | 0.960 |
+| NDCG@5 / MAP | 0.894 / 0.862 | 0.958 / 0.896 |
 
-현재 모델은 실제 로그가 없어 시뮬레이터(`ml/reco/sim.py`)로 학습(`reranker-lr-sim-1`). `user_missions` 로그가 쌓이면 `build_dataset.py --from-firestore` 로 재학습.
+현재 모델은 실제 로그가 없어 시뮬레이터(`ml/reco/sim.py`)로 학습(`reranker-lr-sim-2`). `user_missions` 로그가 쌓이면 `build_dataset.py --from-firestore` 로 재학습.
 
 ## 미션 지도
 

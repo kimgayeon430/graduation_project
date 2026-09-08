@@ -48,7 +48,7 @@ def make_users(n: int, rng: random.Random) -> list[dict]:
             "level": rng.randint(1, 5),
             "completed_by_cat": {},
             "_latent": latent,
-            "_bias": rng.gauss(-4.6, 0.6),   # 낮은 기본 완료율
+            "_bias": rng.gauss(-6.8, 0.6),   # 낮은 기본 완료율(현실적으로 완료는 드묾)
         })
     return users
 
@@ -61,7 +61,7 @@ def simulate(n_users: int = 600, n_missions: int = 300, seed: int = 0):
     rows = []
 
     for u in users:
-        seen = rng.sample(missions, rng.randint(n_missions // 2, n_missions))
+        seen = rng.sample(missions, rng.randint(n_missions // 4, n_missions // 2))
         for m in seen:
             max_c = max((mm["completion_count"] for mm in missions), default=0)
             sig = signals(m, u, max_c)

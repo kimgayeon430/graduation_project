@@ -1,5 +1,5 @@
 {
-  "version": "reranker-lr-sim-1",
+  "version": "reranker-lr-sim-2",
   "feature_names": [
     "explicit_pref",
     "implicit_affinity",
@@ -8,20 +8,20 @@
     "popularity"
   ],
   "weights": [
-    3.10975,
-    5.006305,
-    3.239837,
-    0.171879,
-    0.011929
+    3.576182,
+    3.599489,
+    2.949054,
+    0.210915,
+    -0.067345
   ],
-  "bias": -4.02929,
+  "bias": -4.962027,
   "blend": 0.6,
   "diversity_penalty": 0.15,
   "eval": {
-    "test_roc_auc": 0.9362,
-    "rule_hit@3": 1.0,
-    "learned_hit@3": 1.0,
-    "rule_ndcg@3": 0.9882,
-    "learned_ndcg@3": 0.9906
+    "test_roc_auc": 0.9607,
+    "rule_hit@3": 0.995,
+    "learned_hit@3": 0.995,
+    "rule_ndcg@3": 0.9061,
+    "learned_ndcg@3": 0.9611
   }
 }

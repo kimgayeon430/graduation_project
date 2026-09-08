@@ -3,7 +3,8 @@
 시뮬레이션(또는 --rows) → 사용자 분리 학습 → test 사용자마다 상호작용한 미션을
 (rule / learned / blend) 점수로 정렬해 완료를 relevant 로 두고 랭킹 지표를 잰다.
   - AUC: "이 미션을 완료할지" 이진 예측 성능
-  - NDCG@k, hit@k, MAP: 사용자별 미션 정렬 품질
+  - hit@k / precision@k / NDCG@k / MRR / MAP: 사용자별 미션 정렬 품질
+    (완료가 드물어 hit@k 는 쉽게 포화하므로 precision@k·NDCG·MRR 을 함께 본다)
 
 실제 로그가 생기면 `build_dataset.py --from-firestore` 로 rows.csv 를 만들고 `--rows rows.csv`.
 """
@@ -44,6 +45,12 @@ def split_by_user(rows, test_frac, seed):
 
 
 def ranking_metrics(rows, score_fn, ks=(1, 3, 5, 10)):
+    """사용자마다 상호작용한 미션을 점수로 정렬해 완료(label=1)를 relevant 로 두고 지표를 잰다.
+    hit@k: 상위 k 안에 완료 미션이 하나라도 있으면 1
+    precision@k: 상위 k 중 완료 미션 비율 (완료가 드물어 saturate 하지 않음)
+    MRR: 첫 완료 미션 순위의 역수 평균
+    NDCG@k / MAP: 정렬 품질
+    """
     by_user = defaultdict(list)
     for r in rows:
         by_user[r["user"]].append(r)
@@ -51,20 +58,25 @@ def ranking_metrics(rows, score_fn, ks=(1, 3, 5, 10)):
     n = 0
     for items in by_user.values():
         rel = sum(i["label"] for i in items)
-        if rel == 0 or len(items) < 3:
+        if rel == 0 or len(items) < 5:
             continue
         n += 1
         ranked = sorted(items, key=lambda i: -score_fn(i["features"]))
-        # MAP
-        hits, ap = 0, 0.0
+        # MAP + MRR
+        hits, ap, rr = 0, 0.0, 0.0
         for idx, it in enumerate(ranked):
             if it["label"]:
                 hits += 1
                 ap += hits / (idx + 1)
+                if hits == 1:
+                    rr = 1.0 / (idx + 1)
         agg["map"] += ap / rel
+        agg["mrr"] += rr
         for k in ks:
             top = ranked[:k]
-            agg[f"hit@{k}"] += 1.0 if any(i["label"] for i in top) else 0.0
+            tp = sum(1 for i in top if i["label"])
+            agg[f"hit@{k}"] += 1.0 if tp else 0.0
+            agg[f"prec@{k}"] += tp / k
             dcg = sum(i["label"] / math.log2(i2 + 2) for i2, i in enumerate(top))
             idcg = sum(1 / math.log2(i2 + 2) for i2 in range(min(k, rel)))
             agg[f"ndcg@{k}"] += dcg / idcg if idcg else 0.0
@@ -77,7 +89,7 @@ def main() -> None:
     ap.add_argument("--users", type=int, default=800)
     ap.add_argument("--missions", type=int, default=300)
     ap.add_argument("--seed", type=int, default=0)
-    ap.add_argument("--blend", type=float, default=0.5)
+    ap.add_argument("--blend", type=float, default=0.6, help="reranker.json 과 동일하게 0.6")
     ap.add_argument("--test-frac", type=float, default=0.3)
     args = ap.parse_args()
 
@@ -112,14 +124,18 @@ def main() -> None:
     print(f"  {'(bias)':18}               학습 {b:>6.2f}")
 
     print("\n사용자별 미션 정렬 (test):")
-    hdr = f"{'':9}" + "".join(f"{m:>10}" for m in ("hit@3", "hit@5", "ndcg@3", "ndcg@5", "ndcg@10", "map"))
-    print(hdr)
+    cols = ("hit@3", "prec@3", "ndcg@3", "ndcg@5", "ndcg@10", "mrr", "map")
+    print(f"{'':11}" + "".join(f"{c:>9}" for c in cols))
+    metrics = {}
     for name, fn in (("규칙", rule_score), ("학습", learned), (f"blend λ={args.blend}", blended)):
-        m = ranking_metrics(test, fn)
-        print(f"{name:9}" + "".join(f"{m[k]:>10.3f}" for k in
-              ("hit@3", "hit@5", "ndcg@3", "ndcg@5", "ndcg@10", "map")))
-    r, bl = ranking_metrics(test, rule_score), ranking_metrics(test, blended)
-    print(f"\nblend vs 규칙  NDCG@5 {bl['ndcg@5'] - r['ndcg@5']:+.3f}  ·  MAP {bl['map'] - r['map']:+.3f}")
+        m = metrics[name] = ranking_metrics(test, fn)
+        print(f"{name:11}" + "".join(f"{m[k]:>9.3f}" for k in cols))
+    print(f"\n(정렬 평가 사용자 {metrics['규칙']['users']}명)")
+    r, ln, bl = metrics["규칙"], metrics["학습"], metrics[f"blend λ={args.blend}"]
+    print(f"학습 vs 규칙   NDCG@5 {ln['ndcg@5'] - r['ndcg@5']:+.3f}  ·  "
+          f"MAP {ln['map'] - r['map']:+.3f}  ·  MRR {ln['mrr'] - r['mrr']:+.3f}")
+    print(f"blend vs 규칙  NDCG@5 {bl['ndcg@5'] - r['ndcg@5']:+.3f}  ·  "
+          f"MAP {bl['map'] - r['map']:+.3f}  ·  MRR {bl['mrr'] - r['mrr']:+.3f}")
 
 
 if __name__ == "__main__":

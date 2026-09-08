@@ -31,9 +31,9 @@ cd ml && python -m venv .venv && .venv/bin/pip install -r requirements.txt
 cd reco
 
 # 합성 데이터로 (실제 로그가 없을 때)
-../.venv/bin/python build_dataset.py --out rows.csv
+../.venv/bin/python build_dataset.py --users 800 --missions 300 --out rows.csv
 ../.venv/bin/python train_reranker.py --rows rows.csv \
-    --out ../../app/src/main/assets/reranker.json --blend 0.6 --version reranker-lr-sim-1
+    --out ../../app/src/main/assets/reranker.json --blend 0.6 --version reranker-lr-sim-2
 ../.venv/bin/python evaluate_reco.py
 
 # 실제 user_missions 로그가 쌓이면
@@ -41,16 +41,20 @@ cd reco
 #   export.json = {"users":[...], "missions":[...], "user_missions":[...]}
 ```
 
-## 현재 모델 (`reranker-lr-sim-1`)
+## 현재 모델 (`reranker-lr-sim-2`)
 
 실제 로그가 없어 **시뮬레이터로 학습**했다. 시뮬레이터의 참 선호는 규칙 고정 가중치와 다르게
-설정돼 있다(인기도·거리를 규칙은 크게 잡지만 실제로는 거의 무의미, 난이도 적합도는 규칙보다 훨씬 중요).
+설정돼 있고(인기도·거리를 규칙은 크게 잡지만 실제로는 거의 무의미, 난이도 적합도는 규칙보다 훨씬 중요),
+완료율은 현실적으로 낮게(28%) 둬서 "상위 3건" 정렬이 실제로 변별되도록 했다.
 
-| 지표 (test, 사용자 분리) | 규칙 | 학습 |
-| --- | ---: | ---: |
-| ROC-AUC (완료 예측) | 0.918 | **0.937** |
-| NDCG@10 | 0.977 | **0.990** |
-| MAP | 0.907 | **0.927** |
+| 지표 (test, 사용자 분리) | 규칙 | 학습 | blend λ=0.6 |
+| --- | ---: | ---: | ---: |
+| ROC-AUC (완료 예측) | 0.950 | **0.960** | — |
+| precision@3 | 0.893 | **0.960** | 0.947 |
+| NDCG@5 | 0.894 | **0.958** | 0.948 |
+| MRR | 0.960 | **0.988** | 0.968 |
+| MAP | 0.862 | **0.896** | 0.890 |
 
-학습된 가중치가 규칙의 손튜닝 오류(proximity 1.5→0.17, popularity 1.0→0.01, difficulty 1.0→3.24)를 교정한다.
+hit@3 는 세 방식 모두 0.99+ 로 포화하므로 precision@3·NDCG·MRR 로 본다.
+학습된 가중치가 규칙의 손튜닝 오류(proximity 1.5→0.21, popularity 1.0→−0.07, difficulty 1.0→2.95)를 교정한다.
 `user_missions` 로그가 쌓이면 같은 파이프라인으로 재학습해 `--from-firestore` 로 교체한다.
