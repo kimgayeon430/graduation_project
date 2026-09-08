@@ -285,18 +285,32 @@ PhotoVerification (domain/, 순수 Kotlin)  ── 점수 + 미션 카테고리 
 
 ### 6.3 데이터셋
 
-| 클래스 | 설명 | 목표 규모 |
-| --- | --- | --- |
-| 투어 | 관광지·랜드마크·전망·거리 | 800~1200 |
-| 맛집 | 음식·식당 내부·메뉴판 | 800~1200 |
-| 체험 | 공방·액티비티·전통 체험 | 500~800 |
-| 쇼핑 | 상점·시장·상품 진열 | 500~800 |
-| 무효 | 셀카·스크린샷·무관 실내·흐린 사진 | 1000~1500 |
+`ml/labels.json` 이 클래스 정의의 단일 소스이며 앱의 `PhotoVerification.INVALID_LABEL` 과 일치한다.
+구축은 `ml/data/` 스크립트로 자동화한다: `fetch_public.py`(공개 데이터 수집) → `make_negatives.py`(무효 합성) → `build_dataset.py`(분할) → `upload_hf.py`(HF Hub 업로드).
 
-- **수집 출처**: 공개 데이터셋(Places365, Food-101, Google Landmarks v2 한국 부분집합), 동기·지인 크라우드소싱(실제 미션 수행 사진), 무효 표본 합성.
-- **분할**: train/val/test = 70/15/15. **촬영 장소 단위로 그룹을 묶어 분할**해 근접 중복이 학습·평가에 걸쳐 성능이 부풀려지는 것을 방지한다.
-- 구축 자동화: `ml/data/` (`fetch_public.py`, `make_negatives.py`, `build_dataset.py`, `upload_hf.py`).
-- `ml/labels.json` 이 클래스 정의의 단일 소스이며 앱의 `PhotoVerification.INVALID_LABEL` 과 일치한다.
+**수집 출처**
+
+| 클래스 | 출처 | 방식 |
+| --- | --- | --- |
+| 맛집 | Food-101 (`ethz/food101`) validation | 101개 음식 클래스에서 클래스당 상한을 두고 고르게 표본 |
+| 투어·체험·쇼핑 | Places365 validation (`dpdl-benchmark/Places365-Validation`, 365 scene × 100장) | 라벨 인덱스를 `places365_categories.txt` 로 이름화, `place_classes.py` 로 카테고리 매핑(투어 107 · 체험 53 · 쇼핑 28 scene), scene 당 상한을 두고 표본 |
+| 무효 | 합성 | 스크린샷 합성 + 다른 클래스 이미지 열화(하드 네거티브) + `collected_invalid/` 직접 수집분 |
+
+- **스트리밍 대신 validation 셋 전체 다운로드**: Places365/Food-101 학습 셋은 클래스 순으로 정렬돼 있어 `datasets` 스트리밍 + shuffle 로는 앞쪽 몇 개 scene 에 편중된다(초기 시도에서 투어 3 scene·쇼핑 1 scene 만 수집됨). validation 셋은 scene 당 100~250장으로 작아(합쳐서 ~5.7GB) scene 다양성을 최대로 확보한다.
+- **분할**: train/val/test = 70/15/15. 파일명 `<sceneId>__n.jpg` 의 sceneId 단위로 그룹을 묶어 분할해, 같은 scene 이미지가 train·test 에 걸쳐 성능이 부풀려지는 것을 방지한다(공개 데이터 4개 클래스는 train↔test scene 겹침 0). 합성 무효는 그룹이 2개뿐이라 이미지 단위로 분할한다.
+- **크라우드소싱**(권장, 미적용): 동기·지인의 실제 미션 수행 사진. `raw/<카테고리>/<장소이름>__001.jpg` 로 넣으면 같은 파이프라인으로 합쳐진다.
+
+**구축 결과** (HF Hub 비공개: `kimgayeon430/travel-mission-photos`)
+
+| split | 투어 | 맛집 | 체험 | 쇼핑 | 무효 | 합계 |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| train | 698 | 700 | 700 | 705 | 910 | 3,713 |
+| validation | 152 | 150 | 150 | 161 | 195 | 808 |
+| test | 150 | 150 | 150 | 134 | 195 | 779 |
+| **합계** | **1,000** | **1,000** | **1,000** | **1,000** | **1,300** | **5,300** |
+
+scene 다양성: 투어 107 · 맛집 101 · 체험 53 · 쇼핑 28 · 무효 2(합성).
+공개 데이터는 도메인이 실제 촬영본과 다소 다르므로, 크라우드소싱 사진으로 각 클래스를 보강하는 것이 향후 과제다.
 
 ### 6.4 모델 및 학습
 
@@ -350,6 +364,7 @@ PhotoVerification (domain/, 순수 Kotlin)  ── 점수 + 미션 카테고리 
 - [x] 미션 완료 흐름 연결 (업로드 전 판정, 결과 기록, `REJECT`/`NEEDS_REVIEW` UX 분기)
 - [x] 관리자 사진 검수 큐 화면
 - [x] 데이터셋 구축 스크립트 `ml/data/`, 학습 노트북, ONNX export 스크립트 — 더미 데이터로 파이프라인 전 구간(데이터 로드 → CLIP 제로샷 → 학습 → 평가 → 임계값 → ONNX export) 스모크 테스트 완료
+- [x] 실제 데이터셋 구축 (5,300장, HF Hub `kimgayeon430/travel-mission-photos`) — 6.3절
 - [x] `OnnxPhotoVerifier` (ONNX Runtime Mobile) 구현 — `assets/` 의 모델·전처리·라벨 json 을 읽어 추론, 모델 없으면 `null` 반환해 앱 무영향
 - [x] Firestore 보안 규칙 `firestore.rules`
 - [x] Supabase Storage 사진 업로드 (InvalidKey·RLS 이슈 수정 후 실기기 동작 확인)
@@ -357,8 +372,9 @@ PhotoVerification (domain/, 순수 Kotlin)  ── 점수 + 미션 카테고리 
 
 ### 7.2 남은 작업
 
-- [ ] 실제 데이터셋 수집 (목표 규모 확보) 및 학습 실행
+- [ ] 구축한 데이터셋으로 Colab GPU 에서 파인튜닝 실행 (예상 ~30분)
 - [ ] `thresholds.json` 값을 `PhotoVerificationConfig` 기본값으로 반영, `photo_verifier.onnx` 를 `assets/` 에 커밋
+- [ ] 크라우드소싱 사진으로 각 클래스 보강 (공개 데이터는 실제 촬영본과 도메인 차이)
 - [ ] 모델 확정 후 기본 config 를 `PhotoVerificationConfig.DEFAULT`(모델 부재 시 `NEEDS_REVIEW`)로 전환
 - [ ] `firestore.rules` 배포 및 규칙 시뮬레이터 검증
 - [ ] Robolectric 기반 ViewModel/Compose UI 테스트 `[선택]`
@@ -372,6 +388,9 @@ PhotoVerification (domain/, 순수 Kotlin)  ── 점수 + 미션 카테고리 
 | 사진 업로드가 `403` RLS 거부 | `x-upsert: true` 가 `UPDATE` 정책을 요구하나 anon 은 `INSERT` 정책만 보유 | 항상 유일한 경로이므로 `x-upsert` 를 끄고 새로 `INSERT` |
 | 저사양(RAM 8GB) 환경에서 Gradle sync 중 데몬 강제 종료 | 데몬 힙(2GB) + IDE 메모리 압박 | `gradle.properties` 데몬 힙 1.5GB, `org.gradle.workers.max=2` |
 | `onnxruntime-android` 도입 후 APK +120MB | 모든 ABI 네이티브 라이브러리 포함 | `abiFilters` 로 `arm64-v8a`/`x86_64` 만 (+20MB 수준) |
+| 학습 노트북이 `transformers` 5.x 에서 학습 실패(`KeyError: 'image'`) | `Trainer` 가 `with_transform` 데이터셋의 컬럼을 제거 | `TrainingArguments(remove_unused_columns=False)`, 전처리를 `AutoImageProcessor` 에 위임(export·앱 전처리와 자동 정합) |
+| 공개 데이터 수집 시 투어 3 scene·쇼핑 1 scene 만 확보 | `datasets` 스트리밍이 클래스 정렬 상태라 shuffle 버퍼가 몇 개 클래스만 담음 | 스트리밍 대신 Places365/Food-101 **validation 셋을 통째로 받아** scene 별로 표본 (투어 107·체험 53·쇼핑 28 scene 확보) |
+| 일부 scene(`market/indoor` 등)이 한 그룹으로 뭉침 | 파일명 생성 시 `scene.split('/')[-1]` 로 접미어만 사용 | 전체 scene 경로를 정규화(`canonical_scene`)해 그룹 키로 사용 |
 
 ---
 
@@ -393,17 +412,16 @@ PhotoVerification (domain/, 순수 Kotlin)  ── 점수 + 미션 카테고리 
 | 비교 실험 | CLIP 제로샷 vs 헤드 학습 vs 전체 파인튜닝 vs LoRA |
 | 온디바이스 비용 | 모델 크기(MB), 평균 추론 지연(ms), APK 증가량 |
 
-- 테스트셋은 학습에 쓰지 않은 장소로만 구성한다.
-- APK 증가량(중간 측정): `onnxruntime-android` 도입 시 디버그 APK 약 +120MB(전 ABI) → `abiFilters`(arm64-v8a/x86_64) 적용 후 약 +20MB. 모델 파일 크기는 별도.
-- `[결과 표 TODO]`
+- 테스트셋은 학습에 쓰지 않은 scene 으로만 구성한다(공개 데이터 4개 클래스는 train↔test scene 겹침 0). test 셋 779장.
+- APK 증가량(중간 측정): `onnxruntime-android` 도입 시 디버그 APK 약 +120MB(전 ABI) → `abiFilters`(arm64-v8a/x86_64) 적용 후 약 +20MB. 모델 파일: fp32 ONNX 약 20MB, int8 양자화본 약 5.6MB(스모크 기준).
+- `[학습 후 결과 표 TODO]`
 
 ---
 
 ## 9. 개발 환경 및 협업 방식
 
-- 회사 맥(Android SDK 미설치)에서는 코드 편집·리팩터링만 하고 GitHub 에 push.
-- 집 윈도우 노트북에서 pull 받아 빌드·단위 테스트·모델 학습 수행.
-- ML 산출물(체크포인트·데이터셋)은 `.gitignore` 로 제외하고, 최종 배포 모델(`photo_verifier.onnx`)만 커밋.
+- 맥(Android SDK 미설치)에서는 Kotlin 코드 편집·리팩터링과 Python ML 파이프라인(데이터 수집·전처리)을, 윈도우 노트북에서 Android 빌드·계측 테스트를, Colab GPU 에서 모델 학습을 수행한다. GitHub 로 동기화.
+- ML 산출물(가상환경·체크포인트·raw 데이터·분할 데이터)은 `.gitignore` 로 제외하고, 학습 데이터셋은 HF Hub 비공개 저장소에, 최종 배포 모델(`photo_verifier.onnx` 등 assets)만 리포에 커밋한다.
 - 주요 커밋:
   - `7c4545d` 사진 인증 판정 로직 + `ml/` 학습 파이프라인
   - `599c31e` 사진 인증 판정을 미션 완료 흐름에 연결
@@ -414,6 +432,8 @@ PhotoVerification (domain/, 순수 Kotlin)  ── 점수 + 미션 카테고리 
   - `e46e7cf` 온디바이스 추론기 `OnnxPhotoVerifier` 연결(`onnxruntime-android`)
   - `afaeb33` 마이페이지 포인트 적립 내역 화면
   - `f0e001e` `ml/` 파이프라인 스모크 테스트 + 최신 라이브러리 대응(transformers 5.x / optimum 2.x)
+  - `1e209b2` 마이페이지 완료한 미션 목록 화면
+  - `c0d1029` 데이터셋 구축 스크립트 실전화 + 실제 데이터셋 생성(5,300장, HF Hub 업로드)
 
 ---
 
@@ -434,7 +454,7 @@ PhotoVerification (domain/, 순수 Kotlin)  ── 점수 + 미션 카테고리 
 2. S. Mehta and M. Rastegari, "MobileViT: Light-weight, General-purpose, and Mobile-friendly Vision Transformer," *ICLR*, 2022.
 3. A. Radford et al., "Learning Transferable Visual Models From Natural Language Supervision," *ICML*, 2021.
 4. E. J. Hu et al., "LoRA: Low-Rank Adaptation of Large Language Models," *ICLR*, 2022.
-5. B. Zhou et al., "Places: A 10 Million Image Database for Scene Recognition," *IEEE Transactions on Pattern Analysis and Machine Intelligence*, vol. 40, no. 6, 2018.
-6. L. Bossard, M. Guillaumin, and L. Van Gool, "Food-101 – Mining Discriminative Components with Random Forests," *ECCV*, 2014.
+5. B. Zhou et al., "Places: A 10 Million Image Database for Scene Recognition," *IEEE Transactions on Pattern Analysis and Machine Intelligence*, vol. 40, no. 6, 2018. (본 프로젝트는 validation 셋 미러 `dpdl-benchmark/Places365-Validation` 사용, 투어·체험·쇼핑 학습 데이터)
+6. L. Bossard, M. Guillaumin, and L. Van Gool, "Food-101 – Mining Discriminative Components with Random Forests," *ECCV*, 2014. (`ethz/food101` validation 스플릿, 맛집 학습 데이터)
 7. ONNX Runtime, *https://onnxruntime.ai* (온디바이스 추론 런타임).
 8. Hugging Face Optimum, *https://huggingface.co/docs/optimum* (ONNX 변환·양자화).
