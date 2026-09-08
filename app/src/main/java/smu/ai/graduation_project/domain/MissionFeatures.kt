@@ -1,0 +1,67 @@
+package smu.ai.graduation_project.domain
+
+import smu.ai.graduation_project.model.Mission
+import kotlin.math.abs
+
+/**
+ * 미션 1건의 추천 신호(feature)를 계산한다. 순수 Kotlin, 모델 비의존.
+ *
+ * [MissionScorer] 의 규칙 기반 점수와 [LearnedReranker] 의 학습된 점수가 **같은 신호**를
+ * 쓰도록 계산을 여기 한곳에 모은다. 각 신호는 0~1 로 정규화된다.
+ *
+ * `NAMES` 의 순서는 학습 데이터·모델 가중치·추론이 모두 공유하므로 바꾸지 말 것.
+ */
+object MissionFeatures {
+
+    /** feature 벡터 순서. `ml/reco/` 학습 스크립트와 일치해야 한다. */
+    val NAMES: List<String> = listOf(
+        "explicit_pref", "implicit_affinity", "difficulty_fit", "proximity", "popularity",
+    )
+
+    /** 근접도 만점 거리(m). */
+    private const val NEAR_METERS = 1_000.0
+
+    /** 근접도 0 거리(m). */
+    private const val FAR_METERS = 15_000.0
+
+    data class Signals(
+        /** 미션 카테고리가 명시적 취향에 포함되면 1, 아니면 0. */
+        val explicitPref: Double,
+        /** 그 카테고리를 완료한 비율 (0~1). */
+        val implicitAffinity: Double,
+        /** 미션 포인트대가 사용자 레벨 기대치에 얼마나 맞는지 (0~1). */
+        val difficultyFit: Double,
+        /** 사용자 현재 위치로부터의 근접도 (0~1). 위치를 모르면 0. */
+        val proximity: Double,
+        /** 다른 사용자 완료 횟수 기반 인기도 (0~1). 신호 없으면 0. */
+        val popularity: Double,
+    ) {
+        fun asVector(): DoubleArray =
+            doubleArrayOf(explicitPref, implicitAffinity, difficultyFit, proximity, popularity)
+    }
+
+    /**
+     * @param maxCompletionCount 후보 중 최대 완료 횟수. 0 이면 인기도 신호를 쓰지 않는다.
+     */
+    fun of(
+        mission: Mission,
+        context: RecommendationContext,
+        maxCompletionCount: Int = 0,
+    ): Signals {
+        val explicit = if (mission.category in context.preferredCategories) 1.0 else 0.0
+
+        val affinity = context.affinity(mission.category).coerceIn(0.0, 1.0)
+
+        val expected = MissionScorer.expectedPoints(context.userLevel)
+        val fit = (1.0 - abs(mission.points - expected).toDouble() / expected).coerceIn(0.0, 1.0)
+
+        val distance = context.distanceMeters(mission.id)
+        val proximity = if (distance == null) 0.0
+        else ((FAR_METERS - distance) / (FAR_METERS - NEAR_METERS)).coerceIn(0.0, 1.0)
+
+        val popularity = if (maxCompletionCount <= 0) 0.0
+        else (context.completionCount(mission.id).toDouble() / maxCompletionCount).coerceIn(0.0, 1.0)
+
+        return Signals(explicit, affinity, fit, proximity, popularity)
+    }
+}

@@ -1,4 +1,13 @@
-# 사진 인증 모델 (Travel Mission)
+# ML (Travel Mission)
+
+앱의 두 AI 기능을 위한 학습·평가 파이프라인. Android 빌드와 분리돼 있다.
+
+- **사진 인증** (이 문서): 미션 2단계 사진을 온디바이스 비전 모델(`apple/mobilevit-small` 파인튜닝)로 1차 판정.
+- **추천 re-ranker** (`reco/README.md`): 규칙 기반 추천 점수를 완료 로그로 학습한 로지스틱 회귀로 재정렬.
+
+---
+
+## 사진 인증 모델
 
 미션 2단계 **사진 인증**을 사람이 아닌 온디바이스 비전 모델이 1차 판정하도록,
 HuggingFace 베이스 모델을 우리 미션 사진 데이터로 파인튜닝하는 파이프라인입니다.
@@ -15,7 +24,8 @@ HuggingFace 베이스 모델을 우리 미션 사진 데이터로 파인튜닝�
 | --- | --- |
 | `labels.json` | 분류 클래스 정의 (앱과 공유) |
 | `dataset_card.md` | 데이터셋 클래스·수집 출처·분할 규칙 |
-| `data/` | 데이터셋 구축 스크립트 (공개 데이터 수집 → 무효 합성 → 장소 단위 분할 → HF Hub 업로드). `data/README.md` 참고 |
+| `data/` | 사진 인증 데이터셋 구축 (공개 데이터 수집 → 무효 합성 → 분할 → HF Hub 업로드). `data/README.md` 참고 |
+| `reco/` | 추천 re-ranker 학습·평가. `reco/README.md` 참고 |
 | `data/make_smoke_dataset.py` | 파이프라인 스모크 테스트용 더미 imagefolder 생성 |
 | `notebooks/train_photo_verifier.ipynb` | 데이터 로드 → CLIP 제로샷 베이스라인 → 헤드 학습 → 전체 파인튜닝 → 평가 → 임계값 선정 → 모델 저장 |
 | `export_onnx.py` | 파인튜닝 모델을 ONNX 로 export (+ int8 양자화, 전처리·라벨 함께 출력) |

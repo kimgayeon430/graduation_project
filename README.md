@@ -19,7 +19,7 @@
 - 위치 인증 후 카메라 촬영 → 미리보기 → Supabase Storage 업로드로 사진 인증
 - 인증 단계별 포인트 지급 및 진행 상태 저장 (중복 지급 방지)
 - 진행 중인 미션 확인 및 이어서 수행
-- 홈에서 선호 카테고리를 우선한 규칙 기반 미션 추천 (완료한 미션 제외)
+- 홈에서 취향·완료 이력 기반 미션 추천 (규칙 점수 + 완료 로그 학습 re-ranker 하이브리드, 완료한 미션 제외)
 - 누적 포인트 기반 사용자 랭킹
 - 프로필에서 포인트, 레벨 및 미션 현황 확인
 
@@ -42,7 +42,7 @@
 | Backend | Firebase Authentication(Email/Password), Cloud Firestore |
 | 지도 | 네이버 지도 SDK `com.naver.maps:map-sdk` (미션 위치 마커·정보창) |
 | 이미지 저장 | Supabase Storage (public 버킷 + anon 업로드 정책) |
-| AI (진행 중) | 사진 인증용 온디바이스 이미지 분류 — HuggingFace `apple/mobilevit-small` 파인튜닝 → ONNX (`ml/`). 판정 규칙은 순수 Kotlin `PhotoVerification` |
+| AI | ① 사진 인증: 온디바이스 이미지 분류 (`apple/mobilevit-small` 파인튜닝 → ONNX, `onnxruntime-android`) — `PhotoVerification` / `OnnxPhotoVerifier`  ② 추천: 완료 로그 학습 로지스틱 re-ranker (`LearnedReranker`, `ml/reco/`) |
 | Image Loading | Coil |
 | Build | Gradle 9.4.1 (Kotlin DSL), Version Catalog, AGP 9.2.0, `compileSdk 36` / `minSdk 26` / `targetSdk 36` |
 | Architecture | 미션 수행 기능을 ViewModel · Repository(인터페이스/Firebase 구현) · 순수 도메인 로직으로 분리 |
@@ -65,35 +65,38 @@
    - 업로드나 저장이 실패하면 미션은 완료되지 않으며, 재시도해도 포인트는 한 번만 지급됩니다.
    - 사용자가 처음 완료할 때 같은 트랜잭션에서 `missions/{id}.completionCount` 를 1 올립니다. (추천 인기도 신호)
 
-## 개인화 추천 (규칙 기반)
+## 개인화 추천 (규칙 + 학습 하이브리드)
 
-추천은 별도 AI 모델 없이 현재 데이터만으로 설명 가능한 점수 규칙으로 홈의 추천 미션 상위 3건을 계산합니다. (`MissionScorer` + `MissionRecommender.recommendScored`)
+홈의 추천 미션 상위 3건은 **규칙 점수를 완료 로그로 학습한 re-ranker 로 다시 매겨** 만듭니다. 학습 모델(`assets/reranker.json`)이 없으면 규칙 점수만으로 정렬합니다(콜드스타트).
 
-1. id가 없거나 이미 완료한 미션은 후보에서 제외합니다.
-2. 후보마다 기본 점수를 매깁니다.
-   - **명시적 취향**: 미션 카테고리가 `users/{uid}.preferences` 에 포함되면 가산
-   - **암묵적 취향**: 그 카테고리 미션을 완료한 비율만큼 가산
-   - **난이도 적합도**: 미션 포인트대가 사용자 레벨 기대치에 가까울수록 가산
-   - **거리 근접도**: 미션 목표 지점이 현재 위치에 가까울수록 가산 (위치 권한이 이미 허용된 경우에만)
-   - **인기도**: 다른 사용자의 완료 횟수(`missions/{id}.completionCount`)가 많을수록 가산
-3. "기본 점수 − 다양성 감점 × 이미 뽑힌 같은 카테고리 수" 가 가장 높은 미션을 하나씩 3건 선택합니다.
-4. 각 추천에는 점수에 기여한 근거(예: `맛집 취향`, `자주 하는 유형`, `가까운 미션`, `인기 미션`)를 칩으로 표시합니다.
-5. 진행 중인 미션이 있으면 추천 대신 해당 미션을 노출합니다.
-6. 추천 결과가 없거나 조회에 실패하면 빈 화면 대신 안내 카드를 표시합니다.
+**신호 5개** (`MissionFeatures`, 0~1 정규화 — 규칙·학습이 공유)
 
-가중치는 `RecommendationWeights` 에 모여 있어 오프라인 평가 후 조정할 수 있습니다.
+- **명시적 취향**: 미션 카테고리가 `users/{uid}.preferences` 에 포함되면 1
+- **암묵적 취향**: 그 카테고리 미션을 완료한 비율
+- **난이도 적합도**: 미션 포인트대가 사용자 레벨 기대치에 가까운 정도
+- **거리 근접도**: 현재 위치로부터의 근접도 (위치 권한이 허용된 경우에만)
+- **인기도**: 다른 사용자의 완료 횟수(`missions/{id}.completionCount`) 기반
+
+1. id가 없거나 완료한 미션은 후보에서 제외합니다.
+2. 후보마다 **규칙 점수**(`MissionScorer`, `RecommendationWeights` 가중합 + 근거 칩)와 **학습된 완료 확률**(`LearnedReranker`, 로지스틱 회귀)을 구합니다.
+3. `최종 = (1−λ)·규칙점수/최댓값 + λ·학습확률` (λ = `blend`, 기본 0.6).
+4. "최종 − 다양성 감점 × 이미 뽑힌 같은 카테고리 수" 가 가장 높은 미션을 하나씩 3건 선택합니다.
+5. 근거 칩(`맛집 취향`, `자주 하는 유형`, `가까운 미션` 등)은 규칙 점수 것을 그대로 표시합니다.
+6. 진행 중인 미션이 있으면 추천 대신 노출합니다. 결과가 없으면 안내 카드.
+
+학습·평가 파이프라인은 `ml/reco/` (`build_dataset.py` → `train_reranker.py` → `evaluate_reco.py`). 현재 모델은 실제 로그가 없어 시뮬레이터로 학습(`reranker-lr-sim-1`); `user_missions` 로그가 쌓이면 `--from-firestore` 로 재학습합니다.
 
 신규 가입자는 회원가입 직후 취향 선택 화면으로 이동하고, 기존 사용자는 `preferences` 가 없을 때만 이 화면을 거칩니다.
 
-## 사진 인증 모델 (온디바이스, 진행 중)
+## 사진 인증 모델 (온디바이스)
 
-2단계 사진 인증에서 "아무 사진이나 통과"되는 문제를 없애기 위해, 촬영본을 **온디바이스 이미지 분류 모델**로 1차 판정합니다. 학습 파이프라인은 `ml/` 폴더에 있으며, 판정 규칙은 Firebase·모델에 의존하지 않는 순수 Kotlin `PhotoVerification` 으로 분리해 단위 테스트합니다.
+2단계 사진 인증에서 "아무 사진이나 통과"되는 문제를 없애기 위해, 촬영본을 **온디바이스 이미지 분류 모델**로 1차 판정합니다. 판정 규칙은 Firebase·모델에 의존하지 않는 순수 Kotlin `PhotoVerification` 으로 분리해 단위 테스트합니다.
 
 ### 접근
 
-- **베이스 모델**: HuggingFace `apple/mobilevit-small` (~5M 파라미터, 모바일용). 우리 미션 사진 데이터로 **헤드 학습 → 전체 파인튜닝** 순으로 적응시키고, 학습 없는 `CLIP` 제로샷을 비교 기준선으로 둡니다.
-- **클래스**: `투어 / 맛집 / 체험 / 쇼핑` 4개 미션 카테고리 + `무효`(셀카·스크린샷·무관 실내 등). 정의는 `ml/labels.json` 이 단일 소스이며 앱의 `PhotoVerification.INVALID_LABEL` 과 일치합니다.
-- **배포**: 파인튜닝 모델을 Optimum 으로 ONNX 로 export(`ml/export_onnx.py`)해 `app/src/main/assets/photo_verifier.onnx` 로 번들하고, `onnxruntime-android` 로 추론합니다. 학습·export 는 Colab/로컬 GPU 에서 수행하며 앱 빌드와 분리됩니다.
+- **모델**: HuggingFace `apple/mobilevit-small` (~5M 파라미터) 를 미션 사진으로 **전체 파인튜닝**. 학습 없는 `CLIP` 제로샷을 비교 기준선으로 둡니다. test 정확도 0.83 / macro-F1 0.82 (CLIP 제로샷 0.63).
+- **데이터**: `투어 / 맛집 / 체험 / 쇼핑` + `무효` 5클래스, 총 5,300장 (HF Hub `kimgayeon430/travel-mission-photos`). Places365 / Food-101 validation 셋에서 scene 별로 표본. 정의는 `ml/labels.json` 이 단일 소스.
+- **배포**: `torch.onnx` 로 ONNX(fp32 20MB) 변환 후 `app/src/main/assets/photo_verifier.onnx` 로 번들, `onnxruntime-android` 로 추론. `OnnxPhotoVerifier` 가 `photo_verifier_preprocessor.json` 에서 전처리 상수를 읽어 학습·추론을 자동 정합.
 
 ### 판정 규칙 (`PhotoVerification`)
 
@@ -106,7 +109,7 @@
 | 미션 카테고리 점수 ≥ `autoPassThreshold` | `PASS` | 기존 업로드·완료 흐름 진행 |
 | 그 사이(애매) | `NEEDS_REVIEW` | 미션은 완료하되 `photoNeedsReview` 표시 → 관리자 검수 큐 |
 
-모델을 불러오지 못하면 기본값은 `NEEDS_REVIEW`(관리자 확인) 입니다.
+모델을 불러오지 못하면 기본값은 `NEEDS_REVIEW`(관리자 확인) 입니다. 현재 임계값(`ml/thresholds.json` 에서 선정): `autoPass 0.65 / hardReject 0.22 / invalidReject 0.55`.
 
 추론(`PhotoVerifier`) + 판정(`PhotoVerification`)을 묶은 "업로드 전 결정"은 `data/PhotoGate` 로 분리했습니다. Firebase·Android 비의존이라 `FakePhotoVerifier` 로 전 경로를 단위 테스트하며(`PhotoGateTest`), `FirebaseMissionRepository` 는 `PhotoGate.decide()` 결과(`Reject` / `Proceed(needsReview)`)에 따라 업로드/거부만 합니다.
 
@@ -114,31 +117,32 @@
 
 | 파일 | 내용 |
 | --- | --- |
-| `ml/labels.json` | 분류 클래스 정의 (앱과 공유) |
-| `ml/dataset_card.md` | 클래스별 목표 규모, 수집 출처(Places365·Food-101·Landmarks + 크라우드소싱), 장소 단위 train/val/test 분할 |
-| `ml/notebooks/train_photo_verifier.ipynb` | 데이터 로드 → CLIP 제로샷 → 헤드 학습 → 전체 파인튜닝 → 평가(리포트·혼동행렬) → 임계값 선정 → HF Hub 업로드 |
-| `ml/export_onnx.py` | 파인튜닝 모델 → ONNX (+ int8 양자화), 전처리 상수·라벨 순서 함께 출력 |
-| `ml/thresholds.json` | 노트북이 생성. 값이 정해지면 `PhotoVerificationConfig` 기본값으로 반영 |
-
-### 평가 지표 (보고서용)
-
-- 클래스별 precision / recall / F1, confusion matrix
-- **무효 사진 차단율**(invalid recall)과 **정상 사진 오탐율**(정상 사진이 `REJECT` 되는 비율)
-- 카테고리 점수 PR 커브로 `autoPassThreshold` / `hardRejectThreshold` 선정
-- CLIP 제로샷 vs 헤드 학습 vs 전체 파인튜닝 비교
-- 온디바이스 모델 크기(MB)·추론 지연(ms)
+| `ml/labels.json` · `dataset_card.md` | 분류 클래스 정의(앱과 공유) · 수집 출처·규모 |
+| `ml/data/` | 데이터셋 구축 (Places365/Food-101 validation → scene별 표본 → 분할 → HF Hub) |
+| `ml/notebooks/train_photo_verifier.ipynb` | 데이터 로드 → CLIP 제로샷 → 헤드 학습 → 전체 파인튜닝 → 평가 → 임계값 선정 |
+| `ml/export_onnx.py` | 파인튜닝 모델 → ONNX (`torch.onnx`, 전처리·라벨·버전 함께 출력) |
+| `ml/thresholds.json` | 학습 결과로 선정한 임계값 + 평가 지표. `PhotoVerificationConfig` 기본값과 동기화 |
 
 ### 현재 상태
 
-- [x] 판정 도메인 로직 `PhotoVerification` + `PhotoVerificationConfig` + 단위 테스트
-- [x] 추론 인터페이스 `data/PhotoVerifier` (+ `FakePhotoVerifier`), 업로드 전 결정 `data/PhotoGate` + 단위 테스트
-- [x] `ml/` 학습·평가·export 파이프라인 골격
-- [x] `MissionPerformViewModel` → `MissionRepository` 연결: 업로드 전 판정, `REJECT` 시 업로드 중단, 판정 결과를 `user_missions` 에 기록<br>(모델이 없는 현재는 `PhotoVerificationConfig(passWhenModelUnavailable = true)` 로 통과)
-- [x] 관리자 검수 큐 화면 `AdminPhotoReviewScreen` (`photoNeedsReview == true` 목록, 승인 / 반려·보상 회수)
-- [x] 데이터셋 구축 스크립트 `ml/data/` (공개 데이터셋 수집 · 무효 표본 합성 · 장소 단위 분할 · HF Hub 업로드)
-- [x] Firestore 보안 규칙 `firestore.rules` (소유권·관리자 권한 강제, 사용자의 `photoNeedsReview` 임의 해제 차단)
-- [ ] 데이터셋 수집 실행 및 모델 학습
-- [ ] `OnnxPhotoVerifier` (onnxruntime-android 추론) — 완성 시 `MissionPerformViewModel` 의 기본 verifier·config 교체
+- [x] 판정 로직 `PhotoVerification` / `PhotoVerificationConfig` / `PhotoGate` + 단위 테스트
+- [x] `MissionPerformViewModel` → `FirebaseMissionRepository` 연결 (업로드 전 판정, 결과 기록, UX 분기)
+- [x] 관리자 검수 큐 `AdminPhotoReviewScreen`, Firestore 보안 규칙 `firestore.rules`
+- [x] 데이터셋 5,300장 구축 (HF Hub `kimgayeon430/travel-mission-photos`)
+- [x] Colab T4 파인튜닝 (`mobilevit-small-fullft-1`, test macro-F1 0.82) → `assets/photo_verifier.onnx`
+- [x] `OnnxPhotoVerifier` 연결, 임계값 반영, 기본 verifier 전환
+- [ ] 실기기 전체 루프 검증, `firestore.rules` 배포, 체험 데이터 보강 후 재학습
+
+## 추천 re-ranker (`ml/reco/`)
+
+규칙 점수(`MissionScorer`)에 완료 로그로 학습한 로지스틱 회귀 re-ranker 를 얹은 하이브리드 추천. "개인화 추천" 절 참고.
+
+| | 규칙 | 학습 |
+| --- | ---: | ---: |
+| ROC-AUC (완료 예측, test) | 0.918 | 0.937 |
+| NDCG@10 / MAP | 0.977 / 0.907 | 0.990 / 0.927 |
+
+현재 모델은 실제 로그가 없어 시뮬레이터(`ml/reco/sim.py`)로 학습(`reranker-lr-sim-1`). `user_missions` 로그가 쌓이면 `build_dataset.py --from-firestore` 로 재학습.
 
 ## 미션 지도
 
@@ -167,7 +171,7 @@
 ```text
 app/src/main/java/smu/ai/graduation_project
 ├── MainActivity.kt # 루트/메인 NavHost, 하단 탭, 인증·권한 게이트
-├── data/           # Repository 인터페이스·Firebase 구현, Supabase Storage 업로드, PhotoVerifier·PhotoGate(사진 판정)
+├── data/           # Repository·Firebase·Supabase, PhotoVerifier·PhotoGate(사진 판정), RerankerSource(추천 모델 로드)
 ├── domain/         # Firebase 비의존 순수 로직 (거리·보상·완료·취향·추천 규칙, 사진 인증 판정)
 ├── model/          # Mission, UserRank 등 데이터 모델
 ├── navigation/     # 화면 경로 및 내비게이션 정의
@@ -185,12 +189,11 @@ firestore.rules     # Firestore 보안 규칙
 firebase.json       # Firebase CLI 설정 (규칙 배포)
 docs/               # 보고서 등 문서
 
-ml/                 # 사진 인증 모델 학습·평가·ONNX export (Colab/로컬 GPU, 앱 빌드와 분리)
-├── labels.json
-├── dataset_card.md
-├── data/           # 데이터셋 구축 스크립트 (공개 데이터 수집·무효 합성·분할·HF 업로드)
-├── notebooks/train_photo_verifier.ipynb
-└── export_onnx.py
+ml/                 # 모델 학습·평가 (Colab/로컬, 앱 빌드와 분리)
+├── labels.json · dataset_card.md · thresholds.json
+├── data/           # 사진 인증 데이터셋 구축 (공개 데이터 수집·무효 합성·분할·HF 업로드)
+├── notebooks/train_photo_verifier.ipynb · export_onnx.py   # 사진 인증 모델
+└── reco/           # 추천 re-ranker (로그 → 로지스틱 회귀 → reranker.json, 오프라인 평가)
 ```
 
 ### 주요 도메인 모듈
@@ -203,8 +206,10 @@ ml/                 # 사진 인증 모델 학습·평가·ONNX export (Colab/�
 | `MissionCompletion` | 사진 인증 가능 여부·완료 처리 결과(`resolve`) 계산 |
 | `PhotoVerification` | 온디바이스 모델의 라벨별 점수 → 통과 / 재촬영 / 관리자 검수 판정 |
 | `TravelPreference` | 취향 카테고리 정의, 최소 1개 선택 규칙, 저장용 정규화 |
-| `MissionScorer` | 명시적·암묵적 취향, 난이도 적합도, 거리 근접도, 인기도로 미션 기본 점수 계산 (근거 포함) |
-| `MissionRecommender` | 후보 필터 + 점수 정렬 + 다양성 감점으로 상위 N건 추천 |
+| `MissionFeatures` | 미션 추천 신호 5개(0~1 정규화) 계산. 규칙·학습이 공유 (`ml/reco/features.py` 와 일치) |
+| `MissionScorer` | 신호를 `RecommendationWeights` 로 가중합 + 근거 문구 (규칙 점수) |
+| `LearnedReranker` | 완료 로그로 학습한 로지스틱 회귀로 완료 확률 추정 (`assets/reranker.json`) |
+| `MissionRecommender` | 후보 필터 → 규칙/학습 점수 블렌드 → 다양성 감점으로 상위 N건 |
 
 ## Firestore · Supabase Storage 데이터
 

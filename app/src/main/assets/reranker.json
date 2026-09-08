@@ -1,0 +1,27 @@
+{
+  "version": "reranker-lr-sim-1",
+  "feature_names": [
+    "explicit_pref",
+    "implicit_affinity",
+    "difficulty_fit",
+    "proximity",
+    "popularity"
+  ],
+  "weights": [
+    3.10975,
+    5.006305,
+    3.239837,
+    0.171879,
+    0.011929
+  ],
+  "bias": -4.02929,
+  "blend": 0.6,
+  "diversity_penalty": 0.15,
+  "eval": {
+    "test_roc_auc": 0.9362,
+    "rule_hit@3": 1.0,
+    "learned_hit@3": 1.0,
+    "rule_ndcg@3": 0.9882,
+    "learned_ndcg@3": 0.9906
+  }
+}

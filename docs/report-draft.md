@@ -113,7 +113,9 @@ firebase.json         # Firebase CLI 설정 (규칙 배포)
 | `MissionRewardPolicy` | 1·2단계 보상 계산과 중복 지급 방지 |
 | `MissionCompletion` | 사진 인증 가능 여부·완료 처리 결과(`resolve`) 계산 |
 | `TravelPreference` | 취향 카테고리 정의, 최소 1개 선택 규칙, 저장용 정규화 |
-| `MissionScorer` | 명시적·암묵적 취향, 난이도 적합도, 거리 근접도, 인기도로 미션 기본 점수 계산(근거 포함) |
+| `MissionFeatures` | 미션 추천 신호 5개(0~1 정규화) 계산. 규칙·학습이 공유 |
+| `MissionScorer` | 신호를 `RecommendationWeights` 로 가중합 + 근거 문구 (규칙 점수) |
+| `LearnedReranker` | 완료 로그로 학습한 로지스틱 회귀로 완료 확률 추정 |
 | `MissionRecommender` | 후보 필터 + 점수 정렬 + 다양성 감점으로 상위 N건 추천 |
 | `PhotoVerification` | 온디바이스 모델의 라벨별 점수 → 통과 / 재촬영 / 관리자 검수 판정 |
 
@@ -208,25 +210,30 @@ firebase.json         # Firebase CLI 설정 (규칙 배포)
 - 누적 포인트 기준 사용자 랭킹을 제공하고, 프로필에서 포인트·레벨·완료/진행 미션 수를 보여 준다.
 - **포인트 적립 내역**(`PointHistoryScreen`): 마이페이지의 보유 포인트를 누르면 미션별 위치·사진 인증 보상 내역을 최신순으로 보여 준다. 별도 원장 컬렉션 없이 `user_missions` 의 `stage1RewardGranted`/`stage1RewardPoints`/`stage1VerifiedAt`, `stage2RewardGranted`/`stage2RewardPoints`/`completedAt` 에서 재구성하며, 미션명은 `missions/{id}` 에서 조회한다. (`firestore.rules` 미배포 상태에서 새 컬렉션 추가 시 규칙 누락으로 리워드 트랜잭션이 깨질 위험을 피하기 위한 선택. 서버측 포인트 검증 도입 시 실제 원장으로 교체 — 10장)
 
-### 4.5 개인화 추천 (규칙 기반)
+### 4.5 개인화 추천 (규칙 + 학습 하이브리드)
 
-추천은 별도 AI 모델 없이 현재 데이터만으로 설명 가능한 점수 규칙으로 홈의 추천 미션 상위 3건을
-계산한다. (`MissionScorer` + `MissionRecommender.recommendScored`)
+홈의 추천 미션 상위 3건은 **규칙 점수를 완료 로그로 학습한 re-ranker 로 다시 매겨** 만든다.
+학습 모델(`assets/reranker.json`)이 없으면 규칙 점수만으로 정렬한다(콜드스타트).
 
-1. id 가 없거나 이미 완료한 미션은 후보에서 제외한다.
-2. 후보마다 기본 점수를 매긴다.
-   - **명시적 취향**: 미션 카테고리가 `preferences` 에 포함되면 가산
-   - **암묵적 취향**: 그 카테고리 미션을 완료한 비율만큼 가산
-   - **난이도 적합도**: 미션 포인트대가 사용자 레벨 기대치에 가까울수록 가산
-   - **거리 근접도**: 미션 목표 지점이 현재 위치에 가까울수록 가산 (위치 권한이 있을 때만)
-   - **인기도**: 다른 사용자의 완료 횟수(`completionCount`)가 많을수록 가산
-3. "기본 점수 − 다양성 감점 × 이미 뽑힌 같은 카테고리 수" 가 가장 높은 미션을 하나씩 3건 선택한다.
-4. 각 추천에 점수 근거(예: `맛집 취향`, `자주 하는 유형`, `가까운 미션`, `인기 미션`)를 칩으로 표시한다.
-5. 진행 중인 미션이 있으면 추천 대신 해당 미션을 노출한다.
-6. 추천 결과가 없거나 조회에 실패하면 안내 카드를 표시한다.
+**신호 5개** (`MissionFeatures`, 0~1 정규화 — 규칙·학습이 공유)
 
-가중치는 `RecommendationWeights` 에 모여 있어 오프라인 평가 후 조정할 수 있다.
-이 규칙 기반 추천은 향후 완료 로그 기반 학습 모델로 확장할 여지를 둔다. (8장)
+| 신호 | 의미 |
+| --- | --- |
+| `explicit_pref` | 미션 카테고리가 `preferences` 에 포함되면 1 |
+| `implicit_affinity` | 그 카테고리를 완료한 비율 |
+| `difficulty_fit` | 미션 포인트대가 사용자 레벨 기대치에 가까운 정도 |
+| `proximity` | 현재 위치로부터의 근접도 (위치를 알 때만) |
+| `popularity` | 다른 사용자 완료 횟수 기반 인기도 |
+
+1. id 가 없거나 완료한 미션은 후보에서 제외한다.
+2. 후보마다 **규칙 점수**(`MissionScorer`, `RecommendationWeights` 가중합 + 근거 칩)와
+   **학습된 완료 확률**(`LearnedReranker`, 로지스틱 회귀)을 구한다.
+3. `최종 = (1−λ)·규칙점수/최댓값 + λ·학습확률` (λ = `blend`, 기본 0.6).
+4. "최종 − 다양성 감점 × 이미 뽑힌 같은 카테고리 수" 가 가장 높은 미션을 하나씩 3건 선택한다.
+5. 근거 칩(`맛집 취향`, `자주 하는 유형`, `가까운 미션` 등)은 규칙 점수 것을 그대로 표시한다.
+6. 진행 중인 미션이 있으면 추천 대신 노출한다. 결과가 없으면 안내 카드.
+
+학습·평가는 8.3절, 파이프라인은 `ml/reco/`.
 
 ### 4.6 관리자 기능
 
@@ -237,10 +244,10 @@ firebase.json         # Firebase CLI 설정 (규칙 배포)
 
 ## 5. (기존 프로젝트 대비) 인공지능 관점의 한계와 문제 정의
 
-### 5.1 한계
+### 5.1 한계 (개선 착수 전)
 
-1. **사진 인증에 검증이 없다.** 2단계 인증은 촬영본을 그대로 업로드하고 `photoVerified` 를 참으로 고정했다. 미션과 무관한 사진(셀카, 스크린샷, 실내 사진)으로도 포인트를 받을 수 있어 부정 사용에 취약하다.
-2. **학습된 모델이 없다.** 추천은 하드코딩 가중치의 규칙 기반이며, 오프라인 평가·학습 절차가 없다.
+1. **사진 인증에 검증이 없다.** 2단계 인증은 촬영본을 그대로 업로드하고 `photoVerified` 를 참으로 고정했다. 미션과 무관한 사진(셀카, 스크린샷, 실내 사진)으로도 포인트를 받을 수 있어 부정 사용에 취약하다. → 6장(온디바이스 사진 인증 모델)
+2. **학습된 모델이 없다.** 추천은 하드코딩 가중치의 규칙 기반이며, 오프라인 평가·학습 절차가 없다. → 8.3절(학습된 추천 re-ranker)
 
 ### 5.2 문제 정의
 
@@ -356,8 +363,8 @@ scene 다양성: 투어 107 · 맛집 101 · 체험 53 · 쇼핑 28 · 무효 2(
 
 ### 7.1 완료
 
-- [x] 앱 전체 기능: 인증·온보딩, 미션 목록·지도, 2단계 인증 흐름, 포인트·랭킹, 규칙 기반 추천, 관리자 기능
-- [x] 순수 도메인 로직 분리 + 단위 테스트 (`GeoDistance`, `LocationVerification`, `MissionRewardPolicy`, `MissionCompletion`, `TravelPreference`, `MissionScorer`, `MissionRecommender`, `PhotoVerification`)
+- [x] 앱 전체 기능: 인증·온보딩, 미션 목록·지도, 2단계 인증 흐름, 포인트·랭킹, 개인화 추천, 관리자 기능
+- [x] 순수 도메인 로직 분리 + 단위 테스트 (`GeoDistance`, `LocationVerification`, `MissionRewardPolicy`, `MissionCompletion`, `TravelPreference`, `MissionFeatures`, `MissionScorer`, `MissionRecommender`, `LearnedReranker`, `PhotoVerification`)
 - [x] 사진 인증 판정 로직 `PhotoVerification` + `PhotoVerificationConfig` + 테스트 7건
 - [x] 추론 인터페이스 `PhotoVerifier` (+ `FakePhotoVerifier`), 업로드 전 결정 `PhotoGate` + 테스트 7건
 - [x] 미션 완료 흐름 연결 (업로드 전 판정, 결과 기록, `REJECT`/`NEEDS_REVIEW` UX 분기)
@@ -369,11 +376,13 @@ scene 다양성: 투어 107 · 맛집 101 · 체험 53 · 쇼핑 28 · 무효 2(
 - [x] Supabase Storage 사진 업로드 (InvalidKey·RLS 이슈 수정 후 실기기 동작 확인)
 - [x] 마이페이지 포인트 적립 내역 화면 (`PointHistoryScreen`)
 - [x] Colab T4 에서 파인튜닝 → `photo_verifier.onnx`(20MB) 를 `assets/` 에 번들, 임계값을 `PhotoVerificationConfig.DEFAULT` 로 반영, 기본 verifier 를 `OnnxPhotoVerifier`·`DEFAULT` config 로 전환 (test macro-F1 0.82)
+- [x] 학습된 추천 re-ranker: `MissionFeatures`·`LearnedReranker`·`MissionRecommender.recommendReranked` + `ml/reco/` 파이프라인 + `assets/reranker.json`. 시뮬레이터 학습본으로 규칙 대비 AUC 0.918→0.937 (8.3절)
 
 ### 7.2 남은 작업
 
 - [ ] 실기기에서 사진 인증 전체 루프 확인 (PASS/REJECT/NEEDS_REVIEW → 관리자 승인/반려), 추론 지연 측정
 - [ ] 크라우드소싱 사진으로 각 클래스 보강(특히 체험) 후 재학습
+- [ ] `user_missions` 로그로 추천 re-ranker 재학습(`--from-firestore`), 시뮬레이터 학습본 대체
 - [ ] `firestore.rules` 배포 및 규칙 시뮬레이터 검증
 - [ ] Robolectric 기반 ViewModel/Compose UI 테스트 `[선택]`
 - [ ] 서버측 포인트 검증(Cloud Functions) `[선택]`
@@ -429,6 +438,23 @@ scene 다양성: 투어 107 · 맛집 101 · 체험 53 · 쇼핑 28 · 무효 2(
 - 추론 지연(ms): `[실기기 측정 TODO]`
 - 전처리·라벨·모델버전은 export 산출물(`photo_verifier_preprocessor.json` / `_labels.json` / `_version.txt`)에서 `OnnxPhotoVerifier` 가 읽어 자동 정합.
 
+### 8.3 학습된 추천 re-ranker
+
+규칙 점수(`MissionScorer`, 손튜닝 가중치)에 완료 로그로 학습한 **로지스틱 회귀 re-ranker** 를 얹은
+하이브리드(4.5절). 신호 5개는 규칙·학습이 공유한다(`MissionFeatures`).
+
+- **파이프라인**(`ml/reco/`): `build_dataset.py`(로그 → 학습행) → `train_reranker.py`(로지스틱 회귀 → `reranker.json`) → `evaluate_reco.py`(규칙 vs 학습 비교). 앱은 `assets/reranker.json` 이 없으면 규칙 기반으로 폴백한다.
+- **데이터**: 실제 `user_missions` 로그가 없어 시뮬레이터(`sim.py`)로 학습했다(`reranker-lr-sim-1`). 시뮬레이터의 참 선호는 규칙 고정 가중치와 다르게 설정했다(인기도·거리를 규칙은 크게 잡지만 실제로는 거의 무의미, 난이도 적합도는 규칙보다 훨씬 중요). 로그가 쌓이면 `--from-firestore` 로 교체한다.
+
+| 지표 (test, 사용자 분리) | 규칙 | 학습 |
+| --- | ---: | ---: |
+| ROC-AUC (완료 예측) | 0.918 | **0.937** |
+| NDCG@10 | 0.977 | **0.990** |
+| MAP | 0.907 | **0.927** |
+
+학습 가중치가 규칙의 손튜닝 오류를 교정한다: `proximity` 1.5→0.15, `popularity` 1.0→0.03,
+`difficulty_fit` 1.0→3.31, `implicit_affinity` 2.0→5.01.
+
 ---
 
 ## 9. 개발 환경 및 협업 방식
@@ -447,6 +473,8 @@ scene 다양성: 투어 107 · 맛집 101 · 체험 53 · 쇼핑 28 · 무효 2(
   - `f0e001e` `ml/` 파이프라인 스모크 테스트 + 최신 라이브러리 대응(transformers 5.x / optimum 2.x)
   - `1e209b2` 마이페이지 완료한 미션 목록 화면
   - `c0d1029` 데이터셋 구축 스크립트 실전화 + 실제 데이터셋 생성(5,300장, HF Hub 업로드)
+  - `2db4900` 사진 인증 모델 학습 결과 반영(fullft-1, macro-F1 0.82)
+  - 학습된 추천 re-ranker (`MissionFeatures`/`LearnedReranker` + `ml/reco/`)
 
 ---
 
@@ -454,7 +482,7 @@ scene 다양성: 투어 107 · 맛집 101 · 체험 53 · 쇼핑 28 · 무효 2(
 
 - 미션별 레퍼런스 사진 few-shot 매칭(랜드마크 정합성 강화)
 - 촬영 시각·EXIF·위치 메타데이터 교차 검증, GPS 스푸핑/순간이동 탐지
-- 추천 고도화: 완료 로그 기반 학습된 re-ranking 또는 컨텍스트 밴딧, 오프라인 평가(hit@k, NDCG)
+- 추천 re-ranker 를 실제 `user_missions` 로그로 재학습(현재는 시뮬레이터 학습본), 온라인 A/B 또는 컨텍스트 밴딧으로 확장
 - 서버 사이드 포인트 검증, Firestore 보안 규칙 정비, Compose UI 테스트·Repository 계약 테스트
 
 ---
@@ -471,3 +499,5 @@ scene 다양성: 투어 107 · 맛집 101 · 체험 53 · 쇼핑 28 · 무효 2(
 6. L. Bossard, M. Guillaumin, and L. Van Gool, "Food-101 – Mining Discriminative Components with Random Forests," *ECCV*, 2014. (`ethz/food101` validation 스플릿, 맛집 학습 데이터)
 7. ONNX Runtime, *https://onnxruntime.ai* (온디바이스 추론 런타임).
 8. Hugging Face Optimum, *https://huggingface.co/docs/optimum* (ONNX 변환·양자화).
+9. L. Li, W. Chu, J. Langford, and R. E. Schapire, "A Contextual-Bandit Approach to Personalized News Article Recommendation," *WWW*, 2010. (개인화 추천의 문맥 기반 온라인 학습)
+10. F. Ricci, L. Rokach, and B. Shapira, *Recommender Systems Handbook*, Springer, 2015. (하이브리드 추천, 오프라인 평가 지표)

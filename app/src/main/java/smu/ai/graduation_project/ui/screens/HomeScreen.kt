@@ -63,6 +63,7 @@ import com.google.firebase.Firebase
 import com.google.firebase.auth.auth
 import com.google.firebase.firestore.GeoPoint
 import com.google.firebase.firestore.firestore
+import smu.ai.graduation_project.data.RerankerSource
 import smu.ai.graduation_project.domain.GeoDistance
 import smu.ai.graduation_project.domain.MissionRecommender
 import smu.ai.graduation_project.domain.MissionScorer
@@ -191,12 +192,16 @@ fun HomeScreen(onNavigateToDetail: (String) -> Unit) {
         }
     }
 
-    // 규칙 기반 추천: 진행 중 미션이 있으면 그것을 우선 표시, 없으면 점수 기반 추천 상위 3건.
-    // 점수 = 명시적 취향 + 암묵적 취향(완료 이력) + 난이도 적합도 + 거리 근접도 + 인기도 − 다양성 감점
+    // 학습된 re-ranker 모델(assets/reranker.json). 없으면 null → 규칙 기반으로 폴백.
+    val rerankerModel = remember { RerankerSource.load(context) }
+
+    // 추천: 진행 중 미션이 있으면 그것을 우선 표시, 없으면 상위 3건.
+    // 규칙 점수(명시적/암묵적 취향·난이도·거리·인기도) 를 완료 로그로 학습한 re-ranker 로 다시 매긴 뒤
+    // 다양성 감점을 적용한다. 모델이 없으면 규칙 점수만으로 정렬한다.
     val recommendations = remember(
-        allMissions, preferences, completedMissionIds, level, distances, completionCounts
+        allMissions, preferences, completedMissionIds, level, distances, completionCounts, rerankerModel
     ) {
-        MissionRecommender.recommendScored(
+        MissionRecommender.recommendReranked(
             missions = allMissions,
             context = RecommendationContext(
                 preferredCategories = preferences.toSet(),
@@ -209,6 +214,7 @@ fun HomeScreen(onNavigateToDetail: (String) -> Unit) {
                 completionCountByMissionId = completionCounts
             ),
             completedMissionIds = completedMissionIds,
+            model = rerankerModel,
             limit = 3
         )
     }
