@@ -50,6 +50,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.rememberVectorPainter
+import androidx.compose.ui.layout.ContentScale
+import coil.compose.AsyncImage
 import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
@@ -124,7 +127,8 @@ fun HomeScreen(onNavigateToDetail: (String) -> Unit) {
                         title = title,
                         desc = doc.getString("desc") ?: "",
                         points = doc.getLong("points")?.toInt() ?: 0,
-                        category = doc.getString("category") ?: "투어"
+                        category = doc.getString("category") ?: "투어",
+                        imageUrl = doc.getString("imageUrl").orEmpty()
                     )
                 }
                 missionGeo = snapshot.documents.mapNotNull { doc ->
@@ -337,14 +341,10 @@ fun HomeScreen(onNavigateToDetail: (String) -> Unit) {
                     modifier = Modifier.padding(12.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .size(100.dp)
-                            .background(LightPurple, RoundedCornerShape(12.dp)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(Icons.Default.Landscape, contentDescription = null, tint = MainPurple, modifier = Modifier.size(40.dp))
-                    }
+                    HomeMissionImage(
+                        imageUrl = allMissions.firstOrNull { it.id == mission.id }?.imageUrl.orEmpty(),
+                        title = mission.title
+                    )
                     Column(modifier = Modifier.width(220.dp)) {
                         Surface(
                             color = if (mission.status == "진행중") Color(0xFF4CAF50) else MainPurple,
@@ -456,14 +456,7 @@ private fun RecommendedMissionCard(
             modifier = Modifier.padding(12.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Box(
-                modifier = Modifier
-                    .size(100.dp)
-                    .background(LightPurple, RoundedCornerShape(12.dp)),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(Icons.Default.Landscape, contentDescription = null, tint = MainPurple, modifier = Modifier.size(40.dp))
-            }
+            HomeMissionImage(imageUrl = mission.imageUrl, title = mission.title)
             Column(modifier = Modifier.width(220.dp)) {
                 Surface(color = MainPurple, shape = RoundedCornerShape(4.dp)) {
                     Text(
@@ -505,6 +498,33 @@ private fun RecommendedMissionCard(
                     Text("미션 보기", fontSize = 12.sp)
                 }
             }
+        }
+    }
+}
+
+/** Home cards use the same Firestore imageUrl as the mission list and detail. */
+@Composable
+private fun HomeMissionImage(imageUrl: String, title: String) {
+    Box(
+        modifier = Modifier
+            .size(100.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(LightPurple),
+        contentAlignment = Alignment.Center
+    ) {
+        if (imageUrl.isBlank()) {
+            Icon(Icons.Default.Landscape, contentDescription = null,
+                tint = MainPurple, modifier = Modifier.size(40.dp))
+        } else {
+            val fallback = rememberVectorPainter(Icons.Default.Landscape)
+            AsyncImage(
+                model = imageUrl,
+                contentDescription = "$title 대표 사진",
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop,
+                placeholder = fallback,
+                error = fallback
+            )
         }
     }
 }
