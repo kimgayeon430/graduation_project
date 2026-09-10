@@ -453,7 +453,7 @@ MobileViT feature 는 5-클래스 분류로 파인튜닝되며 클래스 판별 
 #### 6.7.6 남은 위험
 
 - **하드 게이트로는 쓸 수 없다.** `embedding_separability.py` 에서 정상 사진이 hard-negative 상위 5% 유사도 문턱을 못 넘는 비율이 투어 56%·쇼핑 80%다. 유사도로 즉시 `REJECT` 하면 정상 사진 오탈락이 과다하므로 보조/구제 신호로만 쓴다. 쇼핑은 인코더와 무관하게 분리도가 낮아(AUC 0.70) 유사도 결합의 이득이 작다.
-- **임계값이 공개 scene 프록시 기반의 잠정치.** `raw/<장소>__N.jpg` 그룹을 같은 대상으로 간주해 스윕한 값이다. 실제 미션 사진 vs 대표 이미지 쌍(크라우드소싱)으로 재보정해야 하며, `user_missions.photoVerifySimilarity` 로그를 그 데이터로 쌓는다.
+- **임계값이 공개 scene 프록시 기반의 잠정치.** `raw/<장소>__N.jpg` 그룹을 같은 대상으로 간주해 스윕한 값이다. 실제 미션 사진 vs 대표 이미지 쌍으로 재보정해야 한다. `user_missions.photoVerifySimilarity`(PASS·NEEDS_REVIEW)와 `PhotoVerify` logcat(REJECT 포함)이 데이터를 쌓고, `ml/calibrate_similarity.py` 가 관리자 검수 결과를 정답 라벨로 삼아 `rescue`/`suspect` 를 스윕한다.
 - **참조 이미지 1장의 한계.** 각도·조명·계절·주야 차이에 코사인 유사도가 흔들린다. `photoEmbedding` 을 배열의 배열로 두면 여러 장 등록해 최대 유사도를 취하도록 확장할 수 있다.
 - **무효 클래스 의존.** (가) 의 스푸핑 방어 전체가 무효 클래스 성능에 걸려 있다. 6.7.1 에서 사무실 장면이, 6.7.7 에서 모니터 재촬영이 모두 무효로 잡히지 않았으므로(`s[무효] ≈ 0.07`), 크라우드소싱 수집 시 *무관한 실내·업무 환경* 과 *화면·모니터 재촬영* 표본을 보강해야 한다.
 - **전처리 정합.** 촬영본은 EXIF 회전을 반영해 디코드하도록 고쳤다(`ImagePreprocess.decodeUpright`, 분류·임베딩 공통). CLIP 리사이즈는 bicubic 이나 앱은 bilinear 라 미세한 차이가 남는다.
@@ -504,7 +504,7 @@ Galaxy S8(SM-G950N, API 28)에서 `경복궁_투어` 미션(대표 이미지 임
 
 - [x] `photo_embedder_int8.onnx`(88.6MB) 를 HF Hub `kimgayeon430/travel-mission-photo-embedder`(Public) 에 업로드, `ml/embed_missions.py` 로 미션 **16/16건** `photoEmbedding`(512d) + `photoEmbeddingModelVersion` 백필 완료 (`숙대입구`는 `imageUrl` 등록 후 추가 백필). export 산출물 sha256 이 HF 업로드본과 동일해 참조 임베딩이 앱 다운로드 모델과 일치
 - [ ] 실기기에서 사진 인증 전체 루프 확인 — 임베더 HF 다운로드→캐시(`prefetch`), 유사도 결합, 구제 경로(`REJECT`→`NEEDS_REVIEW`)까지 확인 완료(6.7.7). 남은 것: *현장 정상 촬영* 케이스, `PASS` → 관리자 승인/반려 분기
-- [ ] 유사도 임계값 실측 보정 — 6.7.7 관측(무관 0.38 / 재촬영 0.67)에 *현장 정상* 값을 더해 `rescue`/`suspect` 확정. 크라우드소싱 미션 사진 vs 대표 이미지 쌍으로 스윕(현재는 공개 scene 프록시 잠정치), `PhotoVerify` 로그·`user_missions.photoVerifySimilarity` 활용
+- [ ] 유사도 임계값 실측 보정 — 6.7.7 관측(무관 0.38 / 재촬영 0.67)에 *현장 정상* 값을 더해 `rescue`/`suspect` 확정. `ml/calibrate_similarity.py` 가 `PhotoVerify` 로그 + `user_missions.photoVerifySimilarity` 를 관리자 검수 결과로 라벨링해 스윕 (현재는 공개 scene 프록시 잠정치)
 - [ ] 무효 클래스에 화면·모니터 재촬영 표본 보강 — 6.7.7 에서 재촬영본 `s[무효] ≈ 0.07` 로 스푸핑 방어가 유사도 문턱에만 의존
 - [ ] 크라우드소싱 사진으로 각 클래스 보강(특히 체험·무관 실내) 후 재학습
 - [ ] `user_missions` 로그로 추천 re-ranker 재학습(`--from-firestore`), 시뮬레이터 학습본 대체
@@ -618,7 +618,7 @@ NDCG@5 +0.033 으로 이득의 대부분을 가져온다.
 
 ## 10. 향후 계획
 
-- **참조 이미지 임베딩 유사도 정식 배포** — 설계·구현은 6.7절에서 완료(CLIP 인코더, 판정 결합, 사전계산 스크립트). 남은 것은 임베더 모델 업로드, 기존 미션 임베딩 채우기, 실측 임계값 보정. 다중 참조 이미지(최대 유사도)·MobileCLIP 로 모델 경량화는 후속.
+- **참조 이미지 임베딩 유사도** — 설계·구현·배포 완료(6.7절): CLIP 인코더 HF Hub 배포, 미션 16/16 임베딩 백필, 판정 결합, 실기기 예비 관측(6.7.7). 남은 것은 실사용 로그로 `rescue`/`suspect` 확정(`ml/calibrate_similarity.py`). 다중 참조 이미지(최대 유사도)·MobileCLIP 경량화는 후속.
 - 무효 클래스 데이터 보강(무관한 실내·업무 환경 표본) — 스푸핑 방어가 이 클래스에 의존하므로 우선순위 높음 (6.7.6)
 - 1단계 위치 인증 정밀화: 반경 200 m 축소 및 `location.accuracy` 반영 (사진 모델 변경 없이 장소 특이성을 높이는 저비용 개선)
 - 촬영 시각·EXIF·위치 메타데이터 교차 검증, GPS 스푸핑/순간이동 탐지
