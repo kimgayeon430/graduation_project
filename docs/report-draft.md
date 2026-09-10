@@ -483,8 +483,8 @@ MobileViT feature 는 5-클래스 분류로 파인튜닝되며 클래스 판별 
 
 ### 7.2 남은 작업
 
-- [ ] 실기기에서 사진 인증 전체 루프 확인 (PASS → 관리자 승인/반려 분기). `REJECT` 경로와 추론 지연(≈0.9초)은 확인 완료
-- [ ] `photo_embedder_int8.onnx` 를 HF Hub `kimgayeon430/travel-mission-photo-embedder` 에 업로드 + `ml/embed_missions.py` 로 기존 미션 `photoEmbedding` 채우기
+- [x] `photo_embedder_int8.onnx`(88.6MB) 를 HF Hub `kimgayeon430/travel-mission-photo-embedder`(Public) 에 업로드, `ml/embed_missions.py` 로 미션 15/16건 `photoEmbedding`(512d) + `photoEmbeddingModelVersion` 백필 (나머지 1건은 `imageUrl` 없음)
+- [ ] 실기기에서 사진 인증 전체 루프 확인 (임베더 HF 다운로드→캐시, 유사도 결합, PASS → 관리자 승인/반려 분기). `REJECT` 경로와 분류 추론 지연(≈0.9초)은 확인 완료
 - [ ] 유사도 임계값 실측 보정 — 크라우드소싱 미션 사진 vs 대표 이미지 쌍으로 스윕(현재는 공개 scene 프록시 잠정치), `user_missions.photoVerifySimilarity` 로그 활용
 - [ ] 크라우드소싱 사진으로 각 클래스 보강(특히 체험·무관 실내) 후 재학습
 - [ ] `user_missions` 로그로 추천 re-ranker 재학습(`--from-firestore`), 시뮬레이터 학습본 대체
