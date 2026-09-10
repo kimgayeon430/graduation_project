@@ -14,17 +14,28 @@ import smu.ai.graduation_project.domain.PhotoVerificationConfig
 object PhotoGate {
 
     sealed interface Decision {
+        /** 판정 근거 점수. 임계값 보정·로그용. */
+        val matchScore: Double
+        val invalidScore: Double
+        val similarity: Double?
+
         /** 업로드하지 않고 재촬영을 요청한다. */
-        data class Reject(val reason: String) : Decision
+        data class Reject(
+            val reason: String,
+            override val matchScore: Double = 0.0,
+            override val invalidScore: Double = 0.0,
+            override val similarity: Double? = null,
+        ) : Decision
 
         /** 업로드를 진행한다. [needsReview] 면 완료는 하되 관리자 검수 큐에 올린다. */
         data class Proceed(
             val needsReview: Boolean,
-            val matchScore: Double,
+            override val matchScore: Double,
             val topLabel: String,
             val modelVersion: String,
+            override val invalidScore: Double = 0.0,
             /** 미션 대표 이미지와의 코사인 유사도. 참조 임베딩·임베더가 없으면 null. */
-            val similarity: Double? = null,
+            override val similarity: Double? = null,
         ) : Decision
     }
 
@@ -45,12 +56,18 @@ object PhotoGate {
         }
         val result = PhotoVerification.verify(missionCategory, classification, referenceEmbedding, config)
         return when (result.verdict) {
-            PhotoVerification.Verdict.REJECT -> Decision.Reject(result.reason)
+            PhotoVerification.Verdict.REJECT -> Decision.Reject(
+                reason = result.reason,
+                matchScore = result.matchScore,
+                invalidScore = result.invalidScore,
+                similarity = result.similarity,
+            )
             PhotoVerification.Verdict.NEEDS_REVIEW, PhotoVerification.Verdict.PASS -> Decision.Proceed(
                 needsReview = result.verdict == PhotoVerification.Verdict.NEEDS_REVIEW,
                 matchScore = result.matchScore,
                 topLabel = classification?.topLabel ?: "",
                 modelVersion = verifier.modelVersion,
+                invalidScore = result.invalidScore,
                 similarity = result.similarity,
             )
         }

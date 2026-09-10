@@ -27,7 +27,8 @@ class PhotoGateTest {
         )
         assertEquals(
             PhotoGate.Decision.Proceed(
-                needsReview = false, matchScore = 0.92, topLabel = "맛집", modelVersion = "test-1"
+                needsReview = false, matchScore = 0.92, topLabel = "맛집", modelVersion = "test-1",
+                invalidScore = 0.01
             ),
             decision
         )

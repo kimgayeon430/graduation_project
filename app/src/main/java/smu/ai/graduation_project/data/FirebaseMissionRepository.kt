@@ -2,6 +2,7 @@ package smu.ai.graduation_project.data
 
 import android.os.Handler
 import android.os.Looper
+import android.util.Log
 import com.google.firebase.Firebase
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.SetOptions
@@ -147,6 +148,15 @@ class FirebaseMissionRepository : MissionRepository {
             // 0) 온디바이스 모델로 사진을 1차 판정한다. (업로드 전)
             val decision = PhotoGate.decide(
                 photoBytes, missionCategory, photoVerifier, photoVerificationConfig, referenceEmbedding
+            )
+            // 유사도 임계값 보정용 진단 로그. REJECT 는 Firestore 에 아무것도 안 남기므로
+            // 여기서만 관측 가능하다(보고서 6.7.6). `adb logcat -s PhotoVerify:*`
+            Log.i(
+                "PhotoVerify",
+                "mission=$missionId cat=$missionCategory ref=${if (referenceEmbedding != null) "y(${referenceEmbedding.size})" else "n"} " +
+                    "match=${"%.3f".format(decision.matchScore)} invalid=${"%.3f".format(decision.invalidScore)} " +
+                    "sim=${decision.similarity?.let { "%.3f".format(it) } ?: "null"} " +
+                    "-> ${decision::class.simpleName}${if (decision is PhotoGate.Decision.Proceed && decision.needsReview) "(review)" else ""}"
             )
             if (decision is PhotoGate.Decision.Reject) {
                 mainHandler.post {

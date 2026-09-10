@@ -430,7 +430,7 @@ MobileViT feature 는 5-클래스 분류로 파인튜닝되며 클래스 판별 
 
 **(가) 무효는 반드시 먼저 잘라야 한다 — 유사도는 스푸핑에 취약하다.**
 
-참조 이미지를 화면에 띄워놓고 그것을 촬영하면 **유사도가 오히려 최댓값에 가깝게** 나온다. 유사도만 보면 완벽한 인증으로 보이는 역설이 발생한다. 이를 막는 것은 유사도가 아니라 무효 클래스(스크린샷·셀카 판별)이므로, `s[무효] ≥ 0.55` 는 **유사도를 계산하기 전에 무조건 `REJECT`** 여야 한다.
+참조 이미지를 화면에 띄워놓고 그것을 촬영하면 **유사도가 오히려 높게** 나온다. 유사도만 보면 완벽한 인증으로 보이는 역설이 발생한다. 이를 막는 것은 유사도가 아니라 무효 클래스(스크린샷·셀카 판별)이므로, `s[무효] ≥ 0.55` 는 **유사도를 계산하기 전에 무조건 `REJECT`** 여야 한다. 이 취약점은 실기기에서 재현되었다(6.7.7).
 
 **(나) 카테고리 점수로는 단락하면 안 된다 — 유사도를 도입하는 주된 이득이 사라진다.**
 
@@ -455,8 +455,27 @@ MobileViT feature 는 5-클래스 분류로 파인튜닝되며 클래스 판별 
 - **하드 게이트로는 쓸 수 없다.** `embedding_separability.py` 에서 정상 사진이 hard-negative 상위 5% 유사도 문턱을 못 넘는 비율이 투어 56%·쇼핑 80%다. 유사도로 즉시 `REJECT` 하면 정상 사진 오탈락이 과다하므로 보조/구제 신호로만 쓴다. 쇼핑은 인코더와 무관하게 분리도가 낮아(AUC 0.70) 유사도 결합의 이득이 작다.
 - **임계값이 공개 scene 프록시 기반의 잠정치.** `raw/<장소>__N.jpg` 그룹을 같은 대상으로 간주해 스윕한 값이다. 실제 미션 사진 vs 대표 이미지 쌍(크라우드소싱)으로 재보정해야 하며, `user_missions.photoVerifySimilarity` 로그를 그 데이터로 쌓는다.
 - **참조 이미지 1장의 한계.** 각도·조명·계절·주야 차이에 코사인 유사도가 흔들린다. `photoEmbedding` 을 배열의 배열로 두면 여러 장 등록해 최대 유사도를 취하도록 확장할 수 있다.
-- **무효 클래스 의존.** (가) 의 스푸핑 방어 전체가 무효 클래스 성능에 걸려 있다. 6.7.1 에서 사무실 장면이 무효로 잡히지 않았으므로, 크라우드소싱 수집 시 *무관한 실내·업무 환경* 표본을 보강해야 한다.
+- **무효 클래스 의존.** (가) 의 스푸핑 방어 전체가 무효 클래스 성능에 걸려 있다. 6.7.1 에서 사무실 장면이, 6.7.7 에서 모니터 재촬영이 모두 무효로 잡히지 않았으므로(`s[무효] ≈ 0.07`), 크라우드소싱 수집 시 *무관한 실내·업무 환경* 과 *화면·모니터 재촬영* 표본을 보강해야 한다.
 - **전처리 정합.** 촬영본은 EXIF 회전을 반영해 디코드하도록 고쳤다(`ImagePreprocess.decodeUpright`, 분류·임베딩 공통). CLIP 리사이즈는 bicubic 이나 앱은 bilinear 라 미세한 차이가 남는다.
+
+#### 6.7.7 실기기 예비 관측
+
+Galaxy S8(SM-G950N, API 28)에서 `경복궁_투어` 미션(대표 이미지 임베딩 백필 완료)으로 두 가지 사진을 제출해, 유사도 신호가 실제로 어떻게 동작하는지 관측했다. 임베더(CLIP int8 88.6 MB)는 미션 수행 화면 진입 시 HF Hub 에서 받아 `filesDir` 에 캐시되었고(`prefetch`), 첫 인증이 다운로드에 막히지 않았다.
+
+| 제출 사진 | `s[투어]` | `s[무효]` | 참조 유사도 | 판정 |
+| --- | ---: | ---: | ---: | --- |
+| 실내 책상(미션과 무관) | 0.106 | 0.082 | **0.376** | `REJECT` (유지) |
+| 경복궁 사진을 모니터에 띄워 재촬영 | 0.128 | 0.066 | **0.673** | `REJECT` → `NEEDS_REVIEW` (구제) |
+
+관측한 것:
+
+1. **배선 검증.** 참조 임베딩 로드(`ref=y(512)`), 촬영본 임베딩 추론, 코사인 유사도, 구제 경로가 모두 실제로 동작한다. 무관한 사진은 `sim 0.376 < rescueThreshold 0.50` 이라 `REJECT` 가 유지되고, 재촬영본은 `0.673 ≥ 0.50` 이라 즉시 거절 대신 검수로 올라갔다(표 6.7.5 의 3행).
+2. **유사도 스케일이 압축돼 있다.** 무관 0.38 ~ 유사 0.67 로, CLIP 임베딩 공간의 이방성(anisotropy) 때문에 `[0, 1]` 전 구간을 쓰지 않는다. 잠정 임계값 `rescue 0.50 / suspect 0.68` 은 이 좁은 구간을 3등분하는 셈이라 여유가 작다.
+3. **스푸핑 취약점이 재현되었다(6.7.5-가).** 모니터 재촬영인데 무효 점수가 0.066 에 그쳐 무효 게이트를 통과했고, 유사도만으로 `REJECT` 에서 `NEEDS_REVIEW` 로 승격되었다. `suspect 0.68` 을 근소하게(0.673) 못 넘겨 `PASS` 는 면했으나, 무효 클래스가 화면 재촬영을 커버하지 못하면 이 방어가 유사도 문턱 하나에만 의존하게 된다.
+4. **판정을 유사도가 좌우한다.** 두 경우 모두 `s[투어]` 가 0.11~0.13 으로 낮다(6.4·6.7.5-나 의 도메인 격차). `경복궁_투어` 의 실질 판정은 카테고리가 아니라 유사도가 결정하고 있다 — 유사도를 카테고리에 종속시키지 않기로 한 6.7.5-나 설계가 이 미션에서 특히 중요하게 작동한다.
+5. **아직 임계값을 확정할 수 없다.** *현장에서 정상 촬영한* 사진의 유사도 값이 없어 `rescue`/`suspect` 를 어디에 둘지 정할 수 없다. `rescue 0.50` 이 무관 사진(0.376)보다 위라 오구제는 막지만, 간격이 0.12 라 "제대로 찍었으나 각도·조명이 나쁜" 사진이 문턱 아래로 떨어질 여지가 있다.
+
+**계측.** REJECT 는 업로드도 Firestore 기록도 하지 않으므로 유사도 값이 어디에도 남지 않는다. `FirebaseMissionRepository` 가 판정 직후 `PhotoVerify` 태그로 `mission·category·ref·s[c]·s[무효]·similarity·verdict` 한 줄을 로깅해(`adb logcat -s PhotoVerify:*`), 판정과 무관하게 실측 보정 데이터를 모을 수 있게 했다. `PASS`/`NEEDS_REVIEW` 는 종전대로 `user_missions.photoVerifySimilarity` 에도 기록된다.
 
 ---
 
@@ -479,13 +498,14 @@ MobileViT feature 는 5-클래스 분류로 파인튜닝되며 클래스 판별 
 - [x] Colab T4 에서 파인튜닝 → `photo_verifier.onnx`(20MB) 를 `assets/` 에 번들, 임계값을 `PhotoVerificationConfig.DEFAULT` 로 반영, 기본 verifier 를 `OnnxPhotoVerifier`·`DEFAULT` config 로 전환 (test macro-F1 0.82)
 - [x] 학습된 추천 re-ranker: `MissionFeatures`·`LearnedReranker`·`MissionRecommender.recommendReranked` + `ml/reco/` 파이프라인 + `assets/reranker.json`. 신호 6개(시간대 적합도 포함), 시뮬레이터 학습본으로 규칙 대비 AUC 0.949→0.960, NDCG@5 0.914→0.953 (8.3절)
 - [x] 모델 에셋 로딩 계측 테스트 (`OnnxPhotoVerifierTest` 6건, `RerankerSourceTest` 4건) — 실기기(Galaxy S8, API 28)에서 실제 에셋으로 추론·로딩 검증. 두 로더 모두 실패를 `runCatching` 으로 삼켜 **무증상 고장**(사진: 전건 검수 큐행 / 추천: 규칙 기반 폴백)이 나므로, 재학습 모델 교체 시 신호 순서·라벨 불일치를 잡는 방어선
-- [x] 참조 이미지 임베딩 유사도(6.7절) — `CLIP ViT-B/32` 임베딩 인코더 채택(pooled feature 재사용은 분리도 AUC 0.60 으로 기각, `ml/embedding_separability.py`). 온디바이스 `OnnxClipPhotoEmbedder`(89MB int8, Supabase 런타임 다운로드+캐시), 판정 규칙 `PhotoVerification.verify` 에 유사도 ±1단계 결합, 참조 임베딩 사전계산 `ml/embed_missions.py`, EXIF 회전 정합(`ImagePreprocess` + `androidx.exifinterface`). 단위 테스트 신규 13건 포함 `PhotoVerificationTest` 18 + `PhotoGateTest` 8 통과, `testDebugUnitTest`·`compileReleaseKotlin` BUILD SUCCESSFUL. 임계값(rescue 0.50 / suspect 0.68)은 공개 scene 프록시 기반 잠정치
+- [x] 참조 이미지 임베딩 유사도(6.7절) — `CLIP ViT-B/32` 임베딩 인코더 채택(pooled feature 재사용은 분리도 AUC 0.60 으로 기각, `ml/embedding_separability.py`). 온디바이스 `OnnxClipPhotoEmbedder`(88.6MB int8, HF Hub 런타임 다운로드+`filesDir` 캐시), 판정 규칙 `PhotoVerification.verify` 에 유사도 ±1단계 결합, 참조 임베딩 사전계산 `ml/embed_missions.py`, EXIF 회전 정합(`ImagePreprocess` + `androidx.exifinterface`). 단위 테스트 신규 13건 포함 `PhotoVerificationTest` 18 + `PhotoGateTest` 8 통과, `testDebugUnitTest`·`compileReleaseKotlin` BUILD SUCCESSFUL. 실기기(Galaxy S8) 계측 테스트 통과 + 유사도 신호 실동작·구제 경로 확인(6.7.7). 임계값(rescue 0.50 / suspect 0.68)은 공개 scene 프록시 기반 잠정치
 
 ### 7.2 남은 작업
 
 - [x] `photo_embedder_int8.onnx`(88.6MB) 를 HF Hub `kimgayeon430/travel-mission-photo-embedder`(Public) 에 업로드, `ml/embed_missions.py` 로 미션 15/16건 `photoEmbedding`(512d) + `photoEmbeddingModelVersion` 백필 (나머지 1건은 `imageUrl` 없음)
-- [ ] 실기기에서 사진 인증 전체 루프 확인 (임베더 HF 다운로드→캐시, 유사도 결합, PASS → 관리자 승인/반려 분기). `REJECT` 경로와 분류 추론 지연(≈0.9초)은 확인 완료
-- [ ] 유사도 임계값 실측 보정 — 크라우드소싱 미션 사진 vs 대표 이미지 쌍으로 스윕(현재는 공개 scene 프록시 잠정치), `user_missions.photoVerifySimilarity` 로그 활용
+- [ ] 실기기에서 사진 인증 전체 루프 확인 — 임베더 HF 다운로드→캐시(`prefetch`), 유사도 결합, 구제 경로(`REJECT`→`NEEDS_REVIEW`)까지 확인 완료(6.7.7). 남은 것: *현장 정상 촬영* 케이스, `PASS` → 관리자 승인/반려 분기
+- [ ] 유사도 임계값 실측 보정 — 6.7.7 관측(무관 0.38 / 재촬영 0.67)에 *현장 정상* 값을 더해 `rescue`/`suspect` 확정. 크라우드소싱 미션 사진 vs 대표 이미지 쌍으로 스윕(현재는 공개 scene 프록시 잠정치), `PhotoVerify` 로그·`user_missions.photoVerifySimilarity` 활용
+- [ ] 무효 클래스에 화면·모니터 재촬영 표본 보강 — 6.7.7 에서 재촬영본 `s[무효] ≈ 0.07` 로 스푸핑 방어가 유사도 문턱에만 의존
 - [ ] 크라우드소싱 사진으로 각 클래스 보강(특히 체험·무관 실내) 후 재학습
 - [ ] `user_missions` 로그로 추천 re-ranker 재학습(`--from-firestore`), 시뮬레이터 학습본 대체
 - [ ] `firestore.rules` 배포 (`firebase deploy --only firestore:rules` — 규칙 테스트 20건은 통과)
@@ -542,9 +562,9 @@ MobileViT feature 는 5-클래스 분류로 파인튜닝되며 클래스 판별 
 **온디바이스 비용**
 
 - 분류 모델: fp32 ONNX 약 20MB (int8 양자화는 Colab 라이브러리 충돌로 미적용, fp32 채택).
-- 임베딩 모델(6.7.4): CLIP ViT-B/32 int8 ONNX ≈ 89MB. APK 에 번들하지 않고 최초 사용 시 Supabase 에서 받아 `filesDir` 캐시.
+- 임베딩 모델(6.7.4): CLIP ViT-B/32 int8 ONNX ≈ 88.6MB. APK 에 번들하지 않고 최초 사용 시 HF Hub 에서 받아 `filesDir` 캐시.
 - `onnxruntime-android` 도입 시 디버그 APK 약 +120MB(전 ABI) → `abiFilters`(arm64-v8a/x86_64) 적용 후 약 +20MB.
-- 추론 지연: 분류 ≈ 0.9초(실기기 Galaxy S8). 임베딩 지연·다운로드 시간 측정 `[TODO]`.
+- 추론 지연: 분류 ≈ 0.9초(실기기 Galaxy S8). 임베더 모델은 미션 수행 화면 진입 시 `prefetch` 로 미리 받아, 6.7.7 관측에서 첫 인증이 다운로드에 막히지 않았다. 임베딩 추론 지연 측정 `[TODO]`.
 - 전처리·라벨·모델버전은 export 산출물(`photo_verifier_preprocessor.json` / `_labels.json` / `_version.txt`, 임베더는 `photo_embedder_preprocessor.json`)에서 읽어 자동 정합. 전처리 코드는 `ImagePreprocess` 로 분류·임베딩이 공유하며 EXIF 회전을 반영한다.
 
 ### 8.3 학습된 추천 re-ranker
