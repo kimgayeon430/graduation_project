@@ -28,9 +28,11 @@ local.properties
 __pycache__/
 *.pyc
 
-# Firebase CLI
+# Firebase CLI / 서비스 계정 키 (절대 커밋 금지)
 /.firebase/
 firebase-debug.log
+**/serviceAccount*.json
+**/*-firebase-adminsdk-*.json
 .claude/settings.local.json
 /ml/*.onnx
 /ml/*.data

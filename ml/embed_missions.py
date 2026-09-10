@@ -61,7 +61,9 @@ def main() -> None:
     ap.add_argument("--model", required=True, help="photo_embedder(.onnx) — CLIP 이미지 인코더")
     ap.add_argument("--preprocessor", default=None)
     ap.add_argument("--firebase-key", default=None, help="서비스 계정 JSON. 주면 Firestore 를 직접 갱신")
-    ap.add_argument("--csv", default=None, help="id,imageUrl 헤더의 CSV (키 없이 쓸 때)")
+    ap.add_argument("--project", default=None,
+                    help="Firebase 프로젝트 id. --firebase-key 없이 ADC(gcloud auth application-default login)로 쓸 때")
+    ap.add_argument("--csv", default=None, help="id,imageUrl 헤더의 CSV (키·ADC 없이 쓸 때)")
     ap.add_argument("--out", default=None, help="임베딩 결과 JSON 출력 경로")
     ap.add_argument("--version", default=None, help="photoEmbeddingModelVersion (기본: photo_embedder_version.txt)")
     ap.add_argument("--no-exif", action="store_true", help="EXIF 회전 미적용")
@@ -88,11 +90,15 @@ def main() -> None:
     # ---- 미션 목록 확보 ----
     db = None
     missions: list[tuple[str, str]] = []
-    if args.firebase_key:
+    if args.firebase_key or args.project:
         import firebase_admin
         from firebase_admin import credentials, firestore
 
-        firebase_admin.initialize_app(credentials.Certificate(args.firebase_key))
+        if args.firebase_key:
+            firebase_admin.initialize_app(credentials.Certificate(args.firebase_key))
+        else:
+            # ADC: gcloud auth application-default login 으로 얻은 사용자 자격증명
+            firebase_admin.initialize_app(options={"projectId": args.project})
         db = firestore.client()
         for doc in db.collection("missions").stream():
             d = doc.to_dict() or {}
@@ -107,7 +113,7 @@ def main() -> None:
                 if row.get("imageUrl", "").strip():
                     missions.append((row["id"].strip(), row["imageUrl"].strip()))
     else:
-        raise SystemExit("--firebase-key 또는 --csv 중 하나가 필요합니다.")
+        raise SystemExit("--firebase-key, --project(ADC), --csv 중 하나가 필요합니다.")
 
     print(f"대상 미션 {len(missions)}건\n")
     results: dict[str, list[float]] = {}
