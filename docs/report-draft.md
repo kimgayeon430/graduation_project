@@ -502,7 +502,7 @@ Galaxy S8(SM-G950N, API 28)에서 `경복궁_투어` 미션(대표 이미지 임
 
 ### 7.2 남은 작업
 
-- [x] `photo_embedder_int8.onnx`(88.6MB) 를 HF Hub `kimgayeon430/travel-mission-photo-embedder`(Public) 에 업로드, `ml/embed_missions.py` 로 미션 15/16건 `photoEmbedding`(512d) + `photoEmbeddingModelVersion` 백필 (나머지 1건은 `imageUrl` 없음)
+- [x] `photo_embedder_int8.onnx`(88.6MB) 를 HF Hub `kimgayeon430/travel-mission-photo-embedder`(Public) 에 업로드, `ml/embed_missions.py` 로 미션 **16/16건** `photoEmbedding`(512d) + `photoEmbeddingModelVersion` 백필 완료 (`숙대입구`는 `imageUrl` 등록 후 추가 백필). export 산출물 sha256 이 HF 업로드본과 동일해 참조 임베딩이 앱 다운로드 모델과 일치
 - [ ] 실기기에서 사진 인증 전체 루프 확인 — 임베더 HF 다운로드→캐시(`prefetch`), 유사도 결합, 구제 경로(`REJECT`→`NEEDS_REVIEW`)까지 확인 완료(6.7.7). 남은 것: *현장 정상 촬영* 케이스, `PASS` → 관리자 승인/반려 분기
 - [ ] 유사도 임계값 실측 보정 — 6.7.7 관측(무관 0.38 / 재촬영 0.67)에 *현장 정상* 값을 더해 `rescue`/`suspect` 확정. 크라우드소싱 미션 사진 vs 대표 이미지 쌍으로 스윕(현재는 공개 scene 프록시 잠정치), `PhotoVerify` 로그·`user_missions.photoVerifySimilarity` 활용
 - [ ] 무효 클래스에 화면·모니터 재촬영 표본 보강 — 6.7.7 에서 재촬영본 `s[무효] ≈ 0.07` 로 스푸핑 방어가 유사도 문턱에만 의존
