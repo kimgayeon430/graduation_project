@@ -14,6 +14,8 @@
       "per_category_auc": { "맛집": 0.918, "체험": 0.881, "투어": 0.814, "쇼핑": 0.698 },
       "rescue_basis": "같은 대상 쌍 유사도 p15 ≈ 0.50 (이 아래면 대상 불일치로 보아 REJECT 유지)",
       "suspect_basis": "다른 대상 쌍 유사도 p90 ≈ 0.68 (이 위면 닮음으로 인정). 공개 프록시 기준 TPR 0.43 / FPR 0.10",
+      "device_observation": "Galaxy S8: 무관 사진 sim 0.376 / 대표이미지 화면재촬영 0.673 (6.7.7). 현장 정상촬영 값 없음.",
+      "recalibration": "ml/calibrate_similarity.py — 실사용 photoVerifySimilarity + PhotoVerify logcat 쌓이면 실행",
       "note": "MobileViT pooled feature 재사용은 AUC 0.60 으로 기각. 하드 게이트 불가(정상 사진 오탈락 과다) → 보조/구제 신호로만 사용."
     }
   },

@@ -32,6 +32,7 @@ HuggingFace 베이스 모델을 우리 미션 사진 데이터로 파인튜닝�
 | `export_clip_image_encoder.py` | 참조 이미지 유사도용 **CLIP 이미지 인코더**를 ONNX 로 export (`photo_embedder.onnx`, int8 ≈ 89MB). 보고서 6.7.4 |
 | `embedding_separability.py` | 임베딩이 "같은 카테고리 안 대상"을 구분하는지 측정 (ROC AUC). 인코더 선정·임계값 감 잡기 |
 | `embed_missions.py` | 미션 대표 이미지를 CLIP 임베딩으로 사전계산해 Firestore `missions/{id}.photoEmbedding` 에 저장 |
+| `calibrate_similarity.py` | 실사용 데이터(Firestore `photoVerifySimilarity` + `PhotoVerify` logcat)로 `rescue`/`suspect` 임계값 보정. 관리자 검수 결과를 정답 라벨로 씀. 보고서 6.7.6 |
 | `add_embedding_output.py` | (기각) 배포된 MobileViT onnx 에 pooled feature 출력을 붙이는 스크립트. 분리도 부족으로 미채택, 실험 기록용 |
 | `similarity_probe.py` | 촬영본 몇 장의 라벨 점수·임베딩 유사도를 눈으로 보는 도구 |
 | `requirements.txt` | 학습·평가 의존성 |
