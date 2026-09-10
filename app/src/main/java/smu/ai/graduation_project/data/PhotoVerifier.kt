@@ -21,6 +21,12 @@ interface PhotoVerifier {
      * @return 라벨별 점수. 모델을 불러오지 못했으면 null.
      */
     fun classify(photoBytes: ByteArray): PhotoVerification.Classification?
+
+    /**
+     * 무거운 리소스(예: 런타임 다운로드하는 임베더 모델)를 미리 준비한다.
+     * 화면 진입 시 백그라운드로 부르면 첫 [classify] 가 네트워크에 막히지 않는다. 기본은 no-op.
+     */
+    fun prefetch() {}
 }
 
 /** 테스트·Compose 프리뷰용. 미리 지정한 분류 결과를 그대로 돌려준다. */

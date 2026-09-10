@@ -51,6 +51,9 @@ class MissionPerformViewModel(
         this.missionId = missionId
         this.uid = uid
 
+        // 사진 인증 임베더 모델(런타임 다운로드)을 미리 받아 둔다. 위치 인증·촬영을 하는 동안 끝난다.
+        Thread { runCatching { photoVerifier.prefetch() } }.start()
+
         repository.loadMissionInfo(
             missionId = missionId,
             onResult = { info ->
@@ -58,7 +61,8 @@ class MissionPerformViewModel(
                     missionTitle = info.title,
                     missionCategory = info.category,
                     missionPoints = info.points,
-                    missionLocation = info.location
+                    missionLocation = info.location,
+                    missionReferenceEmbedding = info.photoEmbedding
                 )
             },
             onError = {}
@@ -221,6 +225,8 @@ class MissionPerformViewModel(
             missionPoints = state.missionPoints,
             photoVerifier = photoVerifier,
             photoVerificationConfig = photoVerificationConfig,
+            referenceEmbedding = state.missionReferenceEmbedding
+                .takeIf { it.isNotEmpty() }?.toFloatArray(),
             onResult = { result ->
                 uiState = uiState.copy(
                     isUploading = false,

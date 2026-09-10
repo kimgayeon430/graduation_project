@@ -67,6 +67,31 @@ class PhotoGateTest {
     }
 
     @Test
+    fun referenceEmbeddingRescuesLowCategoryToReview() {
+        val ref = floatArrayOf(1f, 0f)
+        val captured = PhotoVerification.Classification(
+            mapOf("체험" to 0.10, "투어" to 0.5, PhotoVerification.INVALID_LABEL to 0.05),
+            embedding = floatArrayOf(1f, 0f),
+        )
+        val decision = PhotoGate.decide(
+            bytes, "체험", FakePhotoVerifier(captured, "test-1"),
+            referenceEmbedding = ref,
+        )
+        val proceed = decision as PhotoGate.Decision.Proceed
+        assertEquals(true, proceed.needsReview)
+        assertEquals(1.0, proceed.similarity!!, 1e-6)
+    }
+
+    @Test
+    fun noReferenceEmbeddingLeavesSimilarityNull() {
+        val decision = PhotoGate.decide(
+            bytes, "맛집",
+            verifier(classification("맛집" to 0.92, PhotoVerification.INVALID_LABEL to 0.01)),
+        )
+        assertEquals(null, (decision as PhotoGate.Decision.Proceed).similarity)
+    }
+
+    @Test
     fun classifierExceptionIsTreatedAsMissingModel() {
         val throwing = object : PhotoVerifier {
             override val modelVersion = "boom"

@@ -33,7 +33,10 @@ class FirebaseMissionRepository : MissionRepository {
                         title = doc.getString("title") ?: "미션",
                         category = doc.getString("category") ?: "투어",
                         points = doc.getLong("points")?.toInt() ?: 0,
-                        location = doc.getGeoPoint("location")
+                        location = doc.getGeoPoint("location"),
+                        photoEmbedding = (doc.get("photoEmbedding") as? List<*>)
+                            ?.mapNotNull { (it as? Number)?.toFloat() }
+                            .orEmpty()
                     )
                 )
             }
@@ -126,6 +129,7 @@ class FirebaseMissionRepository : MissionRepository {
         missionPoints: Int,
         photoVerifier: PhotoVerifier,
         photoVerificationConfig: PhotoVerificationConfig,
+        referenceEmbedding: FloatArray?,
         onResult: (MissionRepository.CompleteResult) -> Unit,
         onError: (Exception) -> Unit
     ) {
@@ -141,7 +145,9 @@ class FirebaseMissionRepository : MissionRepository {
         // 모델 추론·업로드는 무거운 호출이므로 백그라운드 스레드에서 수행한다.
         uploadExecutor.execute {
             // 0) 온디바이스 모델로 사진을 1차 판정한다. (업로드 전)
-            val decision = PhotoGate.decide(photoBytes, missionCategory, photoVerifier, photoVerificationConfig)
+            val decision = PhotoGate.decide(
+                photoBytes, missionCategory, photoVerifier, photoVerificationConfig, referenceEmbedding
+            )
             if (decision is PhotoGate.Decision.Reject) {
                 mainHandler.post {
                     onError(
@@ -197,6 +203,7 @@ class FirebaseMissionRepository : MissionRepository {
                             "photoVerifyScore" to proceed.matchScore,
                             "photoVerifyLabel" to proceed.topLabel,
                             "photoVerifyModelVersion" to proceed.modelVersion,
+                            "photoVerifySimilarity" to (proceed.similarity ?: FieldValue.delete()),
                             "photoUploadedAt" to FieldValue.serverTimestamp(),
                             "stage2RewardGranted" to true,
                             "stage2RewardPoints" to MissionRewardPolicy.stage2Reward(missionPoints),

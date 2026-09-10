@@ -29,8 +29,13 @@ HuggingFace 베이스 모델을 우리 미션 사진 데이터로 파인튜닝�
 | `data/make_smoke_dataset.py` | 파이프라인 스모크 테스트용 더미 imagefolder 생성 |
 | `notebooks/train_photo_verifier.ipynb` | 데이터 로드 → CLIP 제로샷 베이스라인 → 헤드 학습 → 전체 파인튜닝 → 평가 → 임계값 선정 → 모델 저장 |
 | `export_onnx.py` | 파인튜닝 모델을 ONNX 로 export (+ int8 양자화, 전처리·라벨 함께 출력) |
+| `export_clip_image_encoder.py` | 참조 이미지 유사도용 **CLIP 이미지 인코더**를 ONNX 로 export (`photo_embedder.onnx`, int8 ≈ 89MB). 보고서 6.7.4 |
+| `embedding_separability.py` | 임베딩이 "같은 카테고리 안 대상"을 구분하는지 측정 (ROC AUC). 인코더 선정·임계값 감 잡기 |
+| `embed_missions.py` | 미션 대표 이미지를 CLIP 임베딩으로 사전계산해 Firestore `missions/{id}.photoEmbedding` 에 저장 |
+| `add_embedding_output.py` | (기각) 배포된 MobileViT onnx 에 pooled feature 출력을 붙이는 스크립트. 분리도 부족으로 미채택, 실험 기록용 |
+| `similarity_probe.py` | 촬영본 몇 장의 라벨 점수·임베딩 유사도를 눈으로 보는 도구 |
 | `requirements.txt` | 학습·평가 의존성 |
-| `thresholds.json` | 노트북 7단계가 생성하는 임계값. 앱의 `PhotoVerificationConfig` 기본값으로 옮긴다 |
+| `thresholds.json` | 노트북 7단계가 생성하는 임계값 + 유사도 임계값. 앱의 `PhotoVerificationConfig` 기본값으로 옮긴다 |
 
 ## 노트북 환경변수
 
@@ -85,6 +90,18 @@ cd ..
 # 3) export → app/src/main/assets/ 에 커밋
 .venv/bin/python export_onnx.py --model outputs/final \
   --out ../app/src/main/assets/photo_verifier.onnx --quantize
+
+# 4) 참조 이미지 유사도 (보고서 6.7) — 분류 재학습과 독립
+#    a. 인코더 선정 근거 재확인 (공개 scene 프록시)
+.venv/bin/python embedding_separability.py \
+  --model ../app/src/main/assets/photo_verifier.onnx --raw data/raw --no-exif
+#    b. CLIP 이미지 인코더 export (전처리 json 은 assets 에 커밋, onnx 는 아래 c 로)
+.venv/bin/python export_clip_image_encoder.py --out /tmp/emb/photo_embedder.onnx --quantize
+#    c. photo_embedder_int8.onnx (≈89MB) 를 Supabase Storage 공개 버킷 `app-models/` 에 업로드
+#       (APK 번들 대신 앱이 최초 사용 시 받아 캐시. assets 에 넣으면 번들로도 동작)
+#    d. 기존 미션 대표 이미지 임베딩 채우기
+.venv/bin/python embed_missions.py --model /tmp/emb/photo_embedder.onnx \
+  --firebase-key serviceAccount.json
 ```
 
 ## 산출 모델 규격 (Android `OnnxPhotoVerifier` 참고)

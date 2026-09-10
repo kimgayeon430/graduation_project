@@ -15,6 +15,8 @@ data class MissionPerformUiState(
     val missionPoints: Int = 0,
     val missionLocation: GeoPoint? = null,
     val missionDocId: String? = null,
+    /** 미션 대표 이미지 임베딩. 있으면 사진 인증에서 촬영본과의 유사도를 결합한다(6.7). */
+    val missionReferenceEmbedding: List<Float> = emptyList(),
 
     val isVerifying: Boolean = false,
     val isUploading: Boolean = false,

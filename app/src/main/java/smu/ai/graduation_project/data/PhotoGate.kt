@@ -22,29 +22,36 @@ object PhotoGate {
             val needsReview: Boolean,
             val matchScore: Double,
             val topLabel: String,
-            val modelVersion: String
+            val modelVersion: String,
+            /** 미션 대표 이미지와의 코사인 유사도. 참조 임베딩·임베더가 없으면 null. */
+            val similarity: Double? = null,
         ) : Decision
     }
 
+    /**
+     * @param referenceEmbedding 미션 대표 이미지 임베딩(`missions/{id}.photoEmbedding`). 없으면 유사도 결합을 건너뛴다.
+     */
     fun decide(
         photoBytes: ByteArray,
         missionCategory: String,
         verifier: PhotoVerifier,
-        config: PhotoVerificationConfig = PhotoVerificationConfig.DEFAULT
+        config: PhotoVerificationConfig = PhotoVerificationConfig.DEFAULT,
+        referenceEmbedding: FloatArray? = null,
     ): Decision {
         val classification = try {
             verifier.classify(photoBytes)
         } catch (_: Exception) {
             null
         }
-        val result = PhotoVerification.verify(missionCategory, classification, config)
+        val result = PhotoVerification.verify(missionCategory, classification, referenceEmbedding, config)
         return when (result.verdict) {
             PhotoVerification.Verdict.REJECT -> Decision.Reject(result.reason)
             PhotoVerification.Verdict.NEEDS_REVIEW, PhotoVerification.Verdict.PASS -> Decision.Proceed(
                 needsReview = result.verdict == PhotoVerification.Verdict.NEEDS_REVIEW,
                 matchScore = result.matchScore,
                 topLabel = classification?.topLabel ?: "",
-                modelVersion = verifier.modelVersion
+                modelVersion = verifier.modelVersion,
+                similarity = result.similarity,
             )
         }
     }

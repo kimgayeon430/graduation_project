@@ -101,6 +101,8 @@ dependencies {
 
     // 사진 인증 온디바이스 추론 (assets/photo_verifier.onnx). 모델 파일이 없어도 앱은 동작한다.
     implementation(libs.onnxruntime.android)
+    // 촬영본 EXIF 회전 보정 (분류·임베딩 전처리 정합)
+    implementation(libs.androidx.exifinterface)
 
 
     // Add the dependencies for any other desired Firebase products

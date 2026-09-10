@@ -399,18 +399,30 @@ scene 다양성: 투어 107 · 맛집 101 · 체험 53 · 쇼핑 28 · 무효 2(
 
 미션 추가가 관리자 화면에서 상시 일어나는 운영 구조(6.6절 `AdminMissionEditScreen`)와 근본적으로 상충한다.
 
-#### 6.7.4 개선 방향: 참조 이미지 임베딩 유사도 `[설계안 · 미구현]`
+#### 6.7.4 개선 방향: 참조 이미지 임베딩 유사도 `[구현]`
 
-분류(classification) 대신 **검색(retrieval)** 관점을 도입한다. 미션마다 참조 이미지를 등록하고, 촬영본과의 임베딩 코사인 유사도를 판정에 반영하는 방식이다.
+분류(classification) 대신 **검색(retrieval)** 관점을 도입한다. 미션마다 참조 이미지를 등록하고, 촬영본과의 임베딩 코사인 유사도를 판정에 보조 신호로 반영한다.
 
 핵심 이점은 **미션을 추가해도 재학습이 필요 없다**는 것이다. 참조 이미지만 등록하면 되므로 6.7.3 이 기각된 이유를 정면으로 해소한다.
 
-기존 자산을 재사용해 추가 비용이 작다.
+- 미션 문서에 이미 **`imageUrl`(대표 이미지)** 필드가 있어 참조 이미지로 활용한다.
+- 참조 임베딩은 관리자 스크립트(`ml/embed_missions.py`)로 사전 계산해 Firestore(`missions/{id}.photoEmbedding`)에 저장한다. 인증 시점에 참조 이미지를 내려받을 필요가 없다.
+- 온디바이스에서는 촬영본 임베딩과의 코사인 유사도만 계산한다(512차원 내적, 추론 시간 대비 무시 가능).
 
-1. 미션 문서에 이미 **`imageUrl`(대표 이미지)** 필드가 있어 참조 이미지로 활용 가능하다.
-2. `ml/export_onnx.py` 의 래퍼가 현재 `.logits` 만 반환하는데(`return self.model(...).logits`), pooled feature 를 함께 출력하도록 수정하면 **같은 forward pass 에서 임베딩을 얻는다. 모델 추가 용량 0 MB.**
-3. 참조 임베딩은 관리자 스크립트로 사전 계산해 Firestore(`missions/{id}.photoEmbedding`)에 저장한다. 인증 시점에 참조 이미지를 내려받을 필요가 없다.
-4. 온디바이스에서는 촬영본 임베딩과의 코사인 유사도만 계산한다(수백 차원 내적, 추론 0.9 초 대비 무시 가능).
+##### 임베딩 인코더 선정: pooled feature 재사용은 기각
+
+애초 계획은 분류기(`photo_verifier.onnx`, MobileViT)의 분류 헤드 입력 활성값(pooled feature)을 그대로 임베딩으로 써서 **추가 용량 0 MB**로 해결하는 것이었다(`ml/add_embedding_output.py` 로 이미 배포된 모델에 출력만 하나 더 붙일 수 있다). 그러나 이 임베딩이 "같은 카테고리 안에서 대상을 구분"하는지 먼저 검증했더니 실패했다.
+
+`ml/embedding_separability.py` — 공개 scene 데이터(`data/raw/<카테고리>/<scene>__NNNN.jpg`)에서 **같은 scene 쌍(=같은 대상, positive)** 과 **같은 카테고리·다른 scene 쌍(hard negative)** 의 코사인 유사도 분리도(ROC AUC)를 잰다.
+
+| 임베딩 인코더 | 전체 AUC | pos−neg 평균차 | 맛집 | 체험 | 투어 | 쇼핑 |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| MobileViT pooled (분류기 재사용, 0 MB) | 0.60 | 0.107 | 0.63 | 0.66 | 0.63 | 0.60 |
+| **CLIP ViT-B/32** (별도 모델) | **0.76** | 0.125 | 0.92 | 0.88 | 0.81 | 0.70 |
+
+MobileViT feature 는 5-클래스 분류로 파인튜닝되며 클래스 판별 방향으로 붕괴해, 같은 '투어' 안의 서로 다른 랜드마크를 거의 구분하지 못한다(AUC 0.60 ≈ 무작위+α). CLIP 이미지 인코더는 범용 임베딩이라 쓸 만하며(int8 양자화해도 AUC 0.762 로 열화 없음), 이를 채택했다.
+
+**비용**: CLIP ViT-B/32 int8 ONNX 는 ≈ 89 MB 로 `photo_verifier.onnx`(20 MB)의 4.4배다. APK 를 그만큼 키우지 않도록, 앱은 이 모델을 **번들하지 않고 최초 사진 인증 시 Supabase Storage(`app-models` 버킷)에서 1회 받아 `filesDir` 에 캐시**한다(`ModelSource.cachedDownload`, 버전 불일치 시 재다운로드). 미션 수행 화면 진입 시 백그라운드로 미리 받아, 촬영까지 걸리는 시간 동안 준비된다. `assets/photo_embedder_int8.onnx` 를 넣으면 번들 방식으로도 동작한다. 모델을 아직 못 받았으면 유사도 결합을 건너뛰고 카테고리 규칙만 적용한다.
 
 #### 6.7.5 판정 순서 설계: 무효는 단락하고, 카테고리는 단락하지 않는다
 
@@ -424,22 +436,27 @@ scene 다양성: 투어 107 · 맛집 101 · 체험 53 · 쇼핑 28 · 무효 2(
 
 카테고리 점수가 낮다고 즉시 거절하면, "제대로 찍었는데 분류 점수가 낮은 사진"을 구제할 기회가 없어진다. 이는 예외가 아니라 **빈번한 상황**이다. 6.4절 평가에서 체험 클래스 F1 이 0.644 로 가장 낮은데(공개 데이터와 실제 미션 사진의 도메인 차이), 이런 사진들이 정확히 이 경우에 해당한다. 유사도는 약한 클래스를 보완하는 장치이므로 카테고리 뒤에 종속시키면 안 된다.
 
-두 신호를 함께 볼 때의 판정표는 다음과 같다.
+두 신호를 함께 볼 때의 판정표는 다음과 같다. 유사도는 판정을 **한 단계씩만** 조정한다(`PASS ↔ NEEDS_REVIEW ↔ REJECT`).
 
 | 카테고리 `s[c]` | 참조 유사도 | 판정 | 해석 |
 | --- | --- | --- | --- |
-| 높음 | 높음 | `PASS` | 유형·대상 모두 일치 |
-| 낮음 | 높음 | `PASS` 또는 `NEEDS_REVIEW` | **약한 카테고리 클래스 구제** (체험 등) |
-| 높음 | 낮음 | `NEEDS_REVIEW` | 같은 유형의 **다른 대상** 촬영 의심 — 6.7.2 의 빈 곳 |
-| 낮음 | 낮음 | `REJECT` | 미션과 무관 |
+| 높음 (≥ autoPass) | 높음 (≥ suspect) | `PASS` | 유형·대상 모두 일치 |
+| 애매 | 높음 (≥ suspect) | `PASS` | 애매한 분류를 대표 이미지가 뒷받침 |
+| 낮음 (< hardReject) | 높음 (≥ rescue) | `NEEDS_REVIEW` | **약한 카테고리 클래스 구제** (체험 등) — 즉시 거절하지 않고 검수 |
+| 높음 | 낮음 (< suspect) | `NEEDS_REVIEW` | 같은 유형의 **다른 대상** 촬영 의심 — 6.7.2 의 빈 곳 |
+| 낮음 | 낮음 (< rescue) | `REJECT` | 미션과 무관 |
 
-정리하면 판정 순서는 `무효 단락 → (카테고리 × 유사도) 결합` 이다. 6.7.1 의 책상 사진은 두 신호가 모두 낮아 어느 설계에서든 `REJECT` 로 동일하지만, 위 표의 2·3행이 현재 구조에서 잡지 못하는 사례다.
+정리하면 판정 순서는 `무효 단락 → 카테고리 1차 판정 → 유사도로 ±1단계 조정` 이다(`PhotoVerification.verify`). 6.7.1 의 책상 사진은 두 신호가 모두 낮아 `REJECT` 로 동일하지만, 위 표 3·4행이 종전 구조에서 잡지 못하던 사례다.
+
+임계값은 `PhotoVerificationConfig` 에 `similarityRescueThreshold`(구제, 잠정 0.50 = 공개 프록시에서 같은 대상 쌍 p15), `similaritySuspectThreshold`(닮음 기준선, 잠정 0.68 = 다른 대상 쌍 p90)로 둔다. 6.5절 설계상 `NEEDS_REVIEW` 도 포인트는 즉시 지급되므로, 유사도의 실질 효과는 **① 약한 카테고리 구제로 검수 큐 부하 감소, ② 사후 부정 적발 정확도 향상**이다(하드 차단이 아니다).
 
 #### 6.7.6 남은 위험
 
-- **참조 이미지 1장의 한계.** 각도·조명·계절·주야 차이에 코사인 유사도가 크게 흔들린다. 통과 조건이 아니라 **보조 신호**로 쓰고, 참조 이미지를 여러 장 등록해 최대 유사도를 취하는 편이 안정적이다.
-- **무효 클래스 의존.** (가) 의 스푸핑 방어 전체가 무효 클래스 성능에 걸려 있다. 6.7.1 에서 사무실 장면이 무효로 잡히지 않은 관찰이 있으므로, 크라우드소싱 수집 시 *무관한 실내·업무 환경* 표본을 보강해야 한다(현재 `ml/labels.json` 의 무효 정의는 셀카·스크린샷 중심).
-- **유사도 임계값 미정.** 카테고리 임계값과 동일하게 test 셋 스윕으로 정해야 하며, 참조 이미지가 있는 미션에 한정해 적용해야 한다(`photoEmbedding` 부재 시 종전 규칙으로 폴백).
+- **하드 게이트로는 쓸 수 없다.** `embedding_separability.py` 에서 정상 사진이 hard-negative 상위 5% 유사도 문턱을 못 넘는 비율이 투어 56%·쇼핑 80%다. 유사도로 즉시 `REJECT` 하면 정상 사진 오탈락이 과다하므로 보조/구제 신호로만 쓴다. 쇼핑은 인코더와 무관하게 분리도가 낮아(AUC 0.70) 유사도 결합의 이득이 작다.
+- **임계값이 공개 scene 프록시 기반의 잠정치.** `raw/<장소>__N.jpg` 그룹을 같은 대상으로 간주해 스윕한 값이다. 실제 미션 사진 vs 대표 이미지 쌍(크라우드소싱)으로 재보정해야 하며, `user_missions.photoVerifySimilarity` 로그를 그 데이터로 쌓는다.
+- **참조 이미지 1장의 한계.** 각도·조명·계절·주야 차이에 코사인 유사도가 흔들린다. `photoEmbedding` 을 배열의 배열로 두면 여러 장 등록해 최대 유사도를 취하도록 확장할 수 있다.
+- **무효 클래스 의존.** (가) 의 스푸핑 방어 전체가 무효 클래스 성능에 걸려 있다. 6.7.1 에서 사무실 장면이 무효로 잡히지 않았으므로, 크라우드소싱 수집 시 *무관한 실내·업무 환경* 표본을 보강해야 한다.
+- **전처리 정합.** 촬영본은 EXIF 회전을 반영해 디코드하도록 고쳤다(`ImagePreprocess.decodeUpright`, 분류·임베딩 공통). CLIP 리사이즈는 bicubic 이나 앱은 bilinear 라 미세한 차이가 남는다.
 
 ---
 
@@ -461,13 +478,15 @@ scene 다양성: 투어 107 · 맛집 101 · 체험 53 · 쇼핑 28 · 무효 2(
 - [x] 마이페이지 포인트 적립 내역 화면 (`PointHistoryScreen`)
 - [x] Colab T4 에서 파인튜닝 → `photo_verifier.onnx`(20MB) 를 `assets/` 에 번들, 임계값을 `PhotoVerificationConfig.DEFAULT` 로 반영, 기본 verifier 를 `OnnxPhotoVerifier`·`DEFAULT` config 로 전환 (test macro-F1 0.82)
 - [x] 학습된 추천 re-ranker: `MissionFeatures`·`LearnedReranker`·`MissionRecommender.recommendReranked` + `ml/reco/` 파이프라인 + `assets/reranker.json`. 신호 6개(시간대 적합도 포함), 시뮬레이터 학습본으로 규칙 대비 AUC 0.949→0.960, NDCG@5 0.914→0.953 (8.3절)
-- [x] 모델 에셋 로딩 계측 테스트 (`OnnxPhotoVerifierTest` 5건, `RerankerSourceTest` 4건) — 실기기(Galaxy S8, API 28)에서 실제 에셋으로 추론·로딩 검증. 두 로더 모두 실패를 `runCatching` 으로 삼켜 **무증상 고장**(사진: 전건 검수 큐행 / 추천: 규칙 기반 폴백)이 나므로, 재학습 모델 교체 시 신호 순서·라벨 불일치를 잡는 방어선
+- [x] 모델 에셋 로딩 계측 테스트 (`OnnxPhotoVerifierTest` 6건, `RerankerSourceTest` 4건) — 실기기(Galaxy S8, API 28)에서 실제 에셋으로 추론·로딩 검증. 두 로더 모두 실패를 `runCatching` 으로 삼켜 **무증상 고장**(사진: 전건 검수 큐행 / 추천: 규칙 기반 폴백)이 나므로, 재학습 모델 교체 시 신호 순서·라벨 불일치를 잡는 방어선
+- [x] 참조 이미지 임베딩 유사도(6.7절) — `CLIP ViT-B/32` 임베딩 인코더 채택(pooled feature 재사용은 분리도 AUC 0.60 으로 기각, `ml/embedding_separability.py`). 온디바이스 `OnnxClipPhotoEmbedder`(89MB int8, Supabase 런타임 다운로드+캐시), 판정 규칙 `PhotoVerification.verify` 에 유사도 ±1단계 결합, 참조 임베딩 사전계산 `ml/embed_missions.py`, EXIF 회전 정합(`ImagePreprocess` + `androidx.exifinterface`). 단위 테스트 신규 13건 포함 `PhotoVerificationTest` 18 + `PhotoGateTest` 8 통과, `testDebugUnitTest`·`compileReleaseKotlin` BUILD SUCCESSFUL. 임계값(rescue 0.50 / suspect 0.68)은 공개 scene 프록시 기반 잠정치
 
 ### 7.2 남은 작업
 
 - [ ] 실기기에서 사진 인증 전체 루프 확인 (PASS → 관리자 승인/반려 분기). `REJECT` 경로와 추론 지연(≈0.9초)은 확인 완료
-- [ ] 6.7절 참조 이미지 임베딩 유사도 설계안 구현 (export 수정 → 참조 임베딩 사전계산 → 판정 규칙 확장)
-- [ ] 크라우드소싱 사진으로 각 클래스 보강(특히 체험) 후 재학습
+- [ ] `photo_embedder_int8.onnx` 를 Supabase `app-models` 버킷에 업로드 + `ml/embed_missions.py` 로 기존 미션 `photoEmbedding` 채우기
+- [ ] 유사도 임계값 실측 보정 — 크라우드소싱 미션 사진 vs 대표 이미지 쌍으로 스윕(현재는 공개 scene 프록시 잠정치), `user_missions.photoVerifySimilarity` 로그 활용
+- [ ] 크라우드소싱 사진으로 각 클래스 보강(특히 체험·무관 실내) 후 재학습
 - [ ] `user_missions` 로그로 추천 re-ranker 재학습(`--from-firestore`), 시뮬레이터 학습본 대체
 - [ ] `firestore.rules` 배포 (`firebase deploy --only firestore:rules` — 규칙 테스트 20건은 통과)
 - [ ] Robolectric 기반 ViewModel/Compose UI 테스트 `[선택]`
@@ -488,6 +507,7 @@ scene 다양성: 투어 107 · 맛집 101 · 체험 53 · 쇼핑 28 · 무효 2(
 | Colab 에서 `optimum` ONNX export 실패 | `optimum.exporters` 가 `diffusers` 를 import 하는데 Colab 의 `diffusers`/`huggingface_hub` 버전 불일치 | `torch.onnx.export`(레거시, `dynamo=False`, opset 18) 로 직접 변환. int8 양자화는 shape inference 오류로 생략하고 fp32(20MB) 채택 |
 | `torch.onnx` 가 가중치를 `photo_verifier.onnx.data` 로 분리 저장 | 새 torch 의 external-data 기본 동작 | `onnx.save(..., save_as_external_data=False)` 로 단일 파일화 (앱은 `.onnx` bytes 만 로드) |
 | 윈도우 환경에서 `testDebugUnitTest` 가 전량 실행 불가 (`ClassNotFoundException: GradleWorkerMain`) | Gradle 이 테스트 워커 classpath 를 `@argfile` 로 UTF-8 기록하는데 JDK 런처는 네이티브 인코딩(`MS949`)으로 파싱한다. 사용자 홈 경로의 한글이 깨져 `gradle-worker.jar` 를 찾지 못함. 컴파일은 성공해 코드 문제로 오인하기 쉬움 | `GRADLE_USER_HOME` 을 ASCII 경로로 이전. 동일 argfile 을 MS949 로 인코딩하면 정상 로드되는 것으로 원인 확정 |
+| '투어' 미션에 개발 책상 사진을 냈더니 `REJECT` — 판정은 맞지만 카테고리만으로는 "같은 유형의 다른 대상"을 못 거른다 (6.7) | 5-클래스 분류는 유형만 본다. 대상 동일성 검증 계층이 없음 | 참조 이미지 임베딩 유사도 결합. 단, 분류기 pooled feature 를 임베딩으로 재사용하려 했으나 `embedding_separability.py` 측정에서 "같은 카테고리·다른 대상" 분리도 AUC 0.60 → 분류 파인튜닝으로 feature 가 클래스 방향으로 붕괴한 것으로 확인, CLIP 인코더(AUC 0.76)로 교체 |
 
 ---
 
@@ -521,10 +541,11 @@ scene 다양성: 투어 107 · 맛집 101 · 체험 53 · 쇼핑 28 · 무효 2(
 
 **온디바이스 비용**
 
-- 모델: fp32 ONNX 약 20MB (int8 양자화는 Colab 라이브러리 충돌로 미적용, fp32 채택).
+- 분류 모델: fp32 ONNX 약 20MB (int8 양자화는 Colab 라이브러리 충돌로 미적용, fp32 채택).
+- 임베딩 모델(6.7.4): CLIP ViT-B/32 int8 ONNX ≈ 89MB. APK 에 번들하지 않고 최초 사용 시 Supabase 에서 받아 `filesDir` 캐시.
 - `onnxruntime-android` 도입 시 디버그 APK 약 +120MB(전 ABI) → `abiFilters`(arm64-v8a/x86_64) 적용 후 약 +20MB.
-- 추론 지연(ms): `[실기기 측정 TODO]`
-- 전처리·라벨·모델버전은 export 산출물(`photo_verifier_preprocessor.json` / `_labels.json` / `_version.txt`)에서 `OnnxPhotoVerifier` 가 읽어 자동 정합.
+- 추론 지연: 분류 ≈ 0.9초(실기기 Galaxy S8). 임베딩 지연·다운로드 시간 측정 `[TODO]`.
+- 전처리·라벨·모델버전은 export 산출물(`photo_verifier_preprocessor.json` / `_labels.json` / `_version.txt`, 임베더는 `photo_embedder_preprocessor.json`)에서 읽어 자동 정합. 전처리 코드는 `ImagePreprocess` 로 분류·임베딩이 공유하며 EXIF 회전을 반영한다.
 
 ### 8.3 학습된 추천 re-ranker
 
@@ -577,7 +598,7 @@ NDCG@5 +0.033 으로 이득의 대부분을 가져온다.
 
 ## 10. 향후 계획
 
-- **참조 이미지 임베딩 유사도 도입** — 카테고리 분류의 입도 한계(같은 카테고리 내 대상 동일성 미검증)를 검색 기반으로 보완. 설계·판정 순서·위험 분석은 **6.7절** 참조
+- **참조 이미지 임베딩 유사도 정식 배포** — 설계·구현은 6.7절에서 완료(CLIP 인코더, 판정 결합, 사전계산 스크립트). 남은 것은 임베더 모델 업로드, 기존 미션 임베딩 채우기, 실측 임계값 보정. 다중 참조 이미지(최대 유사도)·MobileCLIP 로 모델 경량화는 후속.
 - 무효 클래스 데이터 보강(무관한 실내·업무 환경 표본) — 스푸핑 방어가 이 클래스에 의존하므로 우선순위 높음 (6.7.6)
 - 1단계 위치 인증 정밀화: 반경 200 m 축소 및 `location.accuracy` 반영 (사진 모델 변경 없이 장소 특이성을 높이는 저비용 개선)
 - 촬영 시각·EXIF·위치 메타데이터 교차 검증, GPS 스푸핑/순간이동 탐지

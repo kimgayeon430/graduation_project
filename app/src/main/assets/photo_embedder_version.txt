@@ -1,0 +1,1 @@
+clip-vit-base-patch32

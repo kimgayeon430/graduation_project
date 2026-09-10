@@ -22,3 +22,6 @@ optimum>=1.21
 optimum-onnx>=0.1        # optimum 2.x 는 ORTModel* 을 이 패키지로 분리했다
 onnx>=1.16
 onnxruntime>=1.18
+
+# 참조 이미지 임베딩 사전계산 (embed_missions.py --firebase-key 사용 시)
+firebase-admin>=6.5      # (선택) Firestore 직접 갱신. --csv 만 쓰면 불필요

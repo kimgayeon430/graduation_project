@@ -15,7 +15,9 @@ interface MissionRepository {
         /** 사진 인증 판정에서 기대 카테고리로 쓰인다. */
         val category: String,
         val points: Int,
-        val location: GeoPoint?
+        val location: GeoPoint?,
+        /** 대표 이미지 임베딩(`missions/{id}.photoEmbedding`). 사진 인증 유사도 결합용. 없으면 비어 있다. */
+        val photoEmbedding: List<Float> = emptyList()
     )
 
     /** 현재 사용자의 `user_missions` 진행 상태. */
@@ -108,6 +110,8 @@ interface MissionRepository {
         missionPoints: Int,
         photoVerifier: PhotoVerifier,
         photoVerificationConfig: PhotoVerificationConfig = PhotoVerificationConfig.DEFAULT,
+        /** 미션 대표 이미지 임베딩. 있으면 촬영본과의 코사인 유사도를 판정에 결합한다(6.7). */
+        referenceEmbedding: FloatArray? = null,
         onResult: (CompleteResult) -> Unit,
         onError: (Exception) -> Unit
     )

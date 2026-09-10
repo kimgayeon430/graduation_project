@@ -93,11 +93,25 @@ class OnnxPhotoVerifierTest {
     }
 
     @Test
+    fun capturedEmbeddingIsNormalizedWhenEmbedderBundled() {
+        // photo_embedder_int8.onnx 가 assets 에 번들된 경우만 검증한다(옵션 1). 런타임 다운로드
+        // 환경에서는 스킵. 임베딩이 나오면 CLIP 512차원·L2 정규화 계약을 지켜야 한다.
+        val embedder = OnnxClipPhotoEmbedder(
+            context, ModelSource.asset(context, "photo_embedder_int8.onnx", "test"),
+        )
+        val e = embedder.embed(jpeg(640, 480))
+        org.junit.Assume.assumeNotNull(e)
+        assertEquals("CLIP ViT-B/32 임베딩 차원", 512, e!!.size)
+        val norm = kotlin.math.sqrt(e.fold(0.0) { acc, x -> acc + x.toDouble() * x })
+        assertTrue("임베딩이 L2 정규화되지 않음: $norm", abs(norm - 1.0) < 1e-3)
+    }
+
+    @Test
     fun verdictIsReachedWithoutTheModelUnavailableFallback() {
         val result = verifier.classify(jpeg(640, 480))
         assertNotNull(result)
 
-        val verdict = PhotoVerification.verify("맛집", result, PhotoVerificationConfig.DEFAULT)
+        val verdict = PhotoVerification.verify("맛집", result, config = PhotoVerificationConfig.DEFAULT)
 
         // 모델이 null 이었다면 이 사유 문구로 검수 큐에 실린다. 그 경로를 타지 않아야 한다.
         assertTrue(
