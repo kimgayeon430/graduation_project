@@ -97,8 +97,9 @@ cd ..
   --model ../app/src/main/assets/photo_verifier.onnx --raw data/raw --no-exif
 #    b. CLIP 이미지 인코더 export (전처리 json 은 assets 에 커밋, onnx 는 아래 c 로)
 .venv/bin/python export_clip_image_encoder.py --out /tmp/emb/photo_embedder.onnx --quantize
-#    c. photo_embedder_int8.onnx (≈89MB) 를 Supabase Storage 공개 버킷 `app-models/` 에 업로드
-#       (APK 번들 대신 앱이 최초 사용 시 받아 캐시. assets 에 넣으면 번들로도 동작)
+#    c. photo_embedder_int8.onnx (≈89MB) 를 HF Hub 공개 repo
+#       `kimgayeon430/travel-mission-photo-embedder` 에 업로드 (Supabase 무료 플랜은 50MB 상한)
+#       앱은 최초 사용 시 resolve/main 에서 받아 캐시. assets 에 넣으면 번들로도 동작
 #    d. 기존 미션 대표 이미지 임베딩 채우기
 .venv/bin/python embed_missions.py --model /tmp/emb/photo_embedder.onnx \
   --firebase-key serviceAccount.json

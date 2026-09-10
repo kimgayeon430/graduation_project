@@ -8,7 +8,7 @@
   "similaritySuspectThreshold": 0.68,
   "similarity": {
     "_comment": "참조 이미지 임베딩 유사도 결합(보고서 6.7). 아래는 embedding_separability.py 의 공개 scene 프록시 측정 기반 잠정치이며, 실제 미션 사진 vs 대표 이미지로 재보정 필요.",
-    "embedder": "openai/clip-vit-base-patch32 (int8 onnx, ~89MB, 런타임 다운로드)",
+    "embedder": "openai/clip-vit-base-patch32 (int8 onnx, ~89MB, HF Hub 런타임 다운로드)",
     "separability_public_scene_proxy": {
       "overall_auc": 0.762,
       "per_category_auc": { "맛집": 0.918, "체험": 0.881, "투어": 0.814, "쇼핑": 0.698 },

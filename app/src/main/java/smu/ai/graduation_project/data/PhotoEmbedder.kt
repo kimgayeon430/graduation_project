@@ -2,7 +2,6 @@ package smu.ai.graduation_project.data
 
 import android.content.Context
 import android.util.Log
-import smu.ai.graduation_project.BuildConfig
 import java.io.File
 import java.io.InputStream
 import java.net.HttpURLConnection
@@ -123,32 +122,30 @@ interface ModelSource {
 }
 
 /**
- * 프로덕션 임베더 소스. Supabase Storage 의 공개 버킷에서 CLIP int8 모델을 받는다.
- * `local.properties` 에 Supabase 설정이 없으면 URL 이 비어 다운로드를 시도하지 않는다
- * (→ 유사도 신호 비활성, 앱은 그대로 동작).
+ * 프로덕션 임베더 소스. CLIP int8 모델(≈89MB)은 APK 에 번들하지 않고 HuggingFace Hub 에서
+ * 받아 `filesDir` 에 캐시한다. (데이터셋과 같은 계정 `kimgayeon430`. Supabase 무료 플랜은
+ * 파일당 50MB 상한이라 부적합.) 다운로드 실패 시 유사도 신호만 비활성, 앱은 그대로 동작.
  */
 object PhotoEmbedderAssets {
 
     /** `ml/export_clip_image_encoder.py` 의 photo_embedder_version.txt 와 맞춘다. */
     const val VERSION = "clip-vit-base-patch32"
-    private const val BUCKET = "app-models"
     private const val MODEL_FILE = "photo_embedder_int8.onnx"
 
     /** 전처리 상수는 작아서 APK 에 번들한다. */
     const val PREPROCESSOR_ASSET = "photo_embedder_preprocessor.json"
 
-    val downloadUrl: String
-        get() = BuildConfig.SUPABASE_URL.trimEnd('/').takeIf { it.isNotBlank() }
-            ?.let { "$it/storage/v1/object/public/$BUCKET/$MODEL_FILE" }
-            ?: ""
+    /** HF Hub 의 공개 모델 repo. `resolve/main` 은 CDN 으로 302 리다이렉트되며 인증이 필요 없다. */
+    private const val DOWNLOAD_URL =
+        "https://huggingface.co/kimgayeon430/travel-mission-photo-embedder/resolve/main/photo_embedder_int8.onnx"
 
     /**
      * `assets/photo_embedder_int8.onnx` 가 번들돼 있으면 그걸 쓰고(옵션 1),
-     * 없으면 Supabase 에서 받아 캐시한다(옵션 3, 기본). APK 크기 vs 첫 사용 다운로드 트레이드오프.
+     * 없으면 HF Hub 에서 받아 캐시한다(옵션 3, 기본). APK 크기 vs 첫 사용 다운로드 트레이드오프.
      */
     fun source(context: Context): ModelSource {
         val bundled = runCatching { context.assets.open(MODEL_FILE).close(); true }.getOrDefault(false)
         return if (bundled) ModelSource.asset(context, MODEL_FILE, VERSION)
-        else ModelSource.cachedDownload(context, downloadUrl, VERSION, MODEL_FILE)
+        else ModelSource.cachedDownload(context, DOWNLOAD_URL, VERSION, MODEL_FILE)
     }
 }

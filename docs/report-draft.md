@@ -422,7 +422,7 @@ scene 다양성: 투어 107 · 맛집 101 · 체험 53 · 쇼핑 28 · 무효 2(
 
 MobileViT feature 는 5-클래스 분류로 파인튜닝되며 클래스 판별 방향으로 붕괴해, 같은 '투어' 안의 서로 다른 랜드마크를 거의 구분하지 못한다(AUC 0.60 ≈ 무작위+α). CLIP 이미지 인코더는 범용 임베딩이라 쓸 만하며(int8 양자화해도 AUC 0.762 로 열화 없음), 이를 채택했다.
 
-**비용**: CLIP ViT-B/32 int8 ONNX 는 ≈ 89 MB 로 `photo_verifier.onnx`(20 MB)의 4.4배다. APK 를 그만큼 키우지 않도록, 앱은 이 모델을 **번들하지 않고 최초 사진 인증 시 Supabase Storage(`app-models` 버킷)에서 1회 받아 `filesDir` 에 캐시**한다(`ModelSource.cachedDownload`, 버전 불일치 시 재다운로드). 미션 수행 화면 진입 시 백그라운드로 미리 받아, 촬영까지 걸리는 시간 동안 준비된다. `assets/photo_embedder_int8.onnx` 를 넣으면 번들 방식으로도 동작한다. 모델을 아직 못 받았으면 유사도 결합을 건너뛰고 카테고리 규칙만 적용한다.
+**비용**: CLIP ViT-B/32 int8 ONNX 는 ≈ 89 MB 로 `photo_verifier.onnx`(20 MB)의 4.4배다. APK 를 그만큼 키우지 않도록, 앱은 이 모델을 **번들하지 않고 최초 사진 인증 시 HuggingFace Hub(데이터셋과 같은 계정)에서 1회 받아 `filesDir` 에 캐시**한다(`ModelSource.cachedDownload`, 버전 불일치 시 재다운로드). Supabase Storage 도 검토했으나 무료 플랜의 파일당 50 MB 상한에 걸린다. 미션 수행 화면 진입 시 백그라운드로 미리 받아, 촬영까지 걸리는 시간 동안 준비된다. `assets/photo_embedder_int8.onnx` 를 넣으면 번들 방식으로도 동작한다. 모델을 아직 못 받았으면 유사도 결합을 건너뛰고 카테고리 규칙만 적용한다.
 
 #### 6.7.5 판정 순서 설계: 무효는 단락하고, 카테고리는 단락하지 않는다
 
@@ -484,7 +484,7 @@ MobileViT feature 는 5-클래스 분류로 파인튜닝되며 클래스 판별 
 ### 7.2 남은 작업
 
 - [ ] 실기기에서 사진 인증 전체 루프 확인 (PASS → 관리자 승인/반려 분기). `REJECT` 경로와 추론 지연(≈0.9초)은 확인 완료
-- [ ] `photo_embedder_int8.onnx` 를 Supabase `app-models` 버킷에 업로드 + `ml/embed_missions.py` 로 기존 미션 `photoEmbedding` 채우기
+- [ ] `photo_embedder_int8.onnx` 를 HF Hub `kimgayeon430/travel-mission-photo-embedder` 에 업로드 + `ml/embed_missions.py` 로 기존 미션 `photoEmbedding` 채우기
 - [ ] 유사도 임계값 실측 보정 — 크라우드소싱 미션 사진 vs 대표 이미지 쌍으로 스윕(현재는 공개 scene 프록시 잠정치), `user_missions.photoVerifySimilarity` 로그 활용
 - [ ] 크라우드소싱 사진으로 각 클래스 보강(특히 체험·무관 실내) 후 재학습
 - [ ] `user_missions` 로그로 추천 re-ranker 재학습(`--from-firestore`), 시뮬레이터 학습본 대체
