@@ -36,7 +36,7 @@ huggingface-cli login          # 또는  hf auth login
 | `place_classes.py` | Places365 scene → 카테고리 매핑 (표기 정규화, 365중 209 매핑: 투어 107·체험 53·쇼핑 28·맛집 21) |
 | `places365_categories.txt` | Places365 라벨 인덱스 → scene 이름 (표준 순서, 365줄) |
 | `fetch_public.py` | Food-101 val(맛집) + Places365 val(투어·체험·쇼핑) 을 scene 별로 고르게 표본 → `raw/` |
-| `make_negatives.py` | 무효 표본: 스크린샷 합성 + 카테고리 이미지 열화 + 수집 폴더 병합 |
+| `make_negatives.py` | 무효 표본: 스크린샷 합성 + 카테고리 이미지 열화 + **화면 재촬영 합성**(베젤·무아레·글레어, 6.7.7 스푸핑 대응) + 수집 폴더 병합 |
 | `build_dataset.py` | sceneId 단위 그룹 분할로 `imagefolder` 생성. 그룹이 적으면 이미지 단위로 폴백, 모든 split 에 모든 클래스 보장 |
 | `upload_hf.py` | `imagefolder` 디렉터리를 HF Hub 로 push |
 | `make_smoke_dataset.py` | (학습용 아님) 파이프라인 스모크 테스트용 더미 데이터셋 |
@@ -48,7 +48,7 @@ huggingface-cli login          # 또는  hf auth login
   scene 당 100~250장으로 작아(합쳐서 ~5.7GB) 다양성을 최대로 확보한다.
 - **분할은 sceneId 단위 그룹**으로 한다. 공개 데이터는 scene/음식 클래스명을 sceneId 로 쓴다.
   크라우드소싱 사진은 `raw/<카테고리>/<장소이름>__001.jpg` 형태로 넣으면 같은 규칙으로 처리된다.
-  무효는 합성이라 sceneId 그룹이 2개뿐 → 이미지 단위 분할된다(장소 누수 개념 없음).
+  무효는 합성이라 sceneId 그룹이 `synth`/`degrade`/`recapture`/`collected` 몇 개뿐 → 이미지 단위 분할된다(장소 누수 개념 없음).
 - 얼굴이 크게 나온 사진은 무효 클래스에만 최소한으로. 공개 저장소 업로드 시 제외/블러.
 - HF 데이터셋 id 는 버전에 따라 사라질 수 있다. 안 되면 다른 미러로 바꾸고
   `place_classes.py` / `places365_categories.txt` 를 그 표기에 맞춰 조정한다.

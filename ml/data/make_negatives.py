@@ -1,9 +1,13 @@
 """무효(negatives) 클래스 표본을 만든다.
 
-세 가지 소스를 합친다.
+네 가지 소스를 합친다.
   1. 합성 스크린샷: 단색/그라데이션 배경 + 가짜 UI 박스 + 텍스트 (앱 스크린샷·캡처 흉내)
   2. 카테고리 이미지 열화: raw/<카테고리> 이미지를 심한 블러·과도 확대·저조도로 망가뜨린 하드 네거티브
-  3. 직접 수집한 폴더(--from-dir): 셀카, 실제 스크린샷, 무관한 실내 사진 등
+  3. 화면 재촬영 합성: raw/<카테고리> 이미지를 모니터에 띄워 다시 찍은 것처럼 베젤·무아레·글레어를
+     합성한 스푸핑 표본. 보고서 6.7.7 에서 실기기 재촬영이 `s[무효] ≈ 0.07` 로 전혀 안 걸린 것을
+     확인한 뒤 추가함(`similarity_probe.py` 로 합성 12장을 현재 배포 모델에 돌려도 동일하게
+     0.011~0.129 — degrade() 의 블러·저조도만으로는 이 패턴을 못 잡는다).
+  4. 직접 수집한 폴더(--from-dir): 셀카, 실제 스크린샷, 무관한 실내 사진 등
 
 무효는 "미션과 무관하거나 인증으로 부적절한 사진"을 뜻한다.
 """
@@ -12,7 +16,7 @@ import argparse
 import random
 from pathlib import Path
 
-from PIL import Image, ImageDraw, ImageFilter, ImageOps
+from PIL import Image, ImageDraw, ImageEnhance, ImageFilter, ImageOps
 
 W, H = 512, 512
 
@@ -48,6 +52,42 @@ def degrade(img: Image.Image, rng: random.Random) -> Image.Image:
     return img.crop((off, 0, W, H)).resize((W, H))
 
 
+def recapture(img: Image.Image, rng: random.Random) -> Image.Image:
+    """모니터에 띄운 사진을 다시 촬영한 것처럼: 베젤 + 무아레 줄무늬 + 글레어 + 손떨림."""
+    img = ImageOps.exif_transpose(img).convert("RGB")
+    margin = rng.randint(int(W * 0.07), int(W * 0.12))
+    inner = img.resize((W - 2 * margin, H - 2 * margin))
+
+    canvas = Image.new("RGB", (W, H), (18, 18, 20))
+    canvas.paste(inner, (margin, margin))
+
+    draw = ImageDraw.Draw(canvas)
+    draw.rectangle([margin - 8, margin - 8, W - margin + 8, H - margin + 8],
+                   outline=(40, 40, 44), width=8)
+
+    # 무아레: 가는 반투명 가로줄무늬
+    moire = Image.new("L", (W, H), 0)
+    md = ImageDraw.Draw(moire)
+    for y in range(0, H, 3):
+        md.line([(0, y), (W, y)], fill=rng.randint(25, 60))
+    moire = moire.filter(ImageFilter.GaussianBlur(0.4))
+    canvas = Image.composite(Image.new("RGB", (W, H), (255, 255, 255)), canvas, moire)
+
+    # 글레어(화면 반사광)
+    glare = Image.new("L", (W, H), 0)
+    gd = ImageDraw.Draw(glare)
+    gx, gy = rng.randint(W // 4, 3 * W // 4), rng.randint(H // 6, H // 3)
+    gr = rng.randint(int(W * 0.2), int(W * 0.29))
+    gd.ellipse([gx - gr, gy - gr, gx + gr, gy + gr], fill=90)
+    glare = glare.filter(ImageFilter.GaussianBlur(80))
+    canvas = Image.composite(Image.new("RGB", (W, H), (255, 255, 255)), canvas, glare)
+
+    canvas = canvas.rotate(rng.uniform(-3, 3), resample=Image.BICUBIC, fillcolor=(15, 15, 15))
+    canvas = ImageEnhance.Color(canvas).enhance(rng.uniform(0.75, 0.9))
+    canvas = ImageEnhance.Contrast(canvas).enhance(rng.uniform(0.85, 1.05))
+    return canvas.filter(ImageFilter.GaussianBlur(rng.uniform(0.6, 1.4)))
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--out", default="raw/무효")
@@ -76,12 +116,19 @@ def main() -> None:
     idx = 0
     while n < target:
         idx += 1
-        if rng.random() < 0.55 or not src_pool:
+        roll = rng.random()
+        if roll < 0.40 or not src_pool:
             synth_screenshot(rng).save(out / f"synth__{idx:04d}.jpg", "JPEG", quality=88)
-        else:
+        elif roll < 0.70:
             src = rng.choice(src_pool)
             try:
                 degrade(Image.open(src), rng).save(out / f"degrade__{idx:04d}.jpg", "JPEG", quality=85)
+            except Exception:
+                continue
+        else:
+            src = rng.choice(src_pool)
+            try:
+                recapture(Image.open(src), rng).save(out / f"recapture__{idx:04d}.jpg", "JPEG", quality=85)
             except Exception:
                 continue
         n += 1
