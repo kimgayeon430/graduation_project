@@ -477,6 +477,21 @@ Galaxy S8(SM-G950N, API 28)에서 `경복궁_투어` 미션(대표 이미지 임
 
 **계측.** REJECT 는 업로드도 Firestore 기록도 하지 않으므로 유사도 값이 어디에도 남지 않는다. `FirebaseMissionRepository` 가 판정 직후 `PhotoVerify` 태그로 `mission·category·ref·s[c]·s[무효]·similarity·verdict` 한 줄을 로깅해(`adb logcat -s PhotoVerify:*`), 판정과 무관하게 실측 보정 데이터를 모을 수 있게 했다. `PASS`/`NEEDS_REVIEW` 는 종전대로 `user_missions.photoVerifySimilarity` 에도 기록된다.
 
+#### 6.7.8 웹 프록시 1차 보정
+
+실기기 촬영은 사용자가 실제로 그 장소에 가야 표본이 늘어 속도가 느리다(6.7.7 은 2건 — `correct` 1, `wrong` 1). 매번 현장에 가지 않고도 표본을 늘리려고, **그 미션이 실제로 가리키는 장소의 공개 사진**(Wikimedia Commons)을 받아 같은 임베딩·유사도 파이프라인에 흘려보는 프록시 보정 도구 `ml/calibrate_similarity_web.py` 를 추가했다. 기존 `embedding_separability.py` 의 "같은 장면 카테고리" 프록시보다 타겟이 좁다(그 장소 자체의 사진).
+
+경복궁_투어·명동_맛집·동대문_쇼핑·홍대_체험 4개 미션에 대해 각 미션 사진 4장(`correct`, 자기 미션과 비교) + 다른 미션 사진 4장(`wrong`, 교차 비교)으로 32건을 만들어 스윕했다.
+
+| | n | mean | min | max |
+| --- | --: | --: | --: | --: |
+| `correct` (제 장소) | 16 | 0.569 | 0.377 | 0.875 |
+| `wrong` (다른 장소) | 16 | 0.529 | 0.411 | 0.684 |
+
+두 분포가 상당히 겹친다. Youden J 최댓값은 thr=0.66 에서 0.25 로 크지 않아(1.0 이 완전 분리), 유사도 하나로 "같은 장소인가"를 깔끔히 가르지는 못한다는 6.7.6 의 한계를 다시 확인한다. 다만 현재 `suspect=0.68` 은 이 제안치(0.66)와 근접해 방향성은 부합한다. `동대문_쇼핑` 의 `correct` 유사도가 0.38~0.45 로 유독 낮아 전체 분리도를 끌어내리는데, `embedding_separability.py` 가 이미 짚은 "쇼핑 카테고리 분리도 낮음(AUC 0.70)"과 같은 현상이다.
+
+**한계**: n=16/16, 웹 프록시(사용자가 그 자리에서 찍은 사진이 아님)라 `calibrate_similarity_web.py` 도 실행 시 경고를 출력한다. 임계값을 이 결과로 바꾸지 않았다 — 실사용 로그(`calibrate_similarity.py`)가 우선한다. 다운로드한 이미지는 저작권이 있는 외부 사진이라 리포지토리에는 포함하지 않았고, 스크립트와 절차만 남겼다.
+
 ---
 
 ## 7. 구현 현황
@@ -504,7 +519,7 @@ Galaxy S8(SM-G950N, API 28)에서 `경복궁_투어` 미션(대표 이미지 임
 
 - [x] `photo_embedder_int8.onnx`(88.6MB) 를 HF Hub `kimgayeon430/travel-mission-photo-embedder`(Public) 에 업로드, `ml/embed_missions.py` 로 미션 **16/16건** `photoEmbedding`(512d) + `photoEmbeddingModelVersion` 백필 완료 (`숙대입구`는 `imageUrl` 등록 후 추가 백필). export 산출물 sha256 이 HF 업로드본과 동일해 참조 임베딩이 앱 다운로드 모델과 일치
 - [ ] 실기기에서 사진 인증 전체 루프 확인 — 임베더 HF 다운로드→캐시(`prefetch`), 유사도 결합, 구제 경로(`REJECT`→`NEEDS_REVIEW`)까지 확인 완료(6.7.7). 남은 것: *현장 정상 촬영* 케이스, `PASS` → 관리자 승인/반려 분기
-- [ ] 유사도 임계값 실측 보정 — 6.7.7 관측(무관 0.38 / 재촬영 0.67)에 *현장 정상* 값을 더해 `rescue`/`suspect` 확정. `ml/calibrate_similarity.py` 가 `PhotoVerify` 로그 + `user_missions.photoVerifySimilarity` 를 관리자 검수 결과로 라벨링해 스윕 (현재는 공개 scene 프록시 잠정치)
+- [ ] 유사도 임계값 실측 보정 — 실사용 2건(correct 1 / wrong 1, 6.7.7) + 웹 프록시 32건(6.7.8) 확보했으나 둘 다 확정에는 부족(30건 미만·프록시성). `ml/calibrate_similarity.py`(실사용) / `ml/calibrate_similarity_web.py`(웹 프록시) 로 계속 표본 축적
 - [ ] 무효 클래스에 화면·모니터 재촬영 표본 보강 — 6.7.7 에서 재촬영본 `s[무효] ≈ 0.07` 로 스푸핑 방어가 유사도 문턱에만 의존
 - [ ] 크라우드소싱 사진으로 각 클래스 보강(특히 체험·무관 실내) 후 재학습
 - [ ] `user_missions` 로그로 추천 re-ranker 재학습(`--from-firestore`), 시뮬레이터 학습본 대체
