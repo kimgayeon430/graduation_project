@@ -505,7 +505,16 @@ Youden J 최댓값은 thr=0.52 에서 0.21로, 1차(0.66/J=0.25)보다 **최적�
 
 **실제 구현 완료**: 프로토타입 검증 직후 코드로 옮겼다. `PhotoVerification.verify` 의 `referenceEmbedding: FloatArray?` 를 `referenceEmbeddings: List<FloatArray>` 로 바꾸고 `PhotoEmbedding.maxCosineOrNull` 로 최대 유사도를 취하도록 도메인·데이터 계층(`PhotoGate`, `MissionRepository`, `FirebaseMissionRepository`, `MissionPerformViewModel`)을 전부 고쳤다. Firestore 는 신규 `photoEmbeddings`(배열)와 레거시 `photoEmbedding`(단일)을 둘 다 읽어 합친다(하위호환, 기존 미션 16건은 그대로 동작). `embed_missions.py` 는 미션 문서의 `imageUrl`+`imageUrls`(신규, 배열) 또는 CSV 반복 행으로 여러 장을 받아 `photoEmbeddings` 로 쓰고 첫 장은 `photoEmbedding` 에도 남긴다. `PhotoVerificationTest`/`PhotoGateTest` 에 다중 참조 테스트 추가, 단위 테스트 전건(`testDebugUnitTest`) 통과.
 
-**버그 발견·수정**: 구현 직후 실제 백필을 시도하다 `Nested arrays are not allowed`(400)로 실패 — Firestore 는 **배열의 배열을 지원하지 않는다.** `photoEmbeddings: List<List<Float>>` 을 그대로 쓴 최초 설계가 틀렸다. 원소를 `{"v": [...]}` 맵으로 감싼 "배열의 맵"(배열→맵→배열은 허용)으로 고쳐 `FirebaseMissionRepository`/`embed_missions.py`/`calibrate_similarity_web.py` 세 곳을 함께 수정했다. 실패한 첫 시도는 Firestore `.set()` 이 원자적이라 부분 기록 없이 그대로 롤백됐음을 재조회로 확인. 이후 실기기에서 검증된 웹 프록시 사진(6.7.8, 경복궁·명동·동대문·홍대·광장시장·용산·여의도한강·숙대입구 8건)을 각 미션의 추가 참조로 백필 완료.
+**버그 발견·수정**: 구현 직후 실제 백필을 시도하다 `Nested arrays are not allowed`(400)로 실패 — Firestore 는 **배열의 배열을 지원하지 않는다.** `photoEmbeddings: List<List<Float>>` 을 그대로 쓴 최초 설계가 틀렸다. 원소를 `{"v": [...]}` 맵으로 감싼 "배열의 맵"(배열→맵→배열은 허용)으로 고쳐 `FirebaseMissionRepository`/`embed_missions.py`/`calibrate_similarity_web.py` 세 곳을 함께 수정했다. 실패한 첫 시도는 Firestore `.set()` 이 원자적이라 부분 기록 없이 그대로 롤백됐음을 재조회로 확인. 이후 앞서 웹 프록시 검증에 쓴 사진(6.7.8, 경복궁·명동·동대문·홍대·광장시장·용산·여의도한강·숙대입구 8개 미션, 기존 대표 이미지 1장 + 검증된 웹사진 4~6장)을 `photoEmbeddings` 로 실제 백필 완료.
+
+**백필 후 held-out 검증**: 위 8개 미션의 참조 뱅크에는 없는 **새 사진**(랜드마크당 1~2장, 총 12장)을 추가로 받아, 지금 실제로 Firestore 에 저장된 다중 참조 뱅크(최대 유사도)로 스윕했다.
+
+| | n | mean | Youden J 최댓값 | thr |
+| --- | --: | --: | --: | --: |
+| 참조 1장(백필 전, 6.7.8 1차) | 34/34 | 0.524 / 0.486 | 0.21 | 0.52 |
+| 참조 여러 장(백필 후, 실제 프로덕션 데이터) | 12/12 | 0.711 / 0.659 | **0.33** | 0.72 |
+
+held-out 데이터로도 분리력이 개선된다(J 0.21 → 0.33). 표본이 랜드마크당 1~2장뿐이라 아직 확정적이진 않지만, 오프라인 프로토타입(J 0.33→0.47)과 같은 방향의 결과가 **실제 프로덕션 데이터**에서도 재현됐다.
 
 ---
 
