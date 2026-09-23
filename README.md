@@ -119,7 +119,7 @@
 카테고리 분류만으로는 "미션 *유형* 에 맞는 사진인가"만 보고 "*이* 미션의 대상을 찍었는가"는 못 봅니다(예: 투어 미션에 아무 야외 사진이나 내도 통과). 이를 보완하기 위해 미션 대표 이미지의 **CLIP 임베딩**과 촬영본 임베딩의 코사인 유사도를 보조 신호로 결합합니다.
 
 - **임베더**: CLIP ViT-B/32 int8 ONNX(≈89MB). APK 에 번들하지 않고 첫 사진 인증 시 HF Hub `kimgayeon430/travel-mission-photo-embedder` 에서 받아 `filesDir` 에 캐시(`OnnxClipPhotoEmbedder`, 미션 화면 진입 시 `prefetch`).
-- **참조 이미지는 여러 장 등록 가능**: `missions/{id}.photoEmbeddings`(배열의 배열)에 각도·조명이 다른 사진 여러 장을 저장하면, 판정 시 **최대 유사도**를 씁니다 — 한 장만 닮아도 같은 대상으로 인정(오프라인 검증에서 분리력 Youden J 0.33 → 0.47). 사전계산은 `ml/embed_missions.py`(`imageUrl`+`imageUrls` 또는 CSV 반복 행). 레거시 단일 필드 `photoEmbedding` 도 계속 읽어 합치므로 기존 미션은 그대로 동작합니다.
+- **참조 이미지는 여러 장 등록 가능**: `missions/{id}.photoEmbeddings`(배열, 원소는 Firestore 의 "배열의 배열 금지" 제약 때문에 `{"v": [...]}` 맵으로 감쌈)에 각도·조명이 다른 사진 여러 장을 저장하면, 판정 시 **최대 유사도**를 씁니다 — 한 장만 닮아도 같은 대상으로 인정(오프라인 검증에서 분리력 Youden J 0.33 → 0.47). 사전계산은 `ml/embed_missions.py`(`imageUrl`+`imageUrls` 또는 CSV 반복 행). 레거시 단일 필드 `photoEmbedding` 도 계속 읽어 합치므로 기존 미션은 그대로 동작합니다.
 - **결합 규칙**: 유사도만으로 통과/거절을 뒤집지 않고 판정을 한 단계씩만 조정합니다(무효 판정이 유사도보다 항상 먼저 — 대표 이미지를 화면에 띄워 재촬영하는 스푸핑은 유사도가 높게 나오므로).
 - **한계**: 참조 이미지 1장으로는 분리력이 약하고(6.7.6), 임계값(`similarityRescueThreshold`/`similaritySuspectThreshold`)은 아직 실사용 로그가 적어 잠정치입니다. `ml/calibrate_similarity.py`(실사용 로그)·`ml/calibrate_similarity_web.py`(웹 프록시)로 계속 보정합니다.
 
@@ -232,7 +232,7 @@ ml/                 # 모델 학습·평가 (Colab/로컬, 앱 빌드와 분리)
 | 경로 | 주요 필드 |
 | --- | --- |
 | `users/{uid}` | `nickname`, `mail`, `points`, `level`, `preferences[]` |
-| `missions/{id}` | `title`, `desc`, `category`, `points`, `imageUrl`, `imageUrls`(배열, 선택 — 참조 이미지 추가), `location`(GeoPoint), `completionCount`, `photoEmbeddings`(배열의 배열), `photoEmbedding`(단일, 레거시), `photoEmbeddingModelVersion` |
+| `missions/{id}` | `title`, `desc`, `category`, `points`, `imageUrl`, `imageUrls`(배열, 선택 — 참조 이미지 추가), `location`(GeoPoint), `completionCount`, `photoEmbeddings`(배열, 원소는 `{v:[...]}` 맵), `photoEmbedding`(단일, 레거시), `photoEmbeddingModelVersion` |
 | `user_missions/{id}` | `userId`, `missionId`, `status`, `progress`, `stage1RewardGranted`, `stage2RewardGranted`, `photoUrl`, `photoStoragePath`, `photoVerified`, `photoUploadedAt`, `completedAt`, `photoNeedsReview`, `photoVerifyScore`, `photoVerifyLabel`, `photoVerifyModelVersion`, `photoVerifySimilarity` |
 | `admins/{uid}` | `email`, `name` |
 | Supabase Storage `mission-photos/{missionId}/{uid}_{timestamp}.jpg` | 사진 인증 이미지 (공개 URL 로 접근) |

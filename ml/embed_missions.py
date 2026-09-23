@@ -8,7 +8,7 @@
     # 같은 id 를 여러 행에 반복하면 그 미션에 참조 이미지 여러 장을 등록하는 것과 같다.
     python embed_missions.py --model photo_embedder.onnx --csv missions.csv --out embeddings.json
 
-앱은 `missions/{id}.photoEmbeddings`(배열의 배열) + `photoEmbeddingModelVersion` 을 읽어
+앱은 `missions/{id}.photoEmbeddings`(배열, 원소는 Firestore 제약상 `{"v": [...]}` 맵) + `photoEmbeddingModelVersion` 을 읽어
 촬영본과의 코사인 유사도(최대값, 보고서 6.7.8)를 사진 인증 보조 신호로 쓴다(보고서 6.7).
 이 필드가 없는 미션은 종전대로 카테고리 규칙만 적용되므로, 점진적으로 채워도 된다.
 
@@ -139,9 +139,11 @@ def main() -> None:
         results[mid] = embs
         print(f"  [ok]   {mid}  {len(embs)}/{len(urls)}장  dim={len(embs[0])}")
         if db is not None:
+            # Firestore 는 배열의 배열을 지원하지 않는다("Nested arrays are not allowed").
+            # 원소를 {"v": [...]} 맵으로 감싼 "배열의 맵" 구조로 저장한다(배열→맵→배열은 허용).
             db.collection("missions").document(mid).set(
                 {
-                    "photoEmbeddings": embs,
+                    "photoEmbeddings": [{"v": e} for e in embs],
                     "photoEmbedding": embs[0],  # 하위호환(레거시 단일 필드)
                     "photoEmbeddingModelVersion": version,
                 },

@@ -45,12 +45,16 @@ class FirebaseMissionRepository : MissionRepository {
     /**
      * `missions/{id}.photoEmbeddings`(배열, 신규)와 `photoEmbedding`(단일, 레거시)을 합쳐 반환한다.
      * 두 필드가 다 있으면 둘 다 참조로 쓴다(최대 유사도라 손해 볼 게 없다). 6.7.8.
+     *
+     * Firestore 는 **배열의 배열을 지원하지 않는다**("Nested arrays are not allowed"). 그래서
+     * `photoEmbeddings` 는 배열의 원소가 각각 `{"v": [...]}` 맵인 "배열의 맵" 구조로 저장한다
+     * (배열→맵→배열은 허용). `ml/embed_missions.py` 가 쓰는 형식과 맞춘다.
      */
     private fun parsePhotoEmbeddings(doc: com.google.firebase.firestore.DocumentSnapshot): List<List<Float>> {
         val many = (doc.get("photoEmbeddings") as? List<*>)
             ?.mapNotNull { row ->
-                (row as? List<*>)?.mapNotNull { (it as? Number)?.toFloat() }
-                    ?.takeIf { it.isNotEmpty() }
+                val vec = (row as? Map<*, *>)?.get("v") as? List<*>
+                vec?.mapNotNull { (it as? Number)?.toFloat() }?.takeIf { it.isNotEmpty() }
             }
             .orEmpty()
         val single = (doc.get("photoEmbedding") as? List<*>)

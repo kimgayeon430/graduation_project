@@ -53,9 +53,10 @@ def load_mission_embeddings(mission_ids: set[str], firebase_key: str | None, pro
     for mid in mission_ids:
         doc = db.collection("missions").document(mid).get()
         d = doc.to_dict() or {}
-        # 신규 배열 필드(photoEmbeddings) 우선, 없으면 레거시 단일 필드(photoEmbedding)로 폴백.
+        # 신규 배열 필드(photoEmbeddings, 원소는 Firestore 제약 때문에 {"v": [...]} 맵) 우선,
+        # 없으면 레거시 단일 필드(photoEmbedding)로 폴백.
         many = d.get("photoEmbeddings")
-        refs = [np.array(e, dtype=np.float32) for e in many] if many else []
+        refs = [np.array(e["v"], dtype=np.float32) for e in many if "v" in e] if many else []
         single = d.get("photoEmbedding")
         if single:
             refs.append(np.array(single, dtype=np.float32))
