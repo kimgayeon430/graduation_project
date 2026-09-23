@@ -508,7 +508,7 @@ Galaxy S8(SM-G950N, API 28)에서 `경복궁_투어` 미션(대표 이미지 임
 - [ ] 무효 클래스에 화면·모니터 재촬영 표본 보강 — 6.7.7 에서 재촬영본 `s[무효] ≈ 0.07` 로 스푸핑 방어가 유사도 문턱에만 의존
 - [ ] 크라우드소싱 사진으로 각 클래스 보강(특히 체험·무관 실내) 후 재학습
 - [ ] `user_missions` 로그로 추천 re-ranker 재학습(`--from-firestore`), 시뮬레이터 학습본 대체
-- [ ] `firestore.rules` 배포 (`firebase deploy --only firestore:rules` — 규칙 테스트 20건은 통과)
+- [x] `firestore.rules` 배포 — 규칙 테스트 20건 통과 재확인 후 `firebase deploy --only firestore:rules --project grad-proj-5e09c` 실행, 프로덕션 반영 완료
 - [ ] Robolectric 기반 ViewModel/Compose UI 테스트 `[선택]`
 - [ ] 서버측 포인트 검증(Cloud Functions) `[선택]`
 

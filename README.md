@@ -132,7 +132,8 @@
 - [x] 데이터셋 5,300장 구축 (HF Hub `kimgayeon430/travel-mission-photos`)
 - [x] Colab T4 파인튜닝 (`mobilevit-small-fullft-1`, test macro-F1 0.82) → `assets/photo_verifier.onnx`
 - [x] `OnnxPhotoVerifier` 연결, 임계값 반영, 기본 verifier 전환
-- [ ] 실기기 전체 루프 검증, `firestore.rules` 배포, 체험 데이터 보강 후 재학습
+- [x] `firestore.rules` 배포 (`grad-proj-5e09c`, 에뮬레이터 테스트 20건 통과 확인 후 배포)
+- [ ] 실기기 전체 루프 검증, 체험 데이터 보강 후 재학습
 
 ## 추천 re-ranker (`ml/reco/`)
 
