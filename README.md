@@ -42,7 +42,7 @@
 | Backend | Firebase Authentication(Email/Password), Cloud Firestore |
 | 지도 | 네이버 지도 SDK `com.naver.maps:map-sdk` (미션 위치 마커·정보창) |
 | 이미지 저장 | Supabase Storage (public 버킷 + anon 업로드 정책) |
-| AI | ① 사진 인증: 온디바이스 이미지 분류 (`apple/mobilevit-small` 파인튜닝 → ONNX, `onnxruntime-android`) — `PhotoVerification` / `OnnxPhotoVerifier`  ② 추천: 완료 로그 학습 로지스틱 re-ranker (`LearnedReranker`, `ml/reco/`) |
+| AI | ① 사진 인증: 온디바이스 이미지 분류 (`apple/mobilevit-small` 파인튜닝 → ONNX, `onnxruntime-android`) — `PhotoVerification` / `OnnxPhotoVerifier`, 참조 이미지 CLIP 유사도 보조 신호 — `OnnxClipPhotoEmbedder`  ② 추천: 완료 로그 학습 로지스틱 re-ranker (`LearnedReranker`, `ml/reco/`) |
 | Image Loading | Coil |
 | Build | Gradle 9.4.1 (Kotlin DSL), Version Catalog, AGP 9.2.0, `compileSdk 36` / `minSdk 26` / `targetSdk 36` |
 | Architecture | 미션 수행 기능을 ViewModel · Repository(인터페이스/Firebase 구현) · 순수 도메인 로직으로 분리 |
@@ -114,6 +114,15 @@
 
 추론(`PhotoVerifier`) + 판정(`PhotoVerification`)을 묶은 "업로드 전 결정"은 `data/PhotoGate` 로 분리했습니다. Firebase·Android 비의존이라 `FakePhotoVerifier` 로 전 경로를 단위 테스트하며(`PhotoGateTest`), `FirebaseMissionRepository` 는 `PhotoGate.decide()` 결과(`Reject` / `Proceed(needsReview)`)에 따라 업로드/거부만 합니다.
 
+### 참조 이미지 유사도 (보조 신호, 보고서 6.7절)
+
+카테고리 분류만으로는 "미션 *유형* 에 맞는 사진인가"만 보고 "*이* 미션의 대상을 찍었는가"는 못 봅니다(예: 투어 미션에 아무 야외 사진이나 내도 통과). 이를 보완하기 위해 미션 대표 이미지의 **CLIP 임베딩**과 촬영본 임베딩의 코사인 유사도를 보조 신호로 결합합니다.
+
+- **임베더**: CLIP ViT-B/32 int8 ONNX(≈89MB). APK 에 번들하지 않고 첫 사진 인증 시 HF Hub `kimgayeon430/travel-mission-photo-embedder` 에서 받아 `filesDir` 에 캐시(`OnnxClipPhotoEmbedder`, 미션 화면 진입 시 `prefetch`).
+- **참조 이미지는 여러 장 등록 가능**: `missions/{id}.photoEmbeddings`(배열의 배열)에 각도·조명이 다른 사진 여러 장을 저장하면, 판정 시 **최대 유사도**를 씁니다 — 한 장만 닮아도 같은 대상으로 인정(오프라인 검증에서 분리력 Youden J 0.33 → 0.47). 사전계산은 `ml/embed_missions.py`(`imageUrl`+`imageUrls` 또는 CSV 반복 행). 레거시 단일 필드 `photoEmbedding` 도 계속 읽어 합치므로 기존 미션은 그대로 동작합니다.
+- **결합 규칙**: 유사도만으로 통과/거절을 뒤집지 않고 판정을 한 단계씩만 조정합니다(무효 판정이 유사도보다 항상 먼저 — 대표 이미지를 화면에 띄워 재촬영하는 스푸핑은 유사도가 높게 나오므로).
+- **한계**: 참조 이미지 1장으로는 분리력이 약하고(6.7.6), 임계값(`similarityRescueThreshold`/`similaritySuspectThreshold`)은 아직 실사용 로그가 적어 잠정치입니다. `ml/calibrate_similarity.py`(실사용 로그)·`ml/calibrate_similarity_web.py`(웹 프록시)로 계속 보정합니다.
+
 ### `ml/` 파이프라인
 
 | 파일 | 내용 |
@@ -123,6 +132,9 @@
 | `ml/notebooks/train_photo_verifier.ipynb` | 데이터 로드 → CLIP 제로샷 → 헤드 학습 → 전체 파인튜닝 → 평가 → 임계값 선정 |
 | `ml/export_onnx.py` | 파인튜닝 모델 → ONNX (`torch.onnx`, 전처리·라벨·버전 함께 출력) |
 | `ml/thresholds.json` | 학습 결과로 선정한 임계값 + 평가 지표. `PhotoVerificationConfig` 기본값과 동기화 |
+| `ml/export_clip_image_encoder.py` | 참조 이미지 유사도용 CLIP 이미지 인코더 export |
+| `ml/embed_missions.py` | 미션 대표 이미지(들)를 CLIP 임베딩으로 사전계산해 Firestore `photoEmbeddings`에 저장 |
+| `ml/calibrate_similarity.py` / `ml/calibrate_similarity_web.py` | 유사도 임계값(rescue/suspect) 실사용 로그 / 웹 프록시 보정 |
 
 ### 현재 상태
 
@@ -133,7 +145,8 @@
 - [x] Colab T4 파인튜닝 (`mobilevit-small-fullft-1`, test macro-F1 0.82) → `assets/photo_verifier.onnx`
 - [x] `OnnxPhotoVerifier` 연결, 임계값 반영, 기본 verifier 전환
 - [x] `firestore.rules` 배포 (`grad-proj-5e09c`, 에뮬레이터 테스트 20건 통과 확인 후 배포)
-- [ ] 실기기 전체 루프 검증, 체험 데이터 보강 후 재학습
+- [x] 참조 이미지 유사도 결합 (CLIP 임베딩, 6.7절) + 다중 참조 이미지(최대 유사도, 6.7.8) — 실기기 승인/반려 플로우 확인
+- [ ] 무효 클래스에 화면 재촬영 합성 augmentation 반영 재학습(도구는 준비됨, `ml/data/make_negatives.py`), 체험 데이터 보강
 
 ## 추천 re-ranker (`ml/reco/`)
 
@@ -219,8 +232,8 @@ ml/                 # 모델 학습·평가 (Colab/로컬, 앱 빌드와 분리)
 | 경로 | 주요 필드 |
 | --- | --- |
 | `users/{uid}` | `nickname`, `mail`, `points`, `level`, `preferences[]` |
-| `missions/{id}` | `title`, `desc`, `category`, `points`, `imageUrl`, `location`(GeoPoint), `completionCount` |
-| `user_missions/{id}` | `userId`, `missionId`, `status`, `progress`, `stage1RewardGranted`, `stage2RewardGranted`, `photoUrl`, `photoStoragePath`, `photoVerified`, `photoUploadedAt`, `completedAt`, `photoNeedsReview`, `photoVerifyScore`, `photoVerifyLabel`, `photoVerifyModelVersion` |
+| `missions/{id}` | `title`, `desc`, `category`, `points`, `imageUrl`, `imageUrls`(배열, 선택 — 참조 이미지 추가), `location`(GeoPoint), `completionCount`, `photoEmbeddings`(배열의 배열), `photoEmbedding`(단일, 레거시), `photoEmbeddingModelVersion` |
+| `user_missions/{id}` | `userId`, `missionId`, `status`, `progress`, `stage1RewardGranted`, `stage2RewardGranted`, `photoUrl`, `photoStoragePath`, `photoVerified`, `photoUploadedAt`, `completedAt`, `photoNeedsReview`, `photoVerifyScore`, `photoVerifyLabel`, `photoVerifyModelVersion`, `photoVerifySimilarity` |
 | `admins/{uid}` | `email`, `name` |
 | Supabase Storage `mission-photos/{missionId}/{uid}_{timestamp}.jpg` | 사진 인증 이미지 (공개 URL 로 접근) |
 
