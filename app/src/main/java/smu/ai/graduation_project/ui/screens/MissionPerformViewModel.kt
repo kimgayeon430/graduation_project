@@ -62,7 +62,7 @@ class MissionPerformViewModel(
                     missionCategory = info.category,
                     missionPoints = info.points,
                     missionLocation = info.location,
-                    missionReferenceEmbedding = info.photoEmbedding
+                    missionReferenceEmbeddings = info.photoEmbeddings
                 )
             },
             onError = {}
@@ -225,8 +225,8 @@ class MissionPerformViewModel(
             missionPoints = state.missionPoints,
             photoVerifier = photoVerifier,
             photoVerificationConfig = photoVerificationConfig,
-            referenceEmbedding = state.missionReferenceEmbedding
-                .takeIf { it.isNotEmpty() }?.toFloatArray(),
+            referenceEmbeddings = state.missionReferenceEmbeddings
+                .filter { it.isNotEmpty() }.map { it.toFloatArray() },
             onResult = { result ->
                 uiState = uiState.copy(
                     isUploading = false,

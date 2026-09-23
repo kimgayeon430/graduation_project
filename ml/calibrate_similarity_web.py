@@ -53,11 +53,16 @@ def load_mission_embeddings(mission_ids: set[str], firebase_key: str | None, pro
     for mid in mission_ids:
         doc = db.collection("missions").document(mid).get()
         d = doc.to_dict() or {}
-        emb = d.get("photoEmbedding")
-        if not emb:
-            print(f"  [경고] {mid}: photoEmbedding 없음 — 건너뜀", file=sys.stderr)
+        # 신규 배열 필드(photoEmbeddings) 우선, 없으면 레거시 단일 필드(photoEmbedding)로 폴백.
+        many = d.get("photoEmbeddings")
+        refs = [np.array(e, dtype=np.float32) for e in many] if many else []
+        single = d.get("photoEmbedding")
+        if single:
+            refs.append(np.array(single, dtype=np.float32))
+        if not refs:
+            print(f"  [경고] {mid}: photoEmbeddings/photoEmbedding 없음 — 건너뜀", file=sys.stderr)
             continue
-        out[mid] = np.array(emb, dtype=np.float32)
+        out[mid] = refs
     return out
 
 
@@ -102,7 +107,7 @@ def main() -> None:
                 embed_image_bytes(sess, in_name, out_name, p, data, apply_exif=not args.no_exif),
                 dtype=np.float32,
             )
-        sim = cosine(embed_cache[row["image"]], mission_emb[mission])
+        sim = max(cosine(embed_cache[row["image"]], ref) for ref in mission_emb[mission])
         rows_out.append({**row, "sim": sim})
         (correct if label == "correct" else wrong).append(sim)
         print(f"{label:8s} {row['image']:24s} vs {mission:12s} sim={sim:.3f}")

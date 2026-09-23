@@ -40,21 +40,22 @@ object PhotoGate {
     }
 
     /**
-     * @param referenceEmbedding 미션 대표 이미지 임베딩(`missions/{id}.photoEmbedding`). 없으면 유사도 결합을 건너뛴다.
+     * @param referenceEmbeddings 미션 대표 이미지(들) 임베딩(`missions/{id}.photoEmbeddings`). 비어 있으면
+     *                            유사도 결합을 건너뛴다. 여러 장이면 최대 유사도를 쓴다(6.7.8).
      */
     fun decide(
         photoBytes: ByteArray,
         missionCategory: String,
         verifier: PhotoVerifier,
         config: PhotoVerificationConfig = PhotoVerificationConfig.DEFAULT,
-        referenceEmbedding: FloatArray? = null,
+        referenceEmbeddings: List<FloatArray> = emptyList(),
     ): Decision {
         val classification = try {
             verifier.classify(photoBytes)
         } catch (_: Exception) {
             null
         }
-        val result = PhotoVerification.verify(missionCategory, classification, referenceEmbedding, config)
+        val result = PhotoVerification.verify(missionCategory, classification, referenceEmbeddings, config)
         return when (result.verdict) {
             PhotoVerification.Verdict.REJECT -> Decision.Reject(
                 reason = result.reason,

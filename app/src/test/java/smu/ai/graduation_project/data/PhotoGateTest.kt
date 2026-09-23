@@ -76,10 +76,28 @@ class PhotoGateTest {
         )
         val decision = PhotoGate.decide(
             bytes, "체험", FakePhotoVerifier(captured, "test-1"),
-            referenceEmbedding = ref,
+            referenceEmbeddings = listOf(ref),
         )
         val proceed = decision as PhotoGate.Decision.Proceed
         assertEquals(true, proceed.needsReview)
+        assertEquals(1.0, proceed.similarity!!, 1e-6)
+    }
+
+    @Test
+    fun multipleReferenceEmbeddingsUseBestMatch() {
+        // 참조 이미지 두 장 중 하나만 닮아도(최대 유사도) 통과해야 한다(6.7.8).
+        val unrelatedRef = floatArrayOf(0f, 1f)
+        val matchingRef = floatArrayOf(1f, 0f)
+        val captured = PhotoVerification.Classification(
+            mapOf("쇼핑" to 0.50, PhotoVerification.INVALID_LABEL to 0.10),
+            embedding = floatArrayOf(1f, 0f),
+        )
+        val decision = PhotoGate.decide(
+            bytes, "쇼핑", FakePhotoVerifier(captured, "test-1"),
+            referenceEmbeddings = listOf(unrelatedRef, matchingRef),
+        )
+        val proceed = decision as PhotoGate.Decision.Proceed
+        assertEquals(false, proceed.needsReview)
         assertEquals(1.0, proceed.similarity!!, 1e-6)
     }
 

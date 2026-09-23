@@ -16,9 +16,13 @@ import kotlin.math.sqrt
  *
  * ### 참조 이미지 유사도 (선택)
  * 카테고리 분류만으로는 "미션 *유형* 에 맞는 사진인가"만 볼 수 있고 "*이* 미션의 대상을
- * 찍었는가"는 못 본다(보고서 6.7). 미션 대표 이미지의 임베딩([referenceEmbedding])이
+ * 찍었는가"는 못 본다(보고서 6.7). 미션 대표 이미지의 임베딩([referenceEmbeddings])이
  * 주어지면, 촬영본 임베딩([Classification.embedding])과의 코사인 유사도를 **보조 신호**로
  * 결합한다. 유사도만으로 통과/거절을 뒤집지 않고, 한 단계씩만 조정한다(6.7.5).
+ *
+ * 참조 이미지가 여러 장이면(각도·조명·계절이 다른 사진) [PhotoEmbedding.maxCosineOrNull] 로
+ * **최대 유사도**를 취한다 — 한 장만 닮아도 같은 대상으로 인정한다(6.7.6/6.7.8, 오프라인
+ * 프로토타입에서 Youden J 0.33 → 0.47 로 분리력 개선 확인).
  */
 object PhotoVerification {
 
@@ -63,14 +67,15 @@ object PhotoVerification {
     )
 
     /**
-     * @param missionCategory    미션이 기대하는 카테고리 (예: `"맛집"`)
-     * @param classification     모델 분류 결과. 모델을 못 불러왔으면 null.
-     * @param referenceEmbedding 미션 대표 이미지의 임베딩. 없으면(대부분의 기존 미션) 유사도 결합을 건너뛴다.
+     * @param missionCategory     미션이 기대하는 카테고리 (예: `"맛집"`)
+     * @param classification      모델 분류 결과. 모델을 못 불러왔으면 null.
+     * @param referenceEmbeddings 미션 대표 이미지(들)의 임베딩. 비어 있으면(대부분의 기존 미션) 유사도 결합을 건너뛴다.
+     *                            여러 장이면 최대 유사도를 쓴다.
      */
     fun verify(
         missionCategory: String,
         classification: Classification?,
-        referenceEmbedding: FloatArray? = null,
+        referenceEmbeddings: List<FloatArray> = emptyList(),
         config: PhotoVerificationConfig = PhotoVerificationConfig.DEFAULT
     ): Result {
         if (classification == null) {
@@ -99,7 +104,7 @@ object PhotoVerification {
             else -> Verdict.NEEDS_REVIEW
         }
 
-        val similarity = PhotoEmbedding.cosineOrNull(classification.embedding, referenceEmbedding)
+        val similarity = PhotoEmbedding.maxCosineOrNull(classification.embedding, referenceEmbeddings)
         if (similarity == null) {
             return Result(base, match, invalid, null, reasonFor(base, missionCategory))
         }
@@ -166,6 +171,15 @@ object PhotoEmbedding {
         }
         if (na <= 0.0 || nb <= 0.0) return null
         return dot / (sqrt(na) * sqrt(nb))
+    }
+
+    /**
+     * 참조 이미지가 여러 장일 때 **최대 유사도**를 취한다(6.7.8). 각도·조명·계절이 다른 사진 중
+     * 한 장만 닮아도 같은 대상으로 인정한다. [refs] 가 비어 있거나 [captured] 가 null 이면 null.
+     */
+    fun maxCosineOrNull(captured: FloatArray?, refs: List<FloatArray>): Double? {
+        if (captured == null || refs.isEmpty()) return null
+        return refs.mapNotNull { cosineOrNull(captured, it) }.maxOrNull()
     }
 
     /** L2 정규화한 복사본. 노름이 0이면 원본 복사본. */

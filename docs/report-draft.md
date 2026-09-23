@@ -503,6 +503,8 @@ Youden J 최댓값은 thr=0.52 에서 0.21로, 1차(0.66/J=0.25)보다 **최적�
 
 분리력이 뚜렷이 개선된다(J +0.14). 다만 같은 검색 세션에서 받은 사진끼리라 촬영 조건(조명·각도)이 실제 사용자 촬영본보다 서로 닮아 있을 수 있어 개선폭이 과대추정됐을 가능성이 있다 — 그래도 방향은 명확하다. 이 확장은 **Colab 재학습이 필요 없다**: `missions/{id}.photoEmbedding` 을 배열로 바꾸고 `embed_missions.py` 가 이미지 여러 장을 받아 각각 임베딩하도록, 앱은 `max(cosine(...))` 을 쓰도록 고치면 된다(추론 모델 자체는 그대로).
 
+**실제 구현 완료**: 프로토타입 검증 직후 코드로 옮겼다. `PhotoVerification.verify` 의 `referenceEmbedding: FloatArray?` 를 `referenceEmbeddings: List<FloatArray>` 로 바꾸고 `PhotoEmbedding.maxCosineOrNull` 로 최대 유사도를 취하도록 도메인·데이터 계층(`PhotoGate`, `MissionRepository`, `FirebaseMissionRepository`, `MissionPerformViewModel`)을 전부 고쳤다. Firestore 는 신규 `photoEmbeddings`(배열의 배열)와 레거시 `photoEmbedding`(단일)을 둘 다 읽어 합친다(하위호환, 기존 미션 16건은 그대로 동작). `embed_missions.py` 는 미션 문서의 `imageUrl`+`imageUrls`(신규, 배열) 또는 CSV 반복 행으로 여러 장을 받아 `photoEmbeddings` 로 쓰고 첫 장은 `photoEmbedding` 에도 남긴다. `PhotoVerificationTest`/`PhotoGateTest` 에 다중 참조 테스트 추가, 단위 테스트 전건(`testDebugUnitTest`) 통과. **아직 안 한 것**: 실제 미션에 두 번째 이미지를 등록해 `imageUrls`/CSV 로 백필하는 운영 작업 — 기존 미션은 여전히 참조 1장뿐이라 지금 당장 유사도가 달라지진 않는다.
+
 ---
 
 ## 7. 구현 현황

@@ -1,15 +1,21 @@
-"""미션 대표 이미지(`missions/{id}.imageUrl`)를 CLIP 임베딩으로 사전계산해 Firestore 에 저장한다.
+"""미션 대표 이미지(`missions/{id}.imageUrl` (+ `imageUrls`))를 CLIP 임베딩으로 사전계산해 Firestore 에 저장한다.
 
     # 서비스 계정 키로 Firestore 직접 갱신
     python embed_missions.py --model ../app/src/main/assets/photo_embedder.onnx \
         --firebase-key serviceAccount.json
 
     # 키가 없으면: 미션 목록 CSV(id,imageUrl) 를 받아 임베딩 JSON 만 뽑고 수동 반영
+    # 같은 id 를 여러 행에 반복하면 그 미션에 참조 이미지 여러 장을 등록하는 것과 같다.
     python embed_missions.py --model photo_embedder.onnx --csv missions.csv --out embeddings.json
 
-앱은 `missions/{id}.photoEmbedding`(float 배열) + `photoEmbeddingModelVersion` 을 읽어
-촬영본과의 코사인 유사도를 사진 인증 보조 신호로 쓴다(보고서 6.7). 이 필드가 없는 미션은
-종전대로 카테고리 규칙만 적용되므로, 점진적으로 채워도 된다.
+앱은 `missions/{id}.photoEmbeddings`(배열의 배열) + `photoEmbeddingModelVersion` 을 읽어
+촬영본과의 코사인 유사도(최대값, 보고서 6.7.8)를 사진 인증 보조 신호로 쓴다(보고서 6.7).
+이 필드가 없는 미션은 종전대로 카테고리 규칙만 적용되므로, 점진적으로 채워도 된다.
+
+**여러 장 등록**: Firestore 미션 문서에 `imageUrls`(문자열 배열, 선택)를 추가하면 `imageUrl`(기존,
+단일)과 합쳐 전부 임베딩한다. 참조 이미지가 여러 장이면 각도·조명이 달라도 한 장만 닮으면
+구제된다(오프라인 프로토타입에서 분리력 Youden J 0.33 → 0.47). 하위호환을 위해 첫 번째
+임베딩을 `photoEmbedding`(단일, 레거시) 필드에도 그대로 쓴다.
 
 전처리는 `photo_embedder_preprocessor.json`(CLIP)을 `similarity_probe.py` 로 재사용해
 앱 `OnnxPhotoVerifier`/`OnnxClipPhotoEmbedder` 와 바이트 단위로 맞춘다.
@@ -87,9 +93,9 @@ def main() -> None:
     print(f"전처리 shortest={p['shortest']} crop={p['crop_h']}x{p['crop_w']} "
           f"normalize={p['normalize']} flipBGR={p['flip']}  EXIF={'off' if args.no_exif else 'on'}\n")
 
-    # ---- 미션 목록 확보 ----
+    # ---- 미션별 참조 이미지 URL 목록 확보 (id -> [url, ...]) ----
     db = None
-    missions: list[tuple[str, str]] = []
+    missions: dict[str, list[str]] = {}
     if args.firebase_key or args.project:
         import firebase_admin
         from firebase_admin import credentials, firestore
@@ -102,33 +108,43 @@ def main() -> None:
         db = firestore.client()
         for doc in db.collection("missions").stream():
             d = doc.to_dict() or {}
-            if not args.overwrite and d.get("photoEmbedding"):
+            if not args.overwrite and d.get("photoEmbeddings"):
                 continue
-            url = (d.get("imageUrl") or "").strip()
-            if url:
-                missions.append((doc.id, url))
+            urls = [(d.get("imageUrl") or "").strip()]
+            urls += [str(u).strip() for u in (d.get("imageUrls") or [])]
+            urls = [u for u in urls if u]
+            if urls:
+                missions[doc.id] = urls
     elif args.csv:
         with open(args.csv, newline="", encoding="utf-8") as f:
             for row in csv.DictReader(f):
-                if row.get("imageUrl", "").strip():
-                    missions.append((row["id"].strip(), row["imageUrl"].strip()))
+                url = row.get("imageUrl", "").strip()
+                if url:
+                    missions.setdefault(row["id"].strip(), []).append(url)
     else:
         raise SystemExit("--firebase-key, --project(ADC), --csv 중 하나가 필요합니다.")
 
-    print(f"대상 미션 {len(missions)}건\n")
-    results: dict[str, list[float]] = {}
-    for mid, url in missions:
-        try:
-            data = urlopen(url, timeout=20).read()
-            emb = embed_image_bytes(sess, in_name, out_name, p, data, apply_exif=not args.no_exif)
-        except Exception as e:  # noqa: BLE001
-            print(f"  [skip] {mid}: {e}")
+    print(f"대상 미션 {len(missions)}건 (참조 이미지 {sum(len(v) for v in missions.values())}장)\n")
+    results: dict[str, list[list[float]]] = {}
+    for mid, urls in missions.items():
+        embs: list[list[float]] = []
+        for url in urls:
+            try:
+                data = urlopen(url, timeout=20).read()
+                embs.append(embed_image_bytes(sess, in_name, out_name, p, data, apply_exif=not args.no_exif))
+            except Exception as e:  # noqa: BLE001
+                print(f"  [skip] {mid} ({url[:40]}...): {e}")
+        if not embs:
             continue
-        results[mid] = emb
-        print(f"  [ok]   {mid}  dim={len(emb)}")
+        results[mid] = embs
+        print(f"  [ok]   {mid}  {len(embs)}/{len(urls)}장  dim={len(embs[0])}")
         if db is not None:
             db.collection("missions").document(mid).set(
-                {"photoEmbedding": emb, "photoEmbeddingModelVersion": version},
+                {
+                    "photoEmbeddings": embs,
+                    "photoEmbedding": embs[0],  # 하위호환(레거시 단일 필드)
+                    "photoEmbeddingModelVersion": version,
+                },
                 merge=True,
             )
 

@@ -16,8 +16,11 @@ interface MissionRepository {
         val category: String,
         val points: Int,
         val location: GeoPoint?,
-        /** 대표 이미지 임베딩(`missions/{id}.photoEmbedding`). 사진 인증 유사도 결합용. 없으면 비어 있다. */
-        val photoEmbedding: List<Float> = emptyList()
+        /**
+         * 대표 이미지(들)의 임베딩. 사진 인증 유사도 결합용. 여러 장이면 최대 유사도를 쓴다(6.7.8).
+         * `missions/{id}.photoEmbeddings`(배열, 신규)와 `photoEmbedding`(단일, 레거시)을 합친 값 — 둘 다 없으면 비어 있다.
+         */
+        val photoEmbeddings: List<List<Float>> = emptyList()
     )
 
     /** 현재 사용자의 `user_missions` 진행 상태. */
@@ -110,8 +113,8 @@ interface MissionRepository {
         missionPoints: Int,
         photoVerifier: PhotoVerifier,
         photoVerificationConfig: PhotoVerificationConfig = PhotoVerificationConfig.DEFAULT,
-        /** 미션 대표 이미지 임베딩. 있으면 촬영본과의 코사인 유사도를 판정에 결합한다(6.7). */
-        referenceEmbedding: FloatArray? = null,
+        /** 미션 대표 이미지(들) 임베딩. 있으면 촬영본과의 코사인 유사도(최대값)를 판정에 결합한다(6.7, 6.7.8). */
+        referenceEmbeddings: List<FloatArray> = emptyList(),
         onResult: (CompleteResult) -> Unit,
         onError: (Exception) -> Unit
     )

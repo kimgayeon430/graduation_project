@@ -35,13 +35,28 @@ class FirebaseMissionRepository : MissionRepository {
                         category = doc.getString("category") ?: "투어",
                         points = doc.getLong("points")?.toInt() ?: 0,
                         location = doc.getGeoPoint("location"),
-                        photoEmbedding = (doc.get("photoEmbedding") as? List<*>)
-                            ?.mapNotNull { (it as? Number)?.toFloat() }
-                            .orEmpty()
+                        photoEmbeddings = parsePhotoEmbeddings(doc)
                     )
                 )
             }
             .addOnFailureListener(onError)
+    }
+
+    /**
+     * `missions/{id}.photoEmbeddings`(배열, 신규)와 `photoEmbedding`(단일, 레거시)을 합쳐 반환한다.
+     * 두 필드가 다 있으면 둘 다 참조로 쓴다(최대 유사도라 손해 볼 게 없다). 6.7.8.
+     */
+    private fun parsePhotoEmbeddings(doc: com.google.firebase.firestore.DocumentSnapshot): List<List<Float>> {
+        val many = (doc.get("photoEmbeddings") as? List<*>)
+            ?.mapNotNull { row ->
+                (row as? List<*>)?.mapNotNull { (it as? Number)?.toFloat() }
+                    ?.takeIf { it.isNotEmpty() }
+            }
+            .orEmpty()
+        val single = (doc.get("photoEmbedding") as? List<*>)
+            ?.mapNotNull { (it as? Number)?.toFloat() }
+            ?.takeIf { it.isNotEmpty() }
+        return if (single != null) many + listOf(single) else many
     }
 
     override fun loadUserMissionState(
@@ -130,7 +145,7 @@ class FirebaseMissionRepository : MissionRepository {
         missionPoints: Int,
         photoVerifier: PhotoVerifier,
         photoVerificationConfig: PhotoVerificationConfig,
-        referenceEmbedding: FloatArray?,
+        referenceEmbeddings: List<FloatArray>,
         onResult: (MissionRepository.CompleteResult) -> Unit,
         onError: (Exception) -> Unit
     ) {
@@ -147,13 +162,13 @@ class FirebaseMissionRepository : MissionRepository {
         uploadExecutor.execute {
             // 0) 온디바이스 모델로 사진을 1차 판정한다. (업로드 전)
             val decision = PhotoGate.decide(
-                photoBytes, missionCategory, photoVerifier, photoVerificationConfig, referenceEmbedding
+                photoBytes, missionCategory, photoVerifier, photoVerificationConfig, referenceEmbeddings
             )
             // 유사도 임계값 보정용 진단 로그. REJECT 는 Firestore 에 아무것도 안 남기므로
             // 여기서만 관측 가능하다(보고서 6.7.6). `adb logcat -s PhotoVerify:*`
             Log.i(
                 "PhotoVerify",
-                "mission=$missionId cat=$missionCategory ref=${if (referenceEmbedding != null) "y(${referenceEmbedding.size})" else "n"} " +
+                "mission=$missionId cat=$missionCategory ref=${if (referenceEmbeddings.isNotEmpty()) "y(${referenceEmbeddings.size}x${referenceEmbeddings[0].size})" else "n"} " +
                     "match=${"%.3f".format(decision.matchScore)} invalid=${"%.3f".format(decision.invalidScore)} " +
                     "sim=${decision.similarity?.let { "%.3f".format(it) } ?: "null"} " +
                     "-> ${decision::class.simpleName}${if (decision is PhotoGate.Decision.Proceed && decision.needsReview) "(review)" else ""}"
