@@ -106,7 +106,7 @@ def main() -> None:
     for i, p in enumerate(collected):
         try:
             img = ImageOps.exif_transpose(Image.open(p)).convert("RGB").resize((W, H))
-            img.save(out / f"collected__{i:04d}.jpg", "JPEG", quality=90)
+            img.save(out / f"collected_{i:04d}.jpg", "JPEG", quality=90)
             n += 1
         except Exception:
             pass
@@ -118,17 +118,17 @@ def main() -> None:
         idx += 1
         roll = rng.random()
         if roll < 0.40 or not src_pool:
-            synth_screenshot(rng).save(out / f"synth__{idx:04d}.jpg", "JPEG", quality=88)
+            synth_screenshot(rng).save(out / f"synth_{idx:04d}.jpg", "JPEG", quality=88)
         elif roll < 0.70:
             src = rng.choice(src_pool)
             try:
-                degrade(Image.open(src), rng).save(out / f"degrade__{idx:04d}.jpg", "JPEG", quality=85)
+                degrade(Image.open(src), rng).save(out / f"degrade_{idx:04d}.jpg", "JPEG", quality=85)
             except Exception:
                 continue
         else:
             src = rng.choice(src_pool)
             try:
-                recapture(Image.open(src), rng).save(out / f"recapture__{idx:04d}.jpg", "JPEG", quality=85)
+                recapture(Image.open(src), rng).save(out / f"recapture_{idx:04d}.jpg", "JPEG", quality=85)
             except Exception:
                 continue
         n += 1
