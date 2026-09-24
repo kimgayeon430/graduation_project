@@ -8,6 +8,36 @@
     <string name="category_experience">체험</string>
     <string name="category_shopping">쇼핑</string>
     <string name="shared_reward_label">보상</string>
+    <string name="status_in_progress">진행중</string>
+    <string name="status_completed">완료</string>
+    <string name="status_not_started">미 진행</string>
+    <string name="retry">다시 시도</string>
+
+    <!-- 미션 목록 -->
+    <string name="mission_list_title">미션 목록</string>
+    <string name="mission_map_title">미션 지도</string>
+    <string name="view_list">목록 보기</string>
+    <string name="view_map">지도 보기</string>
+    <string name="error_load_missions">미션을 불러오지 못했습니다. 연결 상태를 확인하고 다시 시도해 주세요.</string>
+    <string name="error_load_progress">미션 진행 상태를 불러오지 못했습니다.</string>
+    <string name="mission_no_title">제목 없는 미션</string>
+
+    <!-- 미션 상세 -->
+    <string name="detail_title">미션 상세</string>
+    <string name="detail_image_placeholder">미션 대표 이미지</string>
+    <string name="detail_desc_fallback">미션 설명이 아직 등록되지 않았습니다.</string>
+    <string name="detail_how_to_title">참여 방법</string>
+    <string name="detail_step1_title">1. 미션 시작</string>
+    <string name="detail_step1_body">버튼을 눌러 미션을 시작하고 진행 상태를 저장합니다.</string>
+    <string name="detail_step2_title">2. 장소 방문 또는 체험</string>
+    <string name="detail_step2_body">미션 설명에 맞는 장소를 방문하거나 행동을 수행합니다.</string>
+    <string name="detail_step3_title">3. 인증 후 완료</string>
+    <string name="detail_step3_body">수행 화면으로 이동해 인증을 마치면 포인트가 지급됩니다.</string>
+    <string name="toast_login_required">로그인이 필요합니다.</string>
+    <string name="toast_already_completed">이미 완료한 미션입니다.</string>
+    <string name="toast_save_failed">미션 정보를 서버에 저장하지 못했습니다.</string>
+    <string name="detail_btn_completed">완료된 미션</string>
+    <string name="detail_btn_start">미션 시작하기</string>
 
     <!-- 홈 -->
     <string name="home_tagline">오늘도 새로운 미션에 도전해보세요!</string>

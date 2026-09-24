@@ -40,6 +40,18 @@ fun categoryLabel(category: String): String = when (category) {
     else -> category
 }
 
+/**
+ * 미션 진행 상태 코드(내부값, 항상 한국어: "진행중"/"완료"/"미 진행")를 표시용 라벨로 바꾼다.
+ * 내부 로직(색상 분기 등)은 코드값을 그대로 쓴다.
+ */
+@Composable
+fun missionStatusLabel(status: String): String = when (status) {
+    "진행중" -> stringResource(R.string.status_in_progress)
+    "완료" -> stringResource(R.string.status_completed)
+    "미 진행" -> stringResource(R.string.status_not_started)
+    else -> status
+}
+
 @Composable
 fun InfoCardSmall(title: String, icon: ImageVector, modifier: Modifier = Modifier) {
     Card(

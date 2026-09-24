@@ -6,6 +6,36 @@
     <string name="category_experience">Experience</string>
     <string name="category_shopping">Shopping</string>
     <string name="shared_reward_label">Reward</string>
+    <string name="status_in_progress">In Progress</string>
+    <string name="status_completed">Completed</string>
+    <string name="status_not_started">Not Started</string>
+    <string name="retry">Retry</string>
+
+    <!-- 미션 목록 -->
+    <string name="mission_list_title">Mission List</string>
+    <string name="mission_map_title">Mission Map</string>
+    <string name="view_list">View List</string>
+    <string name="view_map">View Map</string>
+    <string name="error_load_missions">Couldn\'t load missions. Check your connection and try again.</string>
+    <string name="error_load_progress">Couldn\'t load your mission progress.</string>
+    <string name="mission_no_title">Untitled Mission</string>
+
+    <!-- 미션 상세 -->
+    <string name="detail_title">Mission Detail</string>
+    <string name="detail_image_placeholder">Mission Cover Image</string>
+    <string name="detail_desc_fallback">No description has been added for this mission yet.</string>
+    <string name="detail_how_to_title">How to complete</string>
+    <string name="detail_step1_title">1. Start the mission</string>
+    <string name="detail_step1_body">Tap the button to start the mission and save your progress.</string>
+    <string name="detail_step2_title">2. Visit or experience</string>
+    <string name="detail_step2_body">Visit the place or do the activity described in the mission.</string>
+    <string name="detail_step3_title">3. Verify to complete</string>
+    <string name="detail_step3_body">Go to the verification screen to finish and earn points.</string>
+    <string name="toast_login_required">Please log in first.</string>
+    <string name="toast_already_completed">You\'ve already completed this mission.</string>
+    <string name="toast_save_failed">Couldn\'t save mission info to the server.</string>
+    <string name="detail_btn_completed">Mission Completed</string>
+    <string name="detail_btn_start">Start Mission</string>
 
     <!-- 홈 -->
     <string name="home_tagline">Discover a new mission today!</string>

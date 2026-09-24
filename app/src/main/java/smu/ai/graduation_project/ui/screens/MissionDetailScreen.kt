@@ -46,6 +46,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -53,9 +54,12 @@ import coil.compose.AsyncImage
 import com.google.firebase.Firebase
 import com.google.firebase.auth.auth
 import com.google.firebase.firestore.firestore
+import smu.ai.graduation_project.R
 import smu.ai.graduation_project.data.LanguagePreference
 import smu.ai.graduation_project.data.localizedString
 import smu.ai.graduation_project.model.Mission
+import smu.ai.graduation_project.ui.components.categoryLabel
+import smu.ai.graduation_project.ui.components.missionStatusLabel
 import smu.ai.graduation_project.ui.theme.CardGray
 import smu.ai.graduation_project.ui.theme.LightPurple
 import smu.ai.graduation_project.ui.theme.MainPurple
@@ -75,6 +79,10 @@ fun MissionDetailScreen(
     var imageUrl by remember { mutableStateOf("") }
     var userMissionStatus by remember { mutableStateOf("미 진행") }
     var isStarting by remember { mutableStateOf(false) }
+    val missionTitlePlaceholder = stringResource(R.string.mission_no_title)
+    val toastLoginRequired = stringResource(R.string.toast_login_required)
+    val toastAlreadyCompleted = stringResource(R.string.toast_already_completed)
+    val toastSaveFailed = stringResource(R.string.toast_save_failed)
 
     LaunchedEffect(missionId, user?.uid) {
         db.collection("missions").document(missionId).get().addOnSuccessListener { doc ->
@@ -82,7 +90,7 @@ fun MissionDetailScreen(
                 imageUrl = doc.getString("imageUrl").orEmpty()
                 mission = Mission(
                     id = doc.id,
-                    title = doc.localizedString("title", LanguagePreference.current, "제목 없는 미션"),
+                    title = doc.localizedString("title", LanguagePreference.current, missionTitlePlaceholder),
                     desc = doc.localizedString("desc", LanguagePreference.current),
                     points = doc.getLong("points")?.toInt() ?: 0,
                     category = doc.getString("category") ?: "투어"
@@ -110,7 +118,7 @@ fun MissionDetailScreen(
         containerColor = Color.White,
         topBar = {
             TopAppBar(
-                title = { Text("미션 상세", fontWeight = FontWeight.Bold) },
+                title = { Text(stringResource(R.string.detail_title), fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, null)
@@ -147,7 +155,7 @@ fun MissionDetailScreen(
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Icon(Icons.Default.Image, null, tint = Color.LightGray, modifier = Modifier.size(72.dp))
                             Spacer(modifier = Modifier.height(12.dp))
-                            Text("미션 대표 이미지", color = Color.Gray)
+                            Text(stringResource(R.string.detail_image_placeholder), color = Color.Gray)
                         }
                     }
 
@@ -159,7 +167,7 @@ fun MissionDetailScreen(
                         shape = RoundedCornerShape(14.dp)
                     ) {
                         Text(
-                            text = userMissionStatus,
+                            text = missionStatusLabel(userMissionStatus),
                             color = Color.White,
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Bold,
@@ -176,7 +184,7 @@ fun MissionDetailScreen(
                         color = Color(0xFF2C2C2C)
                     )
                     Text(
-                        text = currentMission.desc.ifBlank { "미션 설명이 아직 등록되지 않았습니다." },
+                        text = currentMission.desc.ifBlank { stringResource(R.string.detail_desc_fallback) },
                         fontSize = 15.sp,
                         lineHeight = 22.sp,
                         color = Color.Gray
@@ -184,7 +192,7 @@ fun MissionDetailScreen(
                 }
 
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    DetailChip(Icons.Default.Place, currentMission.category, LightPurple, MainPurple)
+                    DetailChip(Icons.Default.Place, categoryLabel(currentMission.category), LightPurple, MainPurple)
                     DetailChip(Icons.Default.EmojiEvents, "${currentMission.points}P", Color(0xFFFFF4E4), Orange)
                 }
 
@@ -197,19 +205,19 @@ fun MissionDetailScreen(
                         modifier = Modifier.padding(18.dp),
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
-                        Text("참여 방법", fontWeight = FontWeight.Bold, fontSize = 18.sp)
-                        DetailStep(Icons.Default.Flag, "1. 미션 시작", "버튼을 눌러 미션을 시작하고 진행 상태를 저장합니다.")
-                        DetailStep(Icons.Default.Place, "2. 장소 방문 또는 체험", "미션 설명에 맞는 장소를 방문하거나 행동을 수행합니다.")
-                        DetailStep(Icons.Default.CheckCircle, "3. 인증 후 완료", "수행 화면으로 이동해 인증을 마치면 포인트가 지급됩니다.")
+                        Text(stringResource(R.string.detail_how_to_title), fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                        DetailStep(Icons.Default.Flag, stringResource(R.string.detail_step1_title), stringResource(R.string.detail_step1_body))
+                        DetailStep(Icons.Default.Place, stringResource(R.string.detail_step2_title), stringResource(R.string.detail_step2_body))
+                        DetailStep(Icons.Default.CheckCircle, stringResource(R.string.detail_step3_title), stringResource(R.string.detail_step3_body))
                     }
                 }
 
                 Button(
                     onClick = {
                         if (user == null) {
-                            Toast.makeText(context, "로그인이 필요합니다.", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, toastLoginRequired, Toast.LENGTH_SHORT).show()
                         } else if (userMissionStatus == "완료") {
-                            Toast.makeText(context, "이미 완료한 미션입니다.", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, toastAlreadyCompleted, Toast.LENGTH_SHORT).show()
                         } else if (userMissionStatus == "진행중") {
                             onPerformMission(missionId)
                         } else {
@@ -233,11 +241,7 @@ fun MissionDetailScreen(
                             userMissionRef
                                 .set(userMissionData)
                                 .addOnFailureListener {
-                                    Toast.makeText(
-                                        context,
-                                        "미션 정보를 서버에 저장하지 못했습니다.",
-                                        Toast.LENGTH_SHORT
-                                    ).show()
+                                    Toast.makeText(context, toastSaveFailed, Toast.LENGTH_SHORT).show()
                                 }
 
                             isStarting = false
@@ -258,9 +262,9 @@ fun MissionDetailScreen(
                     } else {
                         Text(
                             text = when (userMissionStatus) {
-                                "완료" -> "완료된 미션"
-                                "진행중" -> "미션 계속하기"
-                                else -> "미션 시작하기"
+                                "완료" -> stringResource(R.string.detail_btn_completed)
+                                "진행중" -> stringResource(R.string.home_btn_continue)
+                                else -> stringResource(R.string.detail_btn_start)
                             },
                             fontWeight = FontWeight.Bold,
                             fontSize = 16.sp

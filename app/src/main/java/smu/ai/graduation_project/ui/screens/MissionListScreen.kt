@@ -44,6 +44,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -51,9 +52,12 @@ import coil.compose.AsyncImage
 import com.google.firebase.Firebase
 import com.google.firebase.auth.auth
 import com.google.firebase.firestore.firestore
+import smu.ai.graduation_project.R
 import smu.ai.graduation_project.data.LanguagePreference
 import smu.ai.graduation_project.data.localizedString
 import smu.ai.graduation_project.model.Mission
+import smu.ai.graduation_project.ui.components.categoryLabel
+import smu.ai.graduation_project.ui.components.missionStatusLabel
 import smu.ai.graduation_project.ui.theme.CardGray
 import smu.ai.graduation_project.ui.theme.MainPurple
 import smu.ai.graduation_project.ui.theme.Orange
@@ -78,6 +82,9 @@ fun MissionListScreen(onMissionClick: (String) -> Unit) {
     var reload by remember { mutableStateOf(0) }
     val db = Firebase.firestore
     val user = Firebase.auth.currentUser
+    val errorLoadMissions = stringResource(R.string.error_load_missions)
+    val errorLoadProgress = stringResource(R.string.error_load_progress)
+    val missionTitlePlaceholder = stringResource(R.string.mission_no_title)
 
     DisposableEffect(selectedCategory, user?.uid, reload) {
         var active = true
@@ -95,7 +102,7 @@ fun MissionListScreen(onMissionClick: (String) -> Unit) {
 
                 Mission(
                     id = doc.id,
-                    title = doc.localizedString("title", LanguagePreference.current, "제목 없는 미션"),
+                    title = doc.localizedString("title", LanguagePreference.current, missionTitlePlaceholder),
                     desc = doc.localizedString("desc", LanguagePreference.current),
                     points = doc.getLong("points")?.toInt() ?: 0,
                     category = doc.getString("category") ?: "투어",
@@ -142,14 +149,14 @@ fun MissionListScreen(onMissionClick: (String) -> Unit) {
                         if (active) {
                             missions = loadedMissions
                             loading = false
-                            loadError = "미션 진행 상태를 불러오지 못했습니다."
+                            loadError = errorLoadProgress
                         }
                     }
             }
         }.addOnFailureListener {
             if (active) {
                 loading = false
-                loadError = "미션을 불러오지 못했습니다. 연결 상태를 확인하고 다시 시도해 주세요."
+                loadError = errorLoadMissions
             }
         }
         onDispose { active = false }
@@ -159,10 +166,15 @@ fun MissionListScreen(onMissionClick: (String) -> Unit) {
         containerColor = Color.White,
         topBar = {
             CenterAlignedTopAppBar(
-                title = { Text(if (showMap) "미션 지도" else "미션 목록", fontWeight = FontWeight.Bold, fontSize = 20.sp) },
+                title = {
+                    Text(
+                        if (showMap) stringResource(R.string.mission_map_title) else stringResource(R.string.mission_list_title),
+                        fontWeight = FontWeight.Bold, fontSize = 20.sp
+                    )
+                },
                 actions = {
                     TextButton(onClick = { showMap = !showMap }) {
-                        Text(if (showMap) "목록 보기" else "지도 보기")
+                        Text(if (showMap) stringResource(R.string.view_list) else stringResource(R.string.view_map))
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.White)
@@ -190,7 +202,7 @@ fun MissionListScreen(onMissionClick: (String) -> Unit) {
                         color = if (selected) MainPurple else Color.Transparent
                     ) {
                         Text(
-                            text = category.label,
+                            text = categoryLabel(category.label),
                             modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
                             color = if (selected) Color.White else Color.Gray,
                             fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
@@ -204,7 +216,7 @@ fun MissionListScreen(onMissionClick: (String) -> Unit) {
                 Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
                     verticalAlignment = Alignment.CenterVertically) {
                     Text(message, modifier = Modifier.weight(1f), color = Color.DarkGray)
-                    TextButton(onClick = { reload++ }) { Text("다시 시도") }
+                    TextButton(onClick = { reload++ }) { Text(stringResource(R.string.retry)) }
                 }
             }
 
@@ -280,7 +292,7 @@ private fun MissionListCard(
                     modifier = Modifier.align(Alignment.TopStart)
                 ) {
                     Text(
-                        text = mission.status,
+                        text = missionStatusLabel(mission.status),
                         color = Color.White,
                         fontSize = 10.sp,
                         fontWeight = FontWeight.Bold,
