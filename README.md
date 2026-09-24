@@ -95,8 +95,8 @@
 
 ### 접근
 
-- **모델**: HuggingFace `apple/mobilevit-small` (~5M 파라미터) 를 미션 사진으로 **전체 파인튜닝**. 학습 없는 `CLIP` 제로샷을 비교 기준선으로 둡니다. test 정확도 0.83 / macro-F1 0.82 (CLIP 제로샷 0.63).
-- **데이터**: `투어 / 맛집 / 체험 / 쇼핑` + `무효` 5클래스, 총 5,300장 (HF Hub `kimgayeon430/travel-mission-photos`). Places365 / Food-101 validation 셋에서 scene 별로 표본. 정의는 `ml/labels.json` 이 단일 소스.
+- **모델**: HuggingFace `apple/mobilevit-small` (~5M 파라미터) 를 미션 사진으로 **전체 파인튜닝**. 학습 없는 `CLIP` 제로샷을 비교 기준선으로 둡니다. test 정확도 0.84 / macro-F1 0.81 (CLIP 제로샷 0.63).
+- **데이터**: `투어 / 맛집 / 체험 / 쇼핑` + `무효` 5클래스, 총 6,063장 (HF Hub `kimgayeon430/travel-mission-photos`). Places365 / Food-101 validation 셋에서 scene 별로 표본, 무효는 스크린샷·열화·화면 재촬영(`recapture()`) 3종 합성. 정의는 `ml/labels.json` 이 단일 소스.
 - **배포**: `torch.onnx` 로 ONNX(fp32 20MB) 변환 후 `app/src/main/assets/photo_verifier.onnx` 로 번들, `onnxruntime-android` 로 추론. `OnnxPhotoVerifier` 가 `photo_verifier_preprocessor.json` 에서 전처리 상수를 읽어 학습·추론을 자동 정합.
 
 ### 판정 규칙 (`PhotoVerification`)
@@ -129,6 +129,7 @@
 | --- | --- |
 | `ml/labels.json` · `dataset_card.md` | 분류 클래스 정의(앱과 공유) · 수집 출처·규모 |
 | `ml/data/` | 데이터셋 구축 (Places365/Food-101 validation → scene별 표본 → 분할 → HF Hub) |
+| `ml/data/import_collected.py` | 크라우드소싱 등 직접 수집한 사진을 `raw/<카테고리>/`에 합류(place_id 그룹 분할 안전) |
 | `ml/notebooks/train_photo_verifier.ipynb` | 데이터 로드 → CLIP 제로샷 → 헤드 학습 → 전체 파인튜닝 → 평가 → 임계값 선정 |
 | `ml/export_onnx.py` | 파인튜닝 모델 → ONNX (`torch.onnx`, 전처리·라벨·버전 함께 출력) |
 | `ml/thresholds.json` | 학습 결과로 선정한 임계값 + 평가 지표. `PhotoVerificationConfig` 기본값과 동기화 |
@@ -141,12 +142,13 @@
 - [x] 판정 로직 `PhotoVerification` / `PhotoVerificationConfig` / `PhotoGate` + 단위 테스트
 - [x] `MissionPerformViewModel` → `FirebaseMissionRepository` 연결 (업로드 전 판정, 결과 기록, UX 분기)
 - [x] 관리자 검수 큐 `AdminPhotoReviewScreen`, Firestore 보안 규칙 `firestore.rules`
-- [x] 데이터셋 5,300장 구축 (HF Hub `kimgayeon430/travel-mission-photos`)
-- [x] Colab T4 파인튜닝 (`mobilevit-small-fullft-1`, test macro-F1 0.82) → `assets/photo_verifier.onnx`
+- [x] 데이터셋 6,063장 구축 (HF Hub `kimgayeon430/travel-mission-photos`)
+- [x] Colab T4 파인튜닝 (`mobilevit-small-fullft-1`, test macro-F1 0.81) → `assets/photo_verifier.onnx`
 - [x] `OnnxPhotoVerifier` 연결, 임계값 반영, 기본 verifier 전환
 - [x] `firestore.rules` 배포 (`grad-proj-5e09c`, 에뮬레이터 테스트 20건 통과 확인 후 배포)
 - [x] 참조 이미지 유사도 결합 (CLIP 임베딩, 6.7절) + 다중 참조 이미지(최대 유사도, 6.7.8) — 실기기 승인/반려 플로우 확인
-- [ ] 무효 클래스에 화면 재촬영 합성 augmentation 반영 재학습(도구는 준비됨, `ml/data/make_negatives.py`), 체험 데이터 보강
+- [x] 무효 클래스에 화면 재촬영 합성 augmentation(`recapture()`) 반영 재학습 — invalid recall 0.92→0.93 유지, `build_dataset.py`의 place_id 그룹 분할 버그(합성 무효 파일명이 소수 그룹에 뭉쳐 split이 쏠리던 문제)를 발견·수정한 뒤 재학습해 정상화
+- [ ] 크라우드소싱 사진으로 체험 클래스 보강 — 수집 스크립트(`ml/data/import_collected.py`)만 준비됨, 실사진 수집은 별도
 
 ## 추천 re-ranker (`ml/reco/`)
 
@@ -335,7 +337,7 @@ python export_onnx.py --model outputs/final --out ../app/src/main/assets/photo_v
 ## 향후 개선 계획
 
 - 유사도 임계값(`rescue`/`suspect`) 실사용 로그 기반 확정 — 현재는 실사용 1건 + 웹 프록시 표본뿐이라 통계적으로 부족 (`ml/calibrate_similarity.py`)
-- 무효 클래스에 화면 재촬영 합성(`recapture()`) 반영한 재학습 — Colab 진행 중, 크라우드소싱 실사진(무관 실내·체험) 보강은 별도
+- 크라우드소싱 사진으로 체험(및 무관 실내) 클래스 보강 후 재학습 — 무효 클래스는 화면 재촬영 합성으로 이미 보강·재학습 완료(위), 체험은 실사진 수집이 남음. 수집 시 `ml/data/import_collected.py --category 체험 --from-dir <폴더>` 로 기존 파이프라인에 합류
 - 촬영 시각·EXIF·위치 메타데이터 교차 검증, GPS 스푸핑/순간이동 탐지
 - 미션 간 동시출현(협업 필터링) 신호까지 반영한 추천 고도화 (시간대 적합도·오프라인 평가는 반영 완료), `user_missions` 실로그로 re-ranker 재학습
 - ViewModel·Repository 패턴을 홈·목록·관리자 등 나머지 화면으로 확대

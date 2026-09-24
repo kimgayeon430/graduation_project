@@ -303,23 +303,23 @@ PhotoVerification (domain/, 순수 Kotlin)  ── 점수 + 미션 카테고리 
 | --- | --- | --- |
 | 맛집 | Food-101 (`ethz/food101`) validation | 101개 음식 클래스에서 클래스당 상한을 두고 고르게 표본 |
 | 투어·체험·쇼핑 | Places365 validation (`dpdl-benchmark/Places365-Validation`, 365 scene × 100장) | 라벨 인덱스를 `places365_categories.txt` 로 이름화, `place_classes.py` 로 카테고리 매핑(투어 107 · 체험 53 · 쇼핑 28 scene), scene 당 상한을 두고 표본 |
-| 무효 | 합성 | 스크린샷 합성 + 다른 클래스 이미지 열화(하드 네거티브) + `collected_invalid/` 직접 수집분 |
+| 무효 | 합성 | 스크린샷 합성 + 다른 클래스 이미지 열화(하드 네거티브) + 화면 재촬영 합성(`recapture()`, 6.7.10) + `collected_invalid/` 직접 수집분 |
 
 - **스트리밍 대신 validation 셋 전체 다운로드**: Places365/Food-101 학습 셋은 클래스 순으로 정렬돼 있어 `datasets` 스트리밍 + shuffle 로는 앞쪽 몇 개 scene 에 편중된다(초기 시도에서 투어 3 scene·쇼핑 1 scene 만 수집됨). validation 셋은 scene 당 100~250장으로 작아(합쳐서 ~5.7GB) scene 다양성을 최대로 확보한다.
-- **분할**: train/val/test = 70/15/15. 파일명 `<sceneId>__n.jpg` 의 sceneId 단위로 그룹을 묶어 분할해, 같은 scene 이미지가 train·test 에 걸쳐 성능이 부풀려지는 것을 방지한다(공개 데이터 4개 클래스는 train↔test scene 겹침 0). 합성 무효는 그룹이 2개뿐이라 이미지 단위로 분할한다.
-- **크라우드소싱**(권장, 미적용): 동기·지인의 실제 미션 수행 사진. `raw/<카테고리>/<장소이름>__001.jpg` 로 넣으면 같은 파이프라인으로 합쳐진다.
+- **분할**: train/val/test = 70/15/15. 파일명 `<sceneId>__n.jpg` 의 sceneId 단위로 그룹을 묶어 분할해, 같은 scene 이미지가 train·test 에 걸쳐 성능이 부풀려지는 것을 방지한다(공개 데이터 4개 클래스는 train↔test scene 겹침 0). 그룹이 3개 미만이면 이미지 단위 분할로 대체하는데, 합성 무효가 처음엔 2종(스크린샷·열화)이라 이 대체 경로를 탔었다. `recapture()` 를 3번째 소스로 추가하며 그룹 수가 3개가 돼 대체 경로를 벗어났고, 그 결과 합성 파일명이 소스별로만 겹쳐 소수 그룹에 뭉치는 버그가 드러났다(6.7.10).
+- **크라우드소싱**: 동기·지인의 실제 미션 수행 사진. `ml/data/import_collected.py --category <카테고리> --from-dir <폴더>` 로 넣으면 같은 파이프라인으로 합쳐진다(체험 클래스 보강 대상, 아직 미적용).
 
-**구축 결과** (HF Hub 비공개: `kimgayeon430/travel-mission-photos`)
+**구축 결과** (HF Hub 비공개: `kimgayeon430/travel-mission-photos`, `recapture()` 반영 재구축 후)
 
 | split | 투어 | 맛집 | 체험 | 쇼핑 | 무효 | 합계 |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| train | 698 | 700 | 700 | 705 | 910 | 3,713 |
-| validation | 152 | 150 | 150 | 161 | 195 | 808 |
-| test | 150 | 150 | 150 | 134 | 195 | 779 |
-| **합계** | **1,000** | **1,000** | **1,000** | **1,000** | **1,300** | **5,300** |
+| train | 698 | 700 | 700 | 705 | 1,444 | 4,247 |
+| validation | 152 | 150 | 150 | 161 | 310 | 923 |
+| test | 150 | 150 | 150 | 134 | 309 | 893 |
+| **합계** | **1,000** | **1,000** | **1,000** | **1,000** | **2,063** | **6,063** |
 
-scene 다양성: 투어 107 · 맛집 101 · 체험 53 · 쇼핑 28 · 무효 2(합성).
-공개 데이터는 도메인이 실제 촬영본과 다소 다르므로, 크라우드소싱 사진으로 각 클래스를 보강하는 것이 향후 과제다.
+scene 다양성: 투어 107 · 맛집 101 · 체험 53 · 쇼핑 28 · 무효 3(합성 소스 종류).
+공개 데이터는 도메인이 실제 촬영본과 다소 다르므로, 크라우드소싱 사진으로 각 클래스(특히 체험)를 보강하는 것이 향후 과제다.
 
 ### 6.4 모델 및 학습
 
@@ -344,7 +344,7 @@ scene 다양성: 투어 107 · 맛집 101 · 체험 53 · 쇼핑 28 · 무효 2(
 | `s[c] ≥ autoPassThreshold` | `PASS` |
 | 그 외 | `NEEDS_REVIEW` |
 
-- 기본값: `autoPass = 0.65`, `hardReject = 0.22`, `invalidReject = 0.55`. `mobilevit-small-fullft-1` 의 test 셋 임계값 스윕으로 선정해 `ml/thresholds.json` → `PhotoVerificationConfig` 로 이식했다. `invalidReject = 0.55` 에서 무효 사진 차단율 0.918.
+- 기본값: `autoPass = 0.65`, `hardReject = 0.22`, `invalidReject = 0.55`. `mobilevit-small-fullft-1` 의 test 셋 임계값 스윕으로 선정해 `ml/thresholds.json` → `PhotoVerificationConfig` 로 이식했다. `invalidReject = 0.55` 에서 무효 사진 차단율 0.932(6.7.10 재학습 후, 화면 재촬영 유형 포함).
 - 모델을 불러오지 못하면 `NEEDS_REVIEW`(`passWhenModelUnavailable = false`). 모델 배포 완료로 전환했으며, 이제 로딩이 실패하면 통과가 아니라 **전건이 관리자 검수로 넘어간다**. 실패가 조용하므로(`RerankerSource`·`OnnxPhotoVerifier` 모두 `runCatching` 으로 삼킴) 계측 테스트로 방어한다(8.2절).
 - **설계 결정**: `NEEDS_REVIEW` 도 미션 완료·포인트 지급은 즉시 진행하고 검수 플래그만 남긴다. "포인트 보류" 상태를 만들지 않아 사용자 경험이 단순하며, 관리자 검수는 사후 부정 적발 용도다.
 
@@ -532,6 +532,24 @@ held-out 데이터로도 분리력이 개선된다(J 0.21 → 0.33). 표본이 �
 
 **의의**: `calibrate_similarity_web.py`(웹 프록시)와 `calibrate_similarity.py`(실사용)가 이제 각각 34/34, 1/1 로 별도 트랙에서 굴러가고 있다. 웹 프록시가 표본 수는 많지만 "그 자리에서 찍은 사진이 아니다"라는 한계가 있고, 실사용은 근거는 확실하지만 아직 표본이 극히 적다 — 두 트랙 다 "30건 미만은 신뢰 낮음" 경고 상태를 벗어나려면 실사용자가 늘어야 한다.
 
+#### 6.7.10 재학습 완료 — place_id 그룹 분할 버그 발견·수정
+
+6.7.6·7.2 에서 준비한 화면 재촬영 합성(`recapture()`)을 실제로 데이터셋에 섞어 Colab 에서 재학습한 첫 결과는 예상과 정반대였다: `classification_report` 에서 무효 클래스의 precision·recall·f1 이 전부 0.000(support 370)이었다 — 무효 사진을 화면 재촬영이든 스크린샷이든 단 한 장도 못 잡는, 기존 배포 모델(invalid_recall 0.918)보다 훨씬 나쁜 결과였다. 나머지 4개 클래스는 recall 0.6~0.99 로 오히려 높아, 무효 사진이 전부 다른 카테고리로 잘못 분류되고 있었다.
+
+원인은 학습 데이터가 아니라 **`build_dataset.py` 의 place_id 그룹 분할 로직**이었다. `place_id()` 는 파일명을 `"__"` 기준으로 잘라 앞부분을 그룹 키로 쓴다(같은 장소 사진이 train·test 에 걸치는 걸 막기 위함). 그런데 `make_negatives.py` 가 만드는 합성 무효 파일명은 전부 `synth__NNNN.jpg` / `degrade__NNNN.jpg` / `recapture__NNNN.jpg` 형태라, 수백~수천 장이 **소스 종류별로 그룹 3개에만 뭉쳤다.** `_assign_groups()` 는 그룹을 통째로 한 split 에만 배정하므로, 특정 합성 소스(예: `recapture` 전체)가 train 에는 전혀 안 들어가고 val 에만 들어가는 식의 극단적 쏠림이 생겼다. 6.3절에서 언급했듯 그룹이 3개 미만이면 이미지 단위 분할로 대체하는 안전장치가 있는데, `recapture()` 추가 전에는 무효 소스가 2종(스크린샷·열화)이라 이 안전장치가 항상 작동해 문제가 가려져 있었다 — 3번째 소스를 추가하자 그룹 수가 정확히 임계값(3개)을 넘겨 안전장치를 벗어났다.
+
+수정은 `make_negatives.py` 의 파일명에서 `"__"` 를 제거해(`synth_NNNN.jpg` 등 단일 언더스코어) place_id() 가 파일마다 고유 그룹으로 인식하게 한 것이다. 같은 조건으로 재학습한 결과:
+
+| | 수정 전(버그) | 수정 후 |
+| --- | ---: | ---: |
+| invalid recall | 0.000 | **0.932** |
+| macro F1 | 0.489 | **0.809** |
+| valid false-reject (hardReject 0.22) | — | 0.146 |
+
+기존 배포 모델(recapture 미포함, invalid_recall 0.918)과 비교해도 recall 이 오히려 올랐다 — 이번엔 화면 재촬영 유형까지 포함해서 나온 수치이므로 실질적 개선이다. 체험 클래스는 여전히 가장 약하다(f1 0.632, recall 0.567) — 6.4 절의 도메인 격차가 원인이라 크라우드소싱 실사진 보강(`ml/data/import_collected.py`)이 필요하다.
+
+새 모델(`app/src/main/assets/photo_verifier.onnx` 등)을 실기기(Galaxy S8)에 설치하고 `OnnxPhotoVerifierTest`(6건, 5 통과·1 스킵)로 on-device 로딩·추론을 재확인했다 — 폴백 경로(`"모델 미탑재"` 사유)를 타지 않고 실제 추론이 도는 것을 확인했다.
+
 ---
 
 ## 7. 구현 현황
@@ -546,11 +564,12 @@ held-out 데이터로도 분리력이 개선된다(J 0.21 → 0.33). 표본이 �
 - [x] 관리자 사진 검수 큐 화면
 - [x] Firestore 보안 규칙 `firestore.rules` + 에뮬레이터 테스트 20건 (`firestore-tests/`)
 - [x] 데이터셋 구축 스크립트 `ml/data/`, 학습 노트북, ONNX export 스크립트 — 더미 데이터로 파이프라인 전 구간(데이터 로드 → CLIP 제로샷 → 학습 → 평가 → 임계값 → ONNX export) 스모크 테스트 완료
-- [x] 실제 데이터셋 구축 (5,300장, HF Hub `kimgayeon430/travel-mission-photos`) — 6.3절
+- [x] 실제 데이터셋 구축 (6,063장, HF Hub `kimgayeon430/travel-mission-photos`) — 6.3절
 - [x] `OnnxPhotoVerifier` (ONNX Runtime Mobile) 구현 — `assets/` 의 모델·전처리·라벨 json 을 읽어 추론, 모델 없으면 `null` 반환해 앱 무영향
 - [x] Supabase Storage 사진 업로드 (InvalidKey·RLS 이슈 수정 후 실기기 동작 확인)
 - [x] 마이페이지 포인트 적립 내역 화면 (`PointHistoryScreen`)
-- [x] Colab T4 에서 파인튜닝 → `photo_verifier.onnx`(20MB) 를 `assets/` 에 번들, 임계값을 `PhotoVerificationConfig.DEFAULT` 로 반영, 기본 verifier 를 `OnnxPhotoVerifier`·`DEFAULT` config 로 전환 (test macro-F1 0.82)
+- [x] Colab T4 에서 파인튜닝 → `photo_verifier.onnx`(20MB) 를 `assets/` 에 번들, 임계값을 `PhotoVerificationConfig.DEFAULT` 로 반영, 기본 verifier 를 `OnnxPhotoVerifier`·`DEFAULT` config 로 전환 (test macro-F1 0.81, 6.7.10)
+- [x] 화면 재촬영 합성(`recapture()`) 포함 재학습 + `build_dataset.py` place_id 그룹 분할 버그 발견·수정(6.7.10) — invalid recall 0.0(버그) → 0.932, 실기기 계측 테스트로 on-device 추론 재확인
 - [x] 학습된 추천 re-ranker: `MissionFeatures`·`LearnedReranker`·`MissionRecommender.recommendReranked` + `ml/reco/` 파이프라인 + `assets/reranker.json`. 신호 6개(시간대 적합도 포함), 시뮬레이터 학습본으로 규칙 대비 AUC 0.949→0.960, NDCG@5 0.914→0.953 (8.3절)
 - [x] 모델 에셋 로딩 계측 테스트 (`OnnxPhotoVerifierTest` 6건, `RerankerSourceTest` 4건) — 실기기(Galaxy S8, API 28)에서 실제 에셋으로 추론·로딩 검증. 두 로더 모두 실패를 `runCatching` 으로 삼켜 **무증상 고장**(사진: 전건 검수 큐행 / 추천: 규칙 기반 폴백)이 나므로, 재학습 모델 교체 시 신호 순서·라벨 불일치를 잡는 방어선
 - [x] 참조 이미지 임베딩 유사도(6.7절) — `CLIP ViT-B/32` 임베딩 인코더 채택(pooled feature 재사용은 분리도 AUC 0.60 으로 기각, `ml/embedding_separability.py`). 온디바이스 `OnnxClipPhotoEmbedder`(88.6MB int8, HF Hub 런타임 다운로드+`filesDir` 캐시), 판정 규칙 `PhotoVerification.verify` 에 유사도 ±1단계 결합, 참조 임베딩 사전계산 `ml/embed_missions.py`, EXIF 회전 정합(`ImagePreprocess` + `androidx.exifinterface`). 단위 테스트 신규 13건 포함 `PhotoVerificationTest` 18 + `PhotoGateTest` 8 통과, `testDebugUnitTest`·`compileReleaseKotlin` BUILD SUCCESSFUL. 실기기(Galaxy S8) 계측 테스트 통과 + 유사도 신호 실동작·구제 경로 확인(6.7.7). 임계값(rescue 0.50 / suspect 0.68)은 공개 scene 프록시 기반 잠정치
@@ -563,8 +582,8 @@ held-out 데이터로도 분리력이 개선된다(J 0.21 → 0.33). 표본이 �
 - [ ] 유사도 임계값 실측 보정 — 실사용 1/1(6.7.9) + 웹 프록시 34/34(6.7.8) + 백필 후 held-out 12/12(6.7.8) 확보했으나 전부 확정에는 부족(30건 미만이거나 프록시성). `ml/calibrate_similarity.py`(실사용) / `ml/calibrate_similarity_web.py`(웹 프록시) 로 계속 표본 축적
 - [x] 참조 이미지 배열화(다중 참조, 최대 유사도) 실제 구현·배포 — `PhotoVerification.verify`/`PhotoGate`/`MissionRepository`/`FirebaseMissionRepository`/`MissionPerformViewModel` 전 계층 반영, Firestore 스키마 버그(배열의 배열 미지원) 발견·수정, 8개 미션 실제 백필 + held-out 검증으로 분리력 개선(J 0.21→0.33) 확인 완료(6.7.8)
 - [x] 화면 재촬영 합성 augmentation `ml/data/make_negatives.py`(`recapture()`, 베젤·무아레·글레어) 추가 — 기존 스크린샷/열화 소스에 3번째 소스로 섞여 들어간다. 합성 12장을 배포 중인 `photo_verifier.onnx` 에 직접 돌려보니 `s[무효]` 0.011~0.129(평균 ≈0.04) — 6.7.7 의 실기기 관측(0.066~0.07)과 같은 패턴을 재현·정량화. 기존 `degrade()`(블러·저조도)는 이 패턴을 못 잡는다는 뜻이라 별도 소스로 추가함
-- [ ] 위 표본을 실제로 섞어 재학습(Colab) — **진행 중.** `ml/data/` 파이프라인(공개 데이터 재수집 → `recapture` 포함 무효 합성 → HF Hub 재업로드)까지 마치고 Colab T4 에서 `train_photo_verifier.ipynb` 재학습 중. 결과(무효 recall·macro-F1) 나오는 대로 `thresholds.json`/`PhotoVerificationConfig`/본 절에 반영 예정
-- [ ] 크라우드소싱 사진으로 각 클래스 보강(특히 체험·무관 실내) 후 재학습 — 위 재학습은 합성 augmentation 만 반영, 크라우드소싱 실사진 보강은 별도
+- [x] 위 표본을 실제로 섞어 재학습(Colab) — 완료(6.7.10). place_id 그룹 분할 버그 발견·수정 포함, invalid recall 0.932·macro-F1 0.809 로 `thresholds.json`/`PhotoVerificationConfig`/6.7.10 반영 완료
+- [ ] 크라우드소싱 사진으로 각 클래스 보강(특히 체험) 후 재학습 — 무효는 합성 augmentation 으로 대체 완료, 체험은 도메인 격차(6.4)가 남아 실사진이 필요. 수집 스크립트 `ml/data/import_collected.py` 준비 완료, 실사진 수집 자체는 별도
 - [ ] `user_missions` 로그로 추천 re-ranker 재학습(`--from-firestore`), 시뮬레이터 학습본 대체
 - [x] `firestore.rules` 배포 — 규칙 테스트 20건 통과 재확인 후 `firebase deploy --only firestore:rules --project grad-proj-5e09c` 실행, 프로덕션 반영 완료
 - [ ] Robolectric 기반 ViewModel/Compose UI 테스트 `[선택]`
@@ -599,22 +618,22 @@ held-out 데이터로도 분리력이 개선된다(J 0.21 → 0.33). 표본이 �
 
 ### 8.2 사진 인증 모델
 
-**학습 결과** (Colab T4, `mobilevit-small-fullft-1`, test 셋 779장. train↔test scene 겹침 0)
+**학습 결과** (Colab T4, `mobilevit-small-fullft-1`, test 셋 893장 — `recapture()` 반영 재구축 후, 6.7.10. train↔test scene 겹침 0)
 
 | 모델 | test accuracy | test macro-F1 |
 | --- | ---: | ---: |
-| CLIP 제로샷 (`clip-vit-base-patch32`, 학습 없음) | 0.639 | 0.631 |
-| MobileViT-small 전체 파인튜닝 | **0.829** | **0.816** |
+| CLIP 제로샷 (`clip-vit-base-patch32`, 학습 없음) | 0.648 | 0.627 |
+| MobileViT-small 전체 파인튜닝 | **0.840** | **0.809** |
 
-클래스별 F1: 투어 0.80 · 맛집 0.93 · **체험 0.64** · 쇼핑 0.76 · 무효 0.95.
-체험이 가장 약함(recall 0.57) — 공개 데이터가 실제 "체험 미션 사진"과 도메인이 다르고 카테고리 경계가 모호. 크라우드소싱 사진 보강이 향후 과제.
+클래스별 F1: 투어 0.79 · 맛집 0.94 · **체험 0.63** · 쇼핑 0.73 · 무효 0.96.
+체험이 가장 약함(recall 0.57) — 공개 데이터가 실제 "체험 미션 사진"과 도메인이 다르고 카테고리 경계가 모호. 크라우드소싱 사진 보강이 향후 과제(`ml/data/import_collected.py` 준비 완료).
 
 **임계값 선정** (`ml/thresholds.json`, test 셋 임계값 스윕)
 
 | 임계값 | 값 | 근거 |
 | --- | ---: | --- |
-| `invalidRejectThreshold` | 0.55 | 무효 사진 차단율 0.92, 정상 사진 오탐 0.005 |
-| `hardRejectThreshold` | 0.22 | 정상 사진 오탐(0.30일 때 0.18)을 낮추는 방향. 애매한 사진은 `REJECT` 대신 `NEEDS_REVIEW` 로 |
+| `invalidRejectThreshold` | 0.55 | 무효 사진 차단율 0.93, 화면 재촬영 유형 포함(6.7.10) |
+| `hardRejectThreshold` | 0.22 | 정상 사진 오탐 0.146 을 낮추는 방향. 애매한 사진은 `REJECT` 대신 `NEEDS_REVIEW` 로 |
 | `autoPassThreshold` | 0.65 | 정상 사진의 약 71%가 자동 통과 |
 
 **온디바이스 비용**
@@ -677,7 +696,8 @@ NDCG@5 +0.033 으로 이득의 대부분을 가져온다.
 ## 10. 향후 계획
 
 - **참조 이미지 임베딩 유사도** — 설계·구현·배포 완료(6.7절): CLIP 인코더 HF Hub 배포, 미션 16/16 임베딩 백필, 판정 결합, 실기기 예비 관측(6.7.7), 다중 참조 이미지(최대 유사도) 구현·8개 미션 백필·held-out 검증(6.7.8), 실사용 라벨 첫 확보(6.7.9). 남은 것은 실사용자가 늘어 `rescue`/`suspect` 를 30건 이상 실측으로 확정하는 것(`ml/calibrate_similarity.py`). MobileCLIP 경량화는 후속.
-- 무효 클래스 데이터 보강(무관한 실내·업무 환경 표본) — 스푸핑 방어가 이 클래스에 의존하므로 우선순위 높음 (6.7.6)
+- 무효 클래스 화면 재촬영 augmentation 반영 재학습 완료(6.7.10, invalid recall 0.932). 무관한 실내·업무 환경 표본은 `collected_invalid/` 소량뿐이라 계속 보강 여지 있음
+- 크라우드소싱 사진으로 체험 클래스 보강 후 재학습 — 도메인 격차로 가장 약한 클래스(f1 0.63). 수집 스크립트(`ml/data/import_collected.py`) 준비 완료, 실사진 수집이 남음
 - 1단계 위치 인증 정밀화: 반경 200 m 축소 및 `location.accuracy` 반영 (사진 모델 변경 없이 장소 특이성을 높이는 저비용 개선)
 - 촬영 시각·EXIF·위치 메타데이터 교차 검증, GPS 스푸핑/순간이동 탐지
 - 추천 re-ranker 를 실제 `user_missions` 로그로 재학습(현재는 시뮬레이터 학습본), 온라인 A/B 또는 컨텍스트 밴딧으로 확장
