@@ -47,7 +47,7 @@ fun RankingScreen() {
     val currentUser = Firebase.auth.currentUser
     var selectedTab by remember { mutableIntStateOf(0) }
     var rankingList by remember { mutableStateOf<List<UserRank>>(emptyList()) }
-    val tabs = listOf("전체 랭킹", "친구 랭킹")
+    val tabs = listOf("전체 랭킹", "내 랭킹")
 
     LaunchedEffect(Unit) {
         db.collection("users")
@@ -69,11 +69,15 @@ fun RankingScreen() {
     val visibleRanking = if (selectedTab == 0) {
         rankingList
     } else {
-        val current = rankingList.firstOrNull { it.uid == currentUser?.uid }
-        val topFriends = rankingList.take(5)
-        listOfNotNull(current).plus(topFriends)
-            .distinctBy { it.uid }
-            .sortedBy { it.rank }
+        // "내 랭킹": 친구 관계 데이터가 없으므로, 전체 랭킹에서 내 순위 주변(위아래 2명)만 보여준다.
+        val myIndex = rankingList.indexOfFirst { it.uid == currentUser?.uid }
+        if (myIndex == -1) {
+            rankingList.take(5)
+        } else {
+            val start = (myIndex - 2).coerceAtLeast(0)
+            val end = (myIndex + 2).coerceAtMost(rankingList.lastIndex)
+            rankingList.subList(start, end + 1)
+        }
     }
 
     Column(
