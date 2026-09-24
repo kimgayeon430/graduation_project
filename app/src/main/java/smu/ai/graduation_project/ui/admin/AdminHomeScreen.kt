@@ -18,7 +18,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AdminPanelSettings
 import androidx.compose.material.icons.filled.Assignment
-import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.filled.PhotoLibrary
@@ -103,13 +102,6 @@ fun AdminHomeScreen(
             desc = "Approve or reject flagged mission photos.",
             icon = Icons.Default.PhotoLibrary,
             onClick = onNavigateToPhotoReview
-        )
-
-        AdminMenuCard(
-            title = "Statistics",
-            desc = "View app usage summary.",
-            icon = Icons.Default.BarChart,
-            onClick = { }
         )
 
         Spacer(modifier = Modifier.height(32.dp))
