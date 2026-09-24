@@ -1,23 +1,23 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="ClaudeCodeEditorTabs">
-    <option name="activeSessionId" value="21faed0c-3895-41ae-87d7-359c46357fc3" />
+    <option name="activeSessionId" value="0ebc4252-4beb-4ce7-9b61-8a3474cd7f91" />
     <option name="openSessionIds">
       <list>
-        <option value="16023072-8059-4969-9d52-833ffa4e3056" />
-        <option value="21faed0c-3895-41ae-87d7-359c46357fc3" />
+        <option value="64efbce0-2bc4-419f-b164-3ad1f7498d5e" />
+        <option value="0ebc4252-4beb-4ce7-9b61-8a3474cd7f91" />
       </list>
     </option>
     <option name="sessionPaths">
       <map>
-        <entry key="16023072-8059-4969-9d52-833ffa4e3056" value="/sessions/5f2552db-38f7-40fc-b778-d790e1931797" />
-        <entry key="21faed0c-3895-41ae-87d7-359c46357fc3" value="/sessions/22424f8f-4aa6-45d7-b412-0f1f2b612e9f" />
+        <entry key="0ebc4252-4beb-4ce7-9b61-8a3474cd7f91" value="/sessions/ffd5aece-2b7a-42a4-afff-125b6cfa2dd3" />
+        <entry key="64efbce0-2bc4-419f-b164-3ad1f7498d5e" value="/sessions/d8d02067-c9ac-4157-b5c5-bec83e4c20e2" />
       </map>
     </option>
     <option name="sessionTitles">
       <map>
-        <entry key="16023072-8059-4969-9d52-833ffa4e3056" value="gradle sync failed래, 해결해줘" />
-        <entry key="21faed0c-3895-41ae-87d7-359c46357fc3" value="맥에서 편집한 추천 관련 변경 2건(커밋 d1038ab, 9e96005)이 아직 Andro" />
+        <entry key="0ebc4252-4beb-4ce7-9b61-8a3474cd7f91" value="프로젝트 구성이랑 깃허브 내용 읽어보고 어떤 작업을 더 해야할지 확인해줘" />
+        <entry key="64efbce0-2bc4-419f-b164-3ad1f7498d5e" value="세션 요약 (다음 세션 전달용) 프로젝트: Travel Mission — 숙명여대 졸업 프" />
       </map>
     </option>
   </component>

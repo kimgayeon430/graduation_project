@@ -40,7 +40,6 @@ import androidx.navigation.compose.rememberNavController
 import com.google.firebase.Firebase
 import com.google.firebase.auth.auth
 import com.google.firebase.firestore.firestore
-import smu.ai.graduation_project.data.LanguagePreference
 import smu.ai.graduation_project.navigation.Screen
 import smu.ai.graduation_project.ui.admin.AdminMissionEditScreen
 import smu.ai.graduation_project.ui.admin.AdminHomeScreen
@@ -67,7 +66,6 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        LanguagePreference.init(this)
         setContent {
             Graduation_projectTheme {
                 AppRoot()

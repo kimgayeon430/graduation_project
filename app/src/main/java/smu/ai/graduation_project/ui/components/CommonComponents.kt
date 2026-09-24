@@ -20,9 +20,25 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.clickable
+import androidx.compose.ui.res.stringResource
+import smu.ai.graduation_project.R
 import smu.ai.graduation_project.model.UserRank
 import smu.ai.graduation_project.ui.theme.*
 import java.util.Locale
+
+/**
+ * 카테고리 코드(Firestore 값, 항상 한국어: "투어"/"맛집"/"체험"/"쇼핑")를 현재 언어에 맞는
+ * 표시용 라벨로 바꾼다. 내부 로직(필터링·매칭)은 코드값을 그대로 쓰고, 화면에 보여줄 때만 이걸 쓴다.
+ */
+@Composable
+fun categoryLabel(category: String): String = when (category) {
+    "전체" -> stringResource(R.string.category_all)
+    "투어" -> stringResource(R.string.category_tour)
+    "맛집" -> stringResource(R.string.category_food)
+    "체험" -> stringResource(R.string.category_experience)
+    "쇼핑" -> stringResource(R.string.category_shopping)
+    else -> category
+}
 
 @Composable
 fun InfoCardSmall(title: String, icon: ImageVector, modifier: Modifier = Modifier) {

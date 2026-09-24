@@ -1,0 +1,23 @@
+<resources>
+    <!-- 공용 -->
+    <string name="category_all">All</string>
+    <string name="category_tour">Tour</string>
+    <string name="category_food">Food</string>
+    <string name="category_experience">Experience</string>
+    <string name="category_shopping">Shopping</string>
+    <string name="shared_reward_label">Reward</string>
+
+    <!-- 홈 -->
+    <string name="home_tagline">Discover a new mission today!</string>
+    <string name="home_weekly_progress_title">This week\'s mission progress</string>
+    <string name="home_active_mission_title">Mission in progress</string>
+    <string name="home_recommended_title">Recommended missions</string>
+    <string name="home_view_more">More &gt;</string>
+    <string name="home_badge_in_progress">In Progress</string>
+    <string name="home_badge_recommended">Recommended</string>
+    <string name="home_btn_continue">Continue Mission</string>
+    <string name="home_btn_view">View Mission</string>
+    <string name="home_empty_title">No missions to recommend right now</string>
+    <string name="home_empty_desc">New missions will show up here. Check the Mission tab to browse them all.</string>
+    <string name="home_mission_image_desc">%1$s cover photo</string>
+</resources>

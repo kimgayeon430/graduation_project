@@ -52,6 +52,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.stringResource
 import coil.compose.AsyncImage
 import android.Manifest
 import android.content.Context
@@ -66,6 +67,7 @@ import com.google.firebase.Firebase
 import com.google.firebase.auth.auth
 import com.google.firebase.firestore.GeoPoint
 import com.google.firebase.firestore.firestore
+import smu.ai.graduation_project.R
 import smu.ai.graduation_project.data.LanguagePreference
 import smu.ai.graduation_project.data.RerankerSource
 import smu.ai.graduation_project.data.localizedString
@@ -74,6 +76,7 @@ import smu.ai.graduation_project.domain.MissionRecommender
 import smu.ai.graduation_project.domain.MissionScorer
 import smu.ai.graduation_project.domain.RecommendationContext
 import smu.ai.graduation_project.model.Mission
+import smu.ai.graduation_project.ui.components.categoryLabel
 import smu.ai.graduation_project.ui.theme.CardGray
 import smu.ai.graduation_project.ui.theme.GradientEnd
 import smu.ai.graduation_project.ui.theme.GradientStart
@@ -252,7 +255,7 @@ fun HomeScreen(onNavigateToDetail: (String) -> Unit) {
             Column {
                 Text("Hello,", fontSize = 28.sp, fontWeight = FontWeight.Bold)
                 Text("$userName!", fontSize = 28.sp, fontWeight = FontWeight.Bold)
-                Text("오늘도 새로운 미션에 도전해보세요!", fontSize = 14.sp, color = Color.Gray)
+                Text(stringResource(R.string.home_tagline), fontSize = 14.sp, color = Color.Gray)
             }
 
             Surface(
@@ -284,7 +287,7 @@ fun HomeScreen(onNavigateToDetail: (String) -> Unit) {
                 .padding(16.dp)
         ) {
             Column {
-                Text("이번 주 미션 진행률", color = Color.White, fontSize = 16.sp)
+                Text(stringResource(R.string.home_weekly_progress_title), color = Color.White, fontSize = 16.sp)
                 Spacer(modifier = Modifier.height(8.dp))
                 Row(verticalAlignment = Alignment.Bottom) {
                     Text(
@@ -323,12 +326,13 @@ fun HomeScreen(onNavigateToDetail: (String) -> Unit) {
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                if (activeMission != null) "현재 진행 중인 미션" else "추천 미션",
+                if (activeMission != null) stringResource(R.string.home_active_mission_title)
+                else stringResource(R.string.home_recommended_title),
                 fontWeight = FontWeight.Bold,
                 fontSize = 18.sp
             )
             TextButton(onClick = { }) {
-                Text("더보기>", color = MainPurple)
+                Text(stringResource(R.string.home_view_more), color = MainPurple)
             }
         }
 
@@ -353,7 +357,8 @@ fun HomeScreen(onNavigateToDetail: (String) -> Unit) {
                             shape = RoundedCornerShape(4.dp)
                         ) {
                             Text(
-                                mission.status.ifEmpty { "추천" },
+                                if (mission.status == "진행중") stringResource(R.string.home_badge_in_progress)
+                                else stringResource(R.string.home_badge_recommended),
                                 color = Color.White,
                                 fontSize = 10.sp,
                                 modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
@@ -362,7 +367,7 @@ fun HomeScreen(onNavigateToDetail: (String) -> Unit) {
                         Text(mission.title, fontWeight = FontWeight.Bold, fontSize = 16.sp)
                         Text(mission.desc, fontSize = 12.sp, color = Color.Gray, maxLines = 1)
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text("보상", fontSize = 12.sp)
+                            Text(stringResource(R.string.shared_reward_label), fontSize = 12.sp)
                             Icon(Icons.Default.Stars, contentDescription = null, tint = Orange, modifier = Modifier.size(14.dp))
                             Text(" ${mission.points}P", fontSize = 12.sp, fontWeight = FontWeight.Bold)
                         }
@@ -373,7 +378,8 @@ fun HomeScreen(onNavigateToDetail: (String) -> Unit) {
                             colors = ButtonDefaults.buttonColors(containerColor = MainPurple)
                         ) {
                             Text(
-                                if (mission.status == "진행중") "미션 계속하기" else "미션 보기",
+                                if (mission.status == "진행중") stringResource(R.string.home_btn_continue)
+                                else stringResource(R.string.home_btn_view),
                                 fontSize = 12.sp
                             )
                         }
@@ -401,9 +407,9 @@ fun HomeScreen(onNavigateToDetail: (String) -> Unit) {
                 shape = RoundedCornerShape(16.dp)
             ) {
                 Column(modifier = Modifier.padding(20.dp)) {
-                    Text("지금은 추천할 미션이 없어요", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                    Text(stringResource(R.string.home_empty_title), fontWeight = FontWeight.Bold, fontSize = 14.sp)
                     Text(
-                        "새로운 미션이 등록되면 여기에 표시됩니다. 미션 탭에서 전체 미션을 둘러보세요.",
+                        stringResource(R.string.home_empty_desc),
                         fontSize = 12.sp,
                         color = Color.Gray
                     )
@@ -432,7 +438,7 @@ fun HomeScreen(onNavigateToDetail: (String) -> Unit) {
                             Icon(icon, contentDescription = null, tint = if (label == "전체") MainPurple else Color.Gray)
                         }
                     }
-                    Text(label, fontSize = 12.sp, color = if (label == "전체") MainPurple else Color.Gray)
+                    Text(categoryLabel(label), fontSize = 12.sp, color = if (label == "전체") MainPurple else Color.Gray)
                 }
             }
         }
@@ -462,7 +468,7 @@ private fun RecommendedMissionCard(
             Column(modifier = Modifier.width(220.dp)) {
                 Surface(color = MainPurple, shape = RoundedCornerShape(4.dp)) {
                     Text(
-                        "추천",
+                        stringResource(R.string.home_badge_recommended),
                         color = Color.White,
                         fontSize = 10.sp,
                         modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
@@ -487,7 +493,7 @@ private fun RecommendedMissionCard(
                     }
                 }
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("보상", fontSize = 12.sp)
+                    Text(stringResource(R.string.shared_reward_label), fontSize = 12.sp)
                     Icon(Icons.Default.Stars, contentDescription = null, tint = Orange, modifier = Modifier.size(14.dp))
                     Text(" ${mission.points}P", fontSize = 12.sp, fontWeight = FontWeight.Bold)
                 }
@@ -497,7 +503,7 @@ private fun RecommendedMissionCard(
                     modifier = Modifier.fillMaxWidth(),
                     colors = ButtonDefaults.buttonColors(containerColor = MainPurple)
                 ) {
-                    Text("미션 보기", fontSize = 12.sp)
+                    Text(stringResource(R.string.home_btn_view), fontSize = 12.sp)
                 }
             }
         }
@@ -521,7 +527,7 @@ private fun HomeMissionImage(imageUrl: String, title: String) {
             val fallback = rememberVectorPainter(Icons.Default.Landscape)
             AsyncImage(
                 model = imageUrl,
-                contentDescription = "$title 대표 사진",
+                contentDescription = stringResource(R.string.home_mission_image_desc, title),
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Crop,
                 placeholder = fallback,
