@@ -102,7 +102,7 @@
     <string name="perform_state_photo_needs_review">Photo uploaded · pending admin review before final confirmation.</string>
     <string name="perform_state_mission_completed">Location verified · mission completed.</string>
     <string name="perform_toast_already_completed">This mission has already been completed.</string>
-    <string name="perform_toast_photo_uploaded_review">Photo uploaded. %1$dP granted · pending admin review.</string>
+    <string name="perform_toast_photo_uploaded_review">Photo uploaded · points will be granted after admin review.</string>
     <string name="perform_toast_photo_verified_reward">Photo verified. %1$dP granted.</string>
     <string name="perform_toast_photo_verified">Photo verified.</string>
     <string name="perform_error_photo_mismatch">The photo doesn\'t match the mission. Please retake it at the mission location/subject.</string>

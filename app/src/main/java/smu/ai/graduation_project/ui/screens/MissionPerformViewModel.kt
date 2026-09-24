@@ -247,8 +247,8 @@ class MissionPerformViewModel(
                     },
                     toastMessage = when {
                         result.alreadyCompleted -> str(R.string.perform_toast_already_completed)
-                        result.needsReview && result.rewardGranted > 0 ->
-                            str(R.string.perform_toast_photo_uploaded_review, result.rewardGranted)
+                        // needsReview 면 승인 전까지 포인트가 없으므로(rewardGranted == 0) 별도 안내로 우선 분기.
+                        result.needsReview -> str(R.string.perform_toast_photo_uploaded_review)
                         result.rewardGranted > 0 -> str(R.string.perform_toast_photo_verified_reward, result.rewardGranted)
                         else -> str(R.string.perform_toast_photo_verified)
                     },
