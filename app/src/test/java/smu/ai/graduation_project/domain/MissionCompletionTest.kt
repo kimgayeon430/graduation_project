@@ -108,4 +108,55 @@ class MissionCompletionTest {
         assertEquals(0, outcome.pointsToGrant)
         assertTrue(outcome.markCompleted)
     }
+
+    // 관리자 검수가 필요하면 업로드가 성공해도 완료·지급을 보류한다
+    @Test
+    fun needsReviewDoesNotCompleteOrGrantOnUpload() {
+        val outcome = MissionCompletion.resolve(
+            currentStatus = "In Progress",
+            missionPoints = 250,
+            stage2AlreadyGranted = false,
+            uploadSucceeded = true,
+            needsReview = true
+        )
+        assertEquals("In Progress", outcome.newStatus)
+        assertFalse(outcome.markCompleted)
+        assertEquals(0, outcome.pointsToGrant)
+        assertFalse(outcome.countTowardPopularity)
+    }
+
+    // 관리자가 승인하면 그제서야 Completed 로 전환되고 2단계 보상이 지급된다
+    @Test
+    fun approvalCompletesAndGrantsPendingReview() {
+        val outcome = MissionCompletion.resolveApproval(
+            currentStatus = "In Progress",
+            stage2Points = 150,
+            stage2AlreadyGranted = false,
+            needsReview = true
+        )
+        assertEquals("Completed", outcome.newStatus)
+        assertTrue(outcome.markCompleted)
+        assertEquals(150, outcome.pointsToGrant)
+        assertTrue(outcome.countTowardPopularity)
+    }
+
+    // 검수 대상이 아니거나, 이미 완료됐거나, 이미 지급됐으면 승인은 아무 효과가 없다 (중복 승인 방지)
+    @Test
+    fun approvalIsNoOpWhenNotPendingReview() {
+        assertFalse(
+            MissionCompletion.resolveApproval(
+                currentStatus = "In Progress", stage2Points = 150, stage2AlreadyGranted = false, needsReview = false
+            ).markCompleted
+        )
+        assertFalse(
+            MissionCompletion.resolveApproval(
+                currentStatus = "Completed", stage2Points = 150, stage2AlreadyGranted = true, needsReview = true
+            ).markCompleted
+        )
+        assertFalse(
+            MissionCompletion.resolveApproval(
+                currentStatus = "In Progress", stage2Points = 150, stage2AlreadyGranted = true, needsReview = true
+            ).markCompleted
+        )
+    }
 }

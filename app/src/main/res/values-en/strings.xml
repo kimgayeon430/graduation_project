@@ -189,6 +189,7 @@
     <string name="admin_toast_rejected">Rejected. The user will be asked to verify again.</string>
     <string name="admin_toast_already_processed">This item has already been processed.</string>
     <string name="admin_toast_reject_failed">Failed to process the rejection.</string>
+    <string name="admin_toast_approve_failed">Failed to process the approval.</string>
 
     <!-- 관리자 미션 편집 -->
     <string name="admin_mission_edit_title">Edit Mission</string>
@@ -226,6 +227,7 @@
     <string name="in_progress_empty_title">No missions in progress.</string>
     <string name="in_progress_empty_desc">Start a new mission from the Mission tab and it\'ll show up here.</string>
     <string name="in_progress_progress_label">Progress %1$s</string>
+    <string name="in_progress_pending_review">Pending admin approval</string>
     <string name="in_progress_btn_continue">Continue</string>
 
     <!-- 완료한 미션 -->

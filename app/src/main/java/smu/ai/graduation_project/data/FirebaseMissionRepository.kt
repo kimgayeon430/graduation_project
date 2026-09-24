@@ -212,18 +212,21 @@ class FirebaseMissionRepository : MissionRepository {
                     val status = missionSnapshot.getString("status").orEmpty()
                     val alreadyCompleted = MissionCompletion.isCompleted(status)
                     val alreadyRewarded = missionSnapshot.getBoolean("stage2RewardGranted") == true
-                    // 이 콜백은 업로드 성공 후에만 실행되므로 uploadSucceeded = true
+                    // 이 콜백은 업로드 성공 후에만 실행되므로 uploadSucceeded = true.
+                    // needsReview 면 관리자가 승인하기 전까지 Completed 전환·포인트 지급을 보류한다
+                    // (AdminPhotoReviewScreen.approve() 가 MissionCompletion.resolveApproval() 로 마무리).
                     val outcome = MissionCompletion.resolve(
                         currentStatus = status,
                         missionPoints = missionPoints,
                         stage2AlreadyGranted = alreadyRewarded,
-                        uploadSucceeded = true
+                        uploadSucceeded = true,
+                        needsReview = needsReview
                     )
                     transaction.update(
                         userMissionRef,
                         mapOf(
                             "status" to outcome.newStatus,
-                            "progress" to 1f,
+                            "progress" to if (needsReview) 0.9f else 1f,
                             "locationVerified" to true,
                             "photoUrl" to photoUrl,
                             "photoStoragePath" to storagePath,
@@ -234,10 +237,13 @@ class FirebaseMissionRepository : MissionRepository {
                             "photoVerifyModelVersion" to proceed.modelVersion,
                             "photoVerifySimilarity" to (proceed.similarity ?: FieldValue.delete()),
                             "photoUploadedAt" to FieldValue.serverTimestamp(),
-                            "stage2RewardGranted" to true,
-                            "stage2RewardPoints" to MissionRewardPolicy.stage2Reward(missionPoints),
-                            "completedAt" to FieldValue.serverTimestamp()
-                        )
+                            "stage2RewardGranted" to outcome.markCompleted,
+                            "stage2RewardPoints" to MissionRewardPolicy.stage2Reward(missionPoints)
+                        ) + if (outcome.markCompleted) {
+                            mapOf("completedAt" to FieldValue.serverTimestamp())
+                        } else {
+                            emptyMap()
+                        }
                     )
                     if (outcome.pointsToGrant > 0) {
                         transaction.set(

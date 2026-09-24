@@ -101,6 +101,7 @@ fun InProgressMissionScreen(
                 activeDocs.forEach { userMissionDoc ->
                     val missionId = userMissionDoc.getString("missionId").orEmpty()
                     val progress = userMissionDoc.get("progress")?.toString()?.toFloatOrNull()?.coerceIn(0f, 1f) ?: 0f
+                    val photoNeedsReview = userMissionDoc.getBoolean("photoNeedsReview") == true
 
                     db.collection("missions").document(missionId).get()
                         .addOnSuccessListener { missionDoc ->
@@ -119,7 +120,8 @@ fun InProgressMissionScreen(
                                     progress >= 0.5f -> "2/3"
                                     progress > 0f -> "1/3"
                                     else -> "0/3"
-                                }
+                                },
+                                photoNeedsReview = photoNeedsReview
                             )
                             remaining -= 1
                             if (remaining == 0) {
@@ -271,9 +273,21 @@ private fun InProgressMissionCard(
                         .fillMaxWidth()
                         .height(8.dp)
                         .clip(RoundedCornerShape(12.dp)),
-                    color = Color(0xFF70BE63),
+                    color = if (mission.photoNeedsReview) Color(0xFFE38B2C) else Color(0xFF70BE63),
                     trackColor = Color(0xFFE8E8E8)
                 )
+                if (mission.photoNeedsReview) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Circle, null, tint = Color(0xFFE38B2C), modifier = Modifier.size(9.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            stringResource(R.string.in_progress_pending_review),
+                            color = Color(0xFFE38B2C),
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 13.sp
+                        )
+                    }
+                }
             }
 
             Button(

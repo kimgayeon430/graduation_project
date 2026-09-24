@@ -72,11 +72,12 @@ private data class PhotoReviewItem(
 )
 
 /**
- * 관리자 사진 검수 큐. `user_missions` 에서 `photoNeedsReview == true` 인 완료 건을 모아
- * 사진과 모델 판정 근거를 보여 주고 승인/반려한다.
+ * 관리자 사진 검수 큐. `user_missions` 에서 `photoNeedsReview == true` 인 승인 대기 건을 모아
+ * 사진과 모델 판정 근거를 보여 주고 승인/반려한다. 자동 판정이 애매한 건은 관리자가 승인하기 전까지
+ * `status` 가 `In Progress` 로 유지되고 2단계 보상도 지급되지 않는다(즉시 완료·지급되지 않음).
  *
- * - 승인: `photoNeedsReview=false`, `photoVerified=true`. (포인트는 이미 지급됨)
- * - 반려: 2단계 보상을 회수하고 미션을 다시 `In Progress` 로 되돌려 재인증하게 한다.
+ * - 승인: 이 시점에 비로소 미션을 `Completed` 로 전환하고 2단계 보상을 지급한다 ([MissionCompletion.resolveApproval]).
+ * - 반려: 제출 시점에 포인트를 지급한 적이 없으므로 회수할 것도 없다. 미션을 다시 `In Progress` 로 되돌려 재인증하게 한다.
  *
  * 다른 admin 화면과 같이 Firestore 를 화면에서 직접 다룬다.
  */
@@ -129,28 +130,67 @@ fun AdminPhotoReviewScreen(onNavigateBack: () -> Unit) {
     val rejectedMessage = stringResource(R.string.admin_toast_rejected)
     val alreadyProcessedMessage = stringResource(R.string.admin_toast_already_processed)
     val rejectFailedMessage = stringResource(R.string.admin_toast_reject_failed)
+    val approveFailedMessage = stringResource(R.string.admin_toast_approve_failed)
 
+    /**
+     * 승인 시점에 비로소 미션을 Completed 로 전환하고 2단계 보상을 지급한다(포인트는 제출 시점이
+     * 아니라 여기서 처음 지급됨). [MissionCompletion.resolveApproval] 로 중복 승인·중복 지급을 막는다.
+     */
     fun approve(item: PhotoReviewItem) {
-        db.collection("user_missions").document(item.docId).update(
-            mapOf(
-                "photoNeedsReview" to false,
-                "photoVerified" to true,
-                "photoReviewedAt" to FieldValue.serverTimestamp()
+        val userMissionRef = db.collection("user_missions").document(item.docId)
+        db.runTransaction { transaction ->
+            val snapshot = transaction.get(userMissionRef)
+            val outcome = MissionCompletion.resolveApproval(
+                currentStatus = snapshot.getString("status").orEmpty(),
+                stage2Points = snapshot.getLong("stage2RewardPoints")?.toInt() ?: 0,
+                stage2AlreadyGranted = snapshot.getBoolean("stage2RewardGranted") == true,
+                needsReview = snapshot.getBoolean("photoNeedsReview") == true
             )
-        ).addOnSuccessListener {
-            android.widget.Toast.makeText(context, approvedMessage, android.widget.Toast.LENGTH_SHORT).show()
+            if (!outcome.markCompleted) return@runTransaction false
+
+            transaction.update(
+                userMissionRef,
+                mapOf(
+                    "photoNeedsReview" to false,
+                    "photoVerified" to true,
+                    "photoReviewedAt" to FieldValue.serverTimestamp(),
+                    "status" to outcome.newStatus,
+                    "progress" to 1f,
+                    "stage2RewardGranted" to true,
+                    "completedAt" to FieldValue.serverTimestamp()
+                )
+            )
+            val uid = snapshot.getString("userId")
+            if (uid != null && outcome.pointsToGrant > 0) {
+                transaction.set(
+                    db.collection("users").document(uid),
+                    mapOf("points" to FieldValue.increment(outcome.pointsToGrant.toLong())),
+                    SetOptions.merge()
+                )
+            }
+            val missionId = snapshot.getString("missionId")
+            if (missionId != null && outcome.countTowardPopularity) {
+                transaction.set(
+                    db.collection("missions").document(missionId),
+                    mapOf("completionCount" to FieldValue.increment(1L)),
+                    SetOptions.merge()
+                )
+            }
+            true
+        }.addOnSuccessListener { done ->
+            val message = if (done == true) approvedMessage else alreadyProcessedMessage
+            android.widget.Toast.makeText(context, message, android.widget.Toast.LENGTH_SHORT).show()
+        }.addOnFailureListener {
+            android.widget.Toast.makeText(context, approveFailedMessage, android.widget.Toast.LENGTH_SHORT).show()
         }
     }
 
+    /** 승인 전에는 포인트가 지급된 적이 없으므로 반려는 회수 없이 1단계 상태로 되돌리기만 한다. */
     fun reject(item: PhotoReviewItem, reason: String) {
         val userMissionRef = db.collection("user_missions").document(item.docId)
         db.runTransaction { transaction ->
             val snapshot = transaction.get(userMissionRef)
             if (snapshot.getBoolean("photoNeedsReview") != true) return@runTransaction false
-            val uid = snapshot.getString("userId") ?: return@runTransaction false
-            val granted = snapshot.getLong("stage2RewardPoints")?.toInt() ?: 0
-            val userRef = db.collection("users").document(uid)
-            val currentPoints = transaction.get(userRef).getLong("points")?.toInt() ?: 0
 
             transaction.update(
                 userMissionRef,
@@ -166,8 +206,6 @@ fun AdminPhotoReviewScreen(onNavigateBack: () -> Unit) {
                     "photoReviewedAt" to FieldValue.serverTimestamp()
                 )
             )
-            // 2단계 보상 회수 (0 미만으로는 내려가지 않게)
-            transaction.set(userRef, mapOf("points" to maxOf(0, currentPoints - granted)), SetOptions.merge())
             true
         }.addOnSuccessListener { done ->
             val message = if (done == true) rejectedMessage else alreadyProcessedMessage

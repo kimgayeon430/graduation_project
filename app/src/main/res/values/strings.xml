@@ -191,6 +191,7 @@
     <string name="admin_toast_rejected">반려했습니다. 사용자에게 재인증이 요청됩니다.</string>
     <string name="admin_toast_already_processed">이미 처리된 건입니다.</string>
     <string name="admin_toast_reject_failed">반려 처리에 실패했습니다.</string>
+    <string name="admin_toast_approve_failed">승인 처리에 실패했습니다.</string>
 
     <!-- 관리자 미션 편집 -->
     <string name="admin_mission_edit_title">미션 수정</string>
@@ -228,6 +229,7 @@
     <string name="in_progress_empty_title">진행 중인 미션이 없습니다.</string>
     <string name="in_progress_empty_desc">미션 목록에서 새 미션을 시작하면 여기서 이어서 볼 수 있습니다.</string>
     <string name="in_progress_progress_label">진행도 %1$s</string>
+    <string name="in_progress_pending_review">관리자 승인 대기 중</string>
     <string name="in_progress_btn_continue">계속 진행하기</string>
 
     <!-- 완료한 미션 -->

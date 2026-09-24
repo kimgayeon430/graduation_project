@@ -98,11 +98,14 @@ interface MissionRepository {
      *  1. [photoVerifier] 로 사진을 온디바이스 분류하고 [smu.ai.graduation_project.domain.PhotoVerification]
      *     규칙으로 판정한다. `REJECT` 면 업로드하지 않고 [MissionCompleteException] (`Stage.VERIFY`) 로 끝낸다.
      *  2. `PASS` / `NEEDS_REVIEW` 면 사진을 Supabase Storage 에 업로드한다.
-     *  3. 업로드 성공 후에만 트랜잭션으로 미션을 완료 처리하고, 아직 지급 전이면 2단계 보상을 지급하며
-     *     판정 결과(`photoVerified` / `photoNeedsReview` / `photoVerifyScore` / `photoVerifyLabel` / `photoVerifyModelVersion`)를 저장한다.
+     *  3. 업로드 성공 후에만 트랜잭션으로 판정 결과(`photoVerified` / `photoNeedsReview` /
+     *     `photoVerifyScore` / `photoVerifyLabel` / `photoVerifyModelVersion`)를 저장한다.
+     *     `PASS` 면 곧바로 미션을 완료 처리하고 아직 지급 전이면 2단계 보상을 지급한다.
      *
-     * `NEEDS_REVIEW` 도 미션은 완료되고 포인트도 지급되며, 관리자 검수용 플래그만 남는다.
-     * 완료 판정/보상 계산은 [smu.ai.graduation_project.domain.MissionCompletion] 에 위임한다.
+     * `NEEDS_REVIEW` 는 사진만 업로드될 뿐 미션은 아직 완료되지 않고 포인트도 지급되지 않는다
+     * (`status` 가 `In Progress` 로 유지됨). 관리자가 `AdminPhotoReviewScreen` 에서 승인해야
+     * 비로소 완료 처리·보상 지급이 이뤄진다. 완료 판정/보상 계산은
+     * [smu.ai.graduation_project.domain.MissionCompletion] 에 위임한다.
      */
     fun uploadPhotoAndComplete(
         missionId: String,

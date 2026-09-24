@@ -236,8 +236,9 @@ class MissionPerformViewModel(
             onResult = { result ->
                 uiState = uiState.copy(
                     isUploading = false,
-                    missionCompleted = true,
-                    stage2RewardGranted = true,
+                    // needsReview 면 관리자가 승인하기 전까지는 완료·지급 상태가 아니다.
+                    missionCompleted = !result.needsReview,
+                    stage2RewardGranted = !result.needsReview && result.rewardGranted > 0,
                     photoUrl = result.photoUrl,
                     verificationText = if (result.needsReview) {
                         str(R.string.perform_state_photo_needs_review)

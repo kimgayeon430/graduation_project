@@ -17,7 +17,9 @@ data class Mission(
     val progress: Float = 0f,
     val progressText: String = "0/1",
     val latitude: Double? = null,
-    val longitude: Double? = null
+    val longitude: Double? = null,
+    /** 사진 인증은 제출됐지만 자동 판정이 애매해 관리자 승인 대기 중인지. 승인 전까지 완료·포인트 지급 보류. */
+    val photoNeedsReview: Boolean = false
 )
 
 data class UserRank(
