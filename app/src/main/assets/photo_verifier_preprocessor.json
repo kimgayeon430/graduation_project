@@ -3,25 +3,27 @@
     "height": 256,
     "width": 256
   },
+  "data_format": "channels_first",
+  "default_to_square": false,
+  "device": null,
+  "disable_grouping": null,
   "do_center_crop": true,
+  "do_convert_rgb": null,
   "do_flip_channel_order": true,
   "do_flip_channels": true,
+  "do_normalize": null,
+  "do_pad": null,
   "do_reduce_labels": false,
   "do_rescale": true,
   "do_resize": true,
-  "image_mean": [
-    0.5,
-    0.5,
-    0.5
-  ],
-  "image_processor_type": "MobileViTImageProcessor",
-  "image_std": [
-    0.5,
-    0.5,
-    0.5
-  ],
+  "image_mean": null,
+  "image_processor_type": "MobileViTImageProcessorFast",
+  "image_std": null,
+  "input_data_format": null,
+  "pad_size": null,
   "resample": 2,
   "rescale_factor": 0.00392156862745098,
+  "return_tensors": null,
   "size": {
     "shortest_edge": 288
   }

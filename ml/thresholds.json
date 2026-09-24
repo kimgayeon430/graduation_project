@@ -21,12 +21,12 @@
   },
   "eval": {
     "base_model": "apple/mobilevit-small",
-    "test_accuracy": 0.829,
-    "test_macro_f1": 0.816,
-    "clip_zeroshot_macro_f1": 0.631,
-    "per_class_f1": { "투어": 0.804, "맛집": 0.927, "체험": 0.644, "쇼핑": 0.757, "무효": 0.946 },
-    "invalid_recall_at_0.55": 0.918,
-    "valid_false_reject_at_0.30": 0.183,
-    "note": "체험 recall 0.57 로 약함(공개 데이터 도메인 차이). 크라우드소싱 사진으로 보강 필요."
+    "test_accuracy": 0.840,
+    "test_macro_f1": 0.809,
+    "clip_zeroshot_macro_f1": 0.627,
+    "per_class_f1": { "투어": 0.786, "맛집": 0.936, "체험": 0.632, "쇼핑": 0.725, "무효": 0.964 },
+    "invalid_recall_at_0.55": 0.932,
+    "valid_false_reject_at_0.22": 0.146,
+    "note": "무효 학습 데이터에 화면 재촬영(recapture) 스푸핑 유형 추가 + build_dataset.py place_id 그룹 분할 버그(합성 무효 파일명이 '__'로 소수 그룹에 뭉쳐 split이 쏠리던 문제) 수정 후 재학습. invalid_recall 0.918→0.932로 recapture 유형 포함해도 유지. 체험 recall 0.567 로 여전히 약함(공개 데이터 도메인 차이). 크라우드소싱 사진으로 보강 필요."
   }
 }

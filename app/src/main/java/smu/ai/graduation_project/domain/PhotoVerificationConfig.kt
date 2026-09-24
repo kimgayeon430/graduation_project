@@ -6,8 +6,8 @@ package smu.ai.graduation_project.domain
  * 온디바이스 비전 모델의 오프라인 평가(test 셋 임계값 스윕)로 정한 값을 한곳에 모아,
  * 판정 결과를 설명하고 튜닝할 수 있게 한다. ([RecommendationWeights] 와 같은 역할)
  *
- * 현재 기본값: `mobilevit-small-fullft-1` (test macro-F1 0.82) 로 `ml/thresholds.json` 에서 선정.
- * invalidReject 0.55 → 무효 사진 차단율 ≈ 0.92 / 정상 사진 오탐 ≈ 0.005.
+ * 현재 기본값: `mobilevit-small-fullft-1` (test macro-F1 0.81, 재촬영 스푸핑 augmentation 포함) 로 `ml/thresholds.json` 에서 선정.
+ * invalidReject 0.55 → 무효 사진 차단율 ≈ 0.93 / 정상 사진 오탐율(hardReject 0.22 기준) ≈ 0.146.
  *
  * 유사도 임계값([similarityRescueThreshold] 0.50, [similaritySuspectThreshold] 0.68)은 미션
  * 대표 이미지 임베딩이 있을 때만 적용된다(보고서 6.7). 공개 scene 프록시(`ml/embedding_separability.py`)
