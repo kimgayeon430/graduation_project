@@ -31,7 +31,7 @@ class FirebaseMissionRepository : MissionRepository {
             .addOnSuccessListener { doc ->
                 onResult(
                     MissionRepository.MissionInfo(
-                        title = doc.getString("title") ?: "미션",
+                        title = doc.localizedString("title", LanguagePreference.current, "미션"),
                         category = doc.getString("category") ?: "투어",
                         points = doc.getLong("points")?.toInt() ?: 0,
                         location = doc.getGeoPoint("location"),

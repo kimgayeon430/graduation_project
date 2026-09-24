@@ -51,6 +51,8 @@ import coil.compose.AsyncImage
 import com.google.firebase.Firebase
 import com.google.firebase.auth.auth
 import com.google.firebase.firestore.firestore
+import smu.ai.graduation_project.data.LanguagePreference
+import smu.ai.graduation_project.data.localizedString
 import smu.ai.graduation_project.model.Mission
 import smu.ai.graduation_project.ui.theme.CardGray
 import smu.ai.graduation_project.ui.theme.MainPurple
@@ -104,10 +106,9 @@ fun CompletedMissionScreen(
                         .addOnSuccessListener { missionDoc ->
                             loaded[index] = Mission(
                                 id = missionId,
-                                title = missionDoc.getString("title")
-                                    ?: userMissionDoc.getString("title")
-                                    ?: "완료한 미션",
-                                desc = missionDoc.getString("desc") ?: "",
+                                title = missionDoc.localizedString("title", LanguagePreference.current, "")
+                                    .ifBlank { userMissionDoc.getString("title") ?: "완료한 미션" },
+                                desc = missionDoc.localizedString("desc", LanguagePreference.current),
                                 points = missionDoc.getLong("points")?.toInt() ?: 0,
                                 category = missionDoc.getString("category") ?: "투어",
                                 imageUrl = missionDoc.getString("imageUrl").orEmpty(),

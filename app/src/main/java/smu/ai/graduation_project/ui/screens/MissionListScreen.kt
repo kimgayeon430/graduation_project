@@ -51,6 +51,8 @@ import coil.compose.AsyncImage
 import com.google.firebase.Firebase
 import com.google.firebase.auth.auth
 import com.google.firebase.firestore.firestore
+import smu.ai.graduation_project.data.LanguagePreference
+import smu.ai.graduation_project.data.localizedString
 import smu.ai.graduation_project.model.Mission
 import smu.ai.graduation_project.ui.theme.CardGray
 import smu.ai.graduation_project.ui.theme.MainPurple
@@ -93,8 +95,8 @@ fun MissionListScreen(onMissionClick: (String) -> Unit) {
 
                 Mission(
                     id = doc.id,
-                    title = doc.getString("title") ?: "제목 없는 미션",
-                    desc = doc.getString("desc") ?: "",
+                    title = doc.localizedString("title", LanguagePreference.current, "제목 없는 미션"),
+                    desc = doc.localizedString("desc", LanguagePreference.current),
                     points = doc.getLong("points")?.toInt() ?: 0,
                     category = doc.getString("category") ?: "투어",
                     imageUrl = doc.getString("imageUrl").orEmpty(),

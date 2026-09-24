@@ -66,7 +66,9 @@ import com.google.firebase.Firebase
 import com.google.firebase.auth.auth
 import com.google.firebase.firestore.GeoPoint
 import com.google.firebase.firestore.firestore
+import smu.ai.graduation_project.data.LanguagePreference
 import smu.ai.graduation_project.data.RerankerSource
+import smu.ai.graduation_project.data.localizedString
 import smu.ai.graduation_project.domain.GeoDistance
 import smu.ai.graduation_project.domain.MissionRecommender
 import smu.ai.graduation_project.domain.MissionScorer
@@ -121,11 +123,11 @@ fun HomeScreen(onNavigateToDetail: (String) -> Unit) {
         Firebase.firestore.collection("missions").get()
             .addOnSuccessListener { snapshot ->
                 allMissions = snapshot.documents.mapNotNull { doc ->
-                    val title = doc.getString("title") ?: return@mapNotNull null
+                    if (doc.getString("title").isNullOrBlank()) return@mapNotNull null
                     Mission(
                         id = doc.id,
-                        title = title,
-                        desc = doc.getString("desc") ?: "",
+                        title = doc.localizedString("title", LanguagePreference.current),
+                        desc = doc.localizedString("desc", LanguagePreference.current),
                         points = doc.getLong("points")?.toInt() ?: 0,
                         category = doc.getString("category") ?: "투어",
                         imageUrl = doc.getString("imageUrl").orEmpty()

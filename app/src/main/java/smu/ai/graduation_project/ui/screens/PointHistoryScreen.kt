@@ -44,6 +44,8 @@ import com.google.firebase.Firebase
 import com.google.firebase.Timestamp
 import com.google.firebase.auth.auth
 import com.google.firebase.firestore.firestore
+import smu.ai.graduation_project.data.LanguagePreference
+import smu.ai.graduation_project.data.localizedString
 import smu.ai.graduation_project.ui.theme.LightPurple
 import smu.ai.graduation_project.ui.theme.MainPurple
 import smu.ai.graduation_project.ui.theme.Orange
@@ -139,7 +141,11 @@ fun PointHistoryScreen(onNavigateBack: () -> Unit) {
                 }
                 missionIds.forEach { id ->
                     db.collection("missions").document(id).get()
-                        .addOnSuccessListener { m -> m.getString("title")?.let { titles[id] = it } }
+                        .addOnSuccessListener { m ->
+                            m.localizedString("title", LanguagePreference.current)
+                                .takeIf { it.isNotBlank() }
+                                ?.let { titles[id] = it }
+                        }
                         .addOnCompleteListener {
                             remaining -= 1
                             if (remaining == 0) finish()

@@ -2,6 +2,7 @@ package smu.ai.graduation_project.ui.screens
 
 import android.widget.Toast
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -22,6 +23,7 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.Flag
 import androidx.compose.material.icons.filled.HourglassTop
+import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.LocalFireDepartment
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Stars
@@ -31,6 +33,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -55,6 +58,8 @@ import com.google.firebase.auth.auth
 import com.google.firebase.auth.userProfileChangeRequest
 import com.google.firebase.firestore.Query
 import com.google.firebase.firestore.firestore
+import smu.ai.graduation_project.data.AppLanguage
+import smu.ai.graduation_project.data.LanguagePreference
 import smu.ai.graduation_project.ui.components.ProfileMenuItem
 import smu.ai.graduation_project.ui.components.StatCard
 import smu.ai.graduation_project.ui.theme.CardGray
@@ -82,6 +87,7 @@ fun ProfileScreen(
     var progressCount by remember { mutableIntStateOf(0) }
     var rank by remember { mutableIntStateOf(0) }
     var showNicknameDialog by remember { mutableStateOf(false) }
+    var showLanguageDialog by remember { mutableStateOf(false) }
     var nicknameDraft by remember { mutableStateOf(nickname) }
 
     LaunchedEffect(currentUser?.uid) {
@@ -275,6 +281,9 @@ fun ProfileScreen(
                         nicknameDraft = nickname
                         showNicknameDialog = true
                     }
+                    ProfileMenuItem("언어 / Language", Icons.Default.Language) {
+                        showLanguageDialog = true
+                    }
                     ProfileMenuItem("랭킹 보기", Icons.Default.EmojiEvents) { }
                     ProfileMenuItem("로그아웃", Icons.AutoMirrored.Filled.ExitToApp, onClick = onLogout)
                 }
@@ -321,6 +330,44 @@ fun ProfileScreen(
             dismissButton = {
                 TextButton(onClick = { showNicknameDialog = false }) {
                     Text("취소")
+                }
+            }
+        )
+    }
+
+    if (showLanguageDialog) {
+        AlertDialog(
+            onDismissRequest = { showLanguageDialog = false },
+            title = { Text("언어 / Language") },
+            text = {
+                Column {
+                    AppLanguage.entries.forEach { language ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    LanguagePreference.set(context, language)
+                                    showLanguageDialog = false
+                                }
+                                .padding(vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            RadioButton(
+                                selected = LanguagePreference.current == language,
+                                onClick = {
+                                    LanguagePreference.set(context, language)
+                                    showLanguageDialog = false
+                                }
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(language.label)
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showLanguageDialog = false }) {
+                    Text("닫기")
                 }
             }
         )
