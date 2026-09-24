@@ -516,6 +516,22 @@ Youden J 최댓값은 thr=0.52 에서 0.21로, 1차(0.66/J=0.25)보다 **최적�
 
 held-out 데이터로도 분리력이 개선된다(J 0.21 → 0.33). 표본이 랜드마크당 1~2장뿐이라 아직 확정적이진 않지만, 오프라인 프로토타입(J 0.33→0.47)과 같은 방향의 결과가 **실제 프로덕션 데이터**에서도 재현됐다.
 
+#### 6.7.9 실사용 라벨 첫 확보 (관리자 검수)
+
+6.7.7 관측 이후, 실기기로 두 건을 추가 제출하고 관리자 검수까지 거쳐 `calibrate_similarity.py` 가 쓸 수 있는 **실제 정답 라벨**(`correct`/`wrong`)을 처음 얻었다.
+
+| 미션 | 상황 | 유사도 | 1차 판정 | 관리자 처리 | 라벨 |
+| --- | --- | ---: | --- | --- | --- |
+| 숙대입구 | 현장 정상 촬영(투어) | 0.791 | `NEEDS_REVIEW` (`match=0.108` 로 카테고리 점수는 낮았으나 유사도로 구제) | **승인** | `correct` |
+| 경복궁_투어 | 모니터 재촬영(6.7.7, 스푸핑) | 0.673 | `NEEDS_REVIEW` (구제) | **반려** | `wrong` |
+
+`ml/calibrate_similarity.py --firebase-key ...` 로 스윕한 결과, `correct`(0.791) 와 `wrong`(0.673) 사이 정확히 현재 `suspect=0.68` 이 낀다 — 표본 1/1 이라 우연일 가능성이 크지만 방향은 현재값을 지지한다. 두 가지를 확인했다:
+
+1. **숙대입구는 카테고리 점수(0.108)가 `hardReject`(0.22) 아래인데도 유사도(0.791)로 구제돼 정상 처리됐다.** 6.4 의 도메인 격차(공개 데이터로 학습한 분류기가 실제 미션 사진에서 카테고리 점수를 낮게 냄)를 유사도가 보완하는 실제 사례.
+2. **REJECT 는 여전히 Firestore 에 안 남는다.** 이번 두 건은 둘 다 `NEEDS_REVIEW` 로 검수 큐까지 올라간 경우라 라벨링이 가능했다 — `REJECT` 로 즉시 잘린 케이스의 정답 라벨은 `PhotoVerify` logcat 으로만 얻을 수 있다(6.7.7 계측).
+
+**의의**: `calibrate_similarity_web.py`(웹 프록시)와 `calibrate_similarity.py`(실사용)가 이제 각각 34/34, 1/1 로 별도 트랙에서 굴러가고 있다. 웹 프록시가 표본 수는 많지만 "그 자리에서 찍은 사진이 아니다"라는 한계가 있고, 실사용은 근거는 확실하지만 아직 표본이 극히 적다 — 두 트랙 다 "30건 미만은 신뢰 낮음" 경고 상태를 벗어나려면 실사용자가 늘어야 한다.
+
 ---
 
 ## 7. 구현 현황
@@ -538,15 +554,17 @@ held-out 데이터로도 분리력이 개선된다(J 0.21 → 0.33). 표본이 �
 - [x] 학습된 추천 re-ranker: `MissionFeatures`·`LearnedReranker`·`MissionRecommender.recommendReranked` + `ml/reco/` 파이프라인 + `assets/reranker.json`. 신호 6개(시간대 적합도 포함), 시뮬레이터 학습본으로 규칙 대비 AUC 0.949→0.960, NDCG@5 0.914→0.953 (8.3절)
 - [x] 모델 에셋 로딩 계측 테스트 (`OnnxPhotoVerifierTest` 6건, `RerankerSourceTest` 4건) — 실기기(Galaxy S8, API 28)에서 실제 에셋으로 추론·로딩 검증. 두 로더 모두 실패를 `runCatching` 으로 삼켜 **무증상 고장**(사진: 전건 검수 큐행 / 추천: 규칙 기반 폴백)이 나므로, 재학습 모델 교체 시 신호 순서·라벨 불일치를 잡는 방어선
 - [x] 참조 이미지 임베딩 유사도(6.7절) — `CLIP ViT-B/32` 임베딩 인코더 채택(pooled feature 재사용은 분리도 AUC 0.60 으로 기각, `ml/embedding_separability.py`). 온디바이스 `OnnxClipPhotoEmbedder`(88.6MB int8, HF Hub 런타임 다운로드+`filesDir` 캐시), 판정 규칙 `PhotoVerification.verify` 에 유사도 ±1단계 결합, 참조 임베딩 사전계산 `ml/embed_missions.py`, EXIF 회전 정합(`ImagePreprocess` + `androidx.exifinterface`). 단위 테스트 신규 13건 포함 `PhotoVerificationTest` 18 + `PhotoGateTest` 8 통과, `testDebugUnitTest`·`compileReleaseKotlin` BUILD SUCCESSFUL. 실기기(Galaxy S8) 계측 테스트 통과 + 유사도 신호 실동작·구제 경로 확인(6.7.7). 임계값(rescue 0.50 / suspect 0.68)은 공개 scene 프록시 기반 잠정치
+- [x] 다중 참조 이미지(최대 유사도, 6.7.8) — 오프라인 프로토타입(J 0.33→0.47)으로 효과 확인 후 실제 구현. `referenceEmbedding: FloatArray?` → `referenceEmbeddings: List<FloatArray>`, `PhotoEmbedding.maxCosineOrNull` 로 전 계층(`PhotoVerification`/`PhotoGate`/`MissionRepository`/`FirebaseMissionRepository`/`MissionPerformViewModel`) 반영. Firestore 가 배열의 배열을 지원하지 않아 원소를 `{"v":[...]}` 맵으로 감싼 구조로 수정(발견·수정 과정 포함). 8개 미션 실제 백필 + held-out 검증(J 0.21→0.33) 완료. `PhotoVerificationTest`/`PhotoGateTest` 다중 참조 테스트 추가
 
 ### 7.2 남은 작업
 
 - [x] `photo_embedder_int8.onnx`(88.6MB) 를 HF Hub `kimgayeon430/travel-mission-photo-embedder`(Public) 에 업로드, `ml/embed_missions.py` 로 미션 **16/16건** `photoEmbedding`(512d) + `photoEmbeddingModelVersion` 백필 완료 (`숙대입구`는 `imageUrl` 등록 후 추가 백필). export 산출물 sha256 이 HF 업로드본과 동일해 참조 임베딩이 앱 다운로드 모델과 일치
-- [ ] 실기기에서 사진 인증 전체 루프 확인 — 임베더 HF 다운로드→캐시(`prefetch`), 유사도 결합, 구제 경로(`REJECT`→`NEEDS_REVIEW`)까지 확인 완료(6.7.7). 남은 것: *현장 정상 촬영* 케이스, `PASS` → 관리자 승인/반려 분기
-- [ ] 유사도 임계값 실측 보정 — 실사용 2건(correct 1 / wrong 1, 6.7.7) + 웹 프록시 32건(6.7.8) 확보했으나 둘 다 확정에는 부족(30건 미만·프록시성). `ml/calibrate_similarity.py`(실사용) / `ml/calibrate_similarity_web.py`(웹 프록시) 로 계속 표본 축적
+- [x] 실기기에서 사진 인증 전체 루프 확인 — 임베더 HF 다운로드→캐시(`prefetch`), 유사도 결합, 구제 경로(`REJECT`→`NEEDS_REVIEW`), `NEEDS_REVIEW`→관리자 승인/반려 둘 다 실기기+실제 관리자 검수로 확인(6.7.7·6.7.9). 남은 것은 자동 `PASS`(검수 없이 바로 통과) 케이스 관측뿐
+- [ ] 유사도 임계값 실측 보정 — 실사용 1/1(6.7.9) + 웹 프록시 34/34(6.7.8) + 백필 후 held-out 12/12(6.7.8) 확보했으나 전부 확정에는 부족(30건 미만이거나 프록시성). `ml/calibrate_similarity.py`(실사용) / `ml/calibrate_similarity_web.py`(웹 프록시) 로 계속 표본 축적
+- [x] 참조 이미지 배열화(다중 참조, 최대 유사도) 실제 구현·배포 — `PhotoVerification.verify`/`PhotoGate`/`MissionRepository`/`FirebaseMissionRepository`/`MissionPerformViewModel` 전 계층 반영, Firestore 스키마 버그(배열의 배열 미지원) 발견·수정, 8개 미션 실제 백필 + held-out 검증으로 분리력 개선(J 0.21→0.33) 확인 완료(6.7.8)
 - [x] 화면 재촬영 합성 augmentation `ml/data/make_negatives.py`(`recapture()`, 베젤·무아레·글레어) 추가 — 기존 스크린샷/열화 소스에 3번째 소스로 섞여 들어간다. 합성 12장을 배포 중인 `photo_verifier.onnx` 에 직접 돌려보니 `s[무효]` 0.011~0.129(평균 ≈0.04) — 6.7.7 의 실기기 관측(0.066~0.07)과 같은 패턴을 재현·정량화. 기존 `degrade()`(블러·저조도)는 이 패턴을 못 잡는다는 뜻이라 별도 소스로 추가함
-- [ ] 위 표본을 실제로 섞어 재학습(Colab) — 데이터 생성 도구는 준비됐고 재학습 실행만 남음. 무관한 실내·업무 환경 표본(크라우드소싱)도 여전히 필요
-- [ ] 크라우드소싱 사진으로 각 클래스 보강(특히 체험·무관 실내) 후 재학습
+- [ ] 위 표본을 실제로 섞어 재학습(Colab) — **진행 중.** `ml/data/` 파이프라인(공개 데이터 재수집 → `recapture` 포함 무효 합성 → HF Hub 재업로드)까지 마치고 Colab T4 에서 `train_photo_verifier.ipynb` 재학습 중. 결과(무효 recall·macro-F1) 나오는 대로 `thresholds.json`/`PhotoVerificationConfig`/본 절에 반영 예정
+- [ ] 크라우드소싱 사진으로 각 클래스 보강(특히 체험·무관 실내) 후 재학습 — 위 재학습은 합성 augmentation 만 반영, 크라우드소싱 실사진 보강은 별도
 - [ ] `user_missions` 로그로 추천 re-ranker 재학습(`--from-firestore`), 시뮬레이터 학습본 대체
 - [x] `firestore.rules` 배포 — 규칙 테스트 20건 통과 재확인 후 `firebase deploy --only firestore:rules --project grad-proj-5e09c` 실행, 프로덕션 반영 완료
 - [ ] Robolectric 기반 ViewModel/Compose UI 테스트 `[선택]`
@@ -658,7 +676,7 @@ NDCG@5 +0.033 으로 이득의 대부분을 가져온다.
 
 ## 10. 향후 계획
 
-- **참조 이미지 임베딩 유사도** — 설계·구현·배포 완료(6.7절): CLIP 인코더 HF Hub 배포, 미션 16/16 임베딩 백필, 판정 결합, 실기기 예비 관측(6.7.7). 남은 것은 실사용 로그로 `rescue`/`suspect` 확정(`ml/calibrate_similarity.py`). 다중 참조 이미지(최대 유사도)·MobileCLIP 경량화는 후속.
+- **참조 이미지 임베딩 유사도** — 설계·구현·배포 완료(6.7절): CLIP 인코더 HF Hub 배포, 미션 16/16 임베딩 백필, 판정 결합, 실기기 예비 관측(6.7.7), 다중 참조 이미지(최대 유사도) 구현·8개 미션 백필·held-out 검증(6.7.8), 실사용 라벨 첫 확보(6.7.9). 남은 것은 실사용자가 늘어 `rescue`/`suspect` 를 30건 이상 실측으로 확정하는 것(`ml/calibrate_similarity.py`). MobileCLIP 경량화는 후속.
 - 무효 클래스 데이터 보강(무관한 실내·업무 환경 표본) — 스푸핑 방어가 이 클래스에 의존하므로 우선순위 높음 (6.7.6)
 - 1단계 위치 인증 정밀화: 반경 200 m 축소 및 `location.accuracy` 반영 (사진 모델 변경 없이 장소 특이성을 높이는 저비용 개선)
 - 촬영 시각·EXIF·위치 메타데이터 교차 검증, GPS 스푸핑/순간이동 탐지

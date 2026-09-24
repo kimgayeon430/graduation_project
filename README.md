@@ -60,7 +60,7 @@
    - 카메라로 사진을 촬영하고 미리보기로 확인합니다. (`FileProvider` + `TakePicture`)
    - 업로드 전에 온디바이스 모델(`PhotoVerifier`)로 사진을 분류하고 `PhotoVerification` 규칙으로 판정합니다. `REJECT` 면 업로드하지 않고 재촬영을 안내하며, `NEEDS_REVIEW` 면 완료는 진행하되 `photoNeedsReview` 플래그를 남깁니다. (자세한 내용은 "사진 인증 모델" 절)
    - 사진을 Supabase Storage 버킷 `mission-photos` 의 `{missionId}/{uid}_{timestamp}.jpg` 로 업로드하고 공개 URL 을 받습니다. (`SupabaseStorage`, 백그라운드 스레드)
-   - 업로드가 성공한 뒤에만 트랜잭션으로 미션을 `Completed` 처리하고 2단계 보상을 지급하며, `photoUrl`(Supabase 공개 URL)·`photoStoragePath`·`photoVerified`·`photoNeedsReview`·`photoVerifyScore`·`photoVerifyLabel`·`photoVerifyModelVersion`·`photoUploadedAt` 을 저장합니다.
+   - 업로드가 성공한 뒤에만 트랜잭션으로 미션을 `Completed` 처리하고 2단계 보상을 지급하며, `photoUrl`(Supabase 공개 URL)·`photoStoragePath`·`photoVerified`·`photoNeedsReview`·`photoVerifyScore`·`photoVerifyLabel`·`photoVerifyModelVersion`·`photoVerifySimilarity`·`photoUploadedAt` 을 저장합니다.
    - 2단계 보상 = `미션 포인트 - 1단계 보상`
    - 업로드나 저장이 실패하면 미션은 완료되지 않으며, 재시도해도 포인트는 한 번만 지급됩니다.
    - 사용자가 처음 완료할 때 같은 트랜잭션에서 `missions/{id}.completionCount` 를 1 올립니다. (추천 인기도 신호)
@@ -334,8 +334,10 @@ python export_onnx.py --model outputs/final --out ../app/src/main/assets/photo_v
 
 ## 향후 개선 계획
 
-- 사진 인증 모델 데이터 수집·학습 실행, `OnnxPhotoVerifier` 연결, 촬영 시각·위치 메타데이터 교차 검증
-- 미션 간 동시출현(협업 필터링) 신호까지 반영한 추천 고도화 (시간대 적합도·오프라인 평가는 반영 완료)
+- 유사도 임계값(`rescue`/`suspect`) 실사용 로그 기반 확정 — 현재는 실사용 1건 + 웹 프록시 표본뿐이라 통계적으로 부족 (`ml/calibrate_similarity.py`)
+- 무효 클래스에 화면 재촬영 합성(`recapture()`) 반영한 재학습 — Colab 진행 중, 크라우드소싱 실사진(무관 실내·체험) 보강은 별도
+- 촬영 시각·EXIF·위치 메타데이터 교차 검증, GPS 스푸핑/순간이동 탐지
+- 미션 간 동시출현(협업 필터링) 신호까지 반영한 추천 고도화 (시간대 적합도·오프라인 평가는 반영 완료), `user_missions` 실로그로 re-ranker 재학습
 - ViewModel·Repository 패턴을 홈·목록·관리자 등 나머지 화면으로 확대
 - 서버 사이드 포인트 검증(Cloud Functions), Supabase Storage 업로드 서버 검증
 - Robolectric 기반 ViewModel/Compose UI 테스트와 Repository 계약 테스트 추가
