@@ -1,4 +1,12 @@
 <resources>
+    <!-- 하단 메뉴바 -->
+    <string name="nav_home">Home</string>
+    <string name="nav_mission">Mission</string>
+    <string name="nav_admin">Admin</string>
+    <string name="nav_ranking">Ranking</string>
+    <string name="nav_profile">Profile</string>
+    <string name="toast_admin_only">Admins only.</string>
+
     <!-- 공용 -->
     <string name="category_all">All</string>
     <string name="category_tour">Tour</string>
@@ -36,6 +44,253 @@
     <string name="toast_save_failed">Couldn\'t save mission info to the server.</string>
     <string name="detail_btn_completed">Mission Completed</string>
     <string name="detail_btn_start">Start Mission</string>
+
+    <!-- 미션 수행 (GPS·사진 인증) -->
+    <string name="perform_title">Mission</string>
+    <string name="perform_intro_body">The first step is verifying your current location. Allow GPS permission and tap the verify button on site.</string>
+    <string name="perform_reward_line">Points: Step 1 %1$dP · Step 2 %2$dP</string>
+    <string name="perform_target_location">Target: %1$.4f, %2$.4f · verify within %3$dm</string>
+    <string name="perform_step1_title">Step 1 · GPS Location Verification</string>
+    <string name="perform_reward_granted_suffix"> · %1$dP granted</string>
+    <string name="perform_btn_reverify">Verify Location Again</string>
+    <string name="perform_btn_verify">Verify Location</string>
+    <string name="perform_step2_title">Step 2 · Photo Verification</string>
+    <string name="perform_photo_preview_desc">Verification photo preview</string>
+    <string name="perform_btn_retake">Retake</string>
+    <string name="perform_btn_photo_capture">Take Photo</string>
+    <string name="perform_btn_photo_complete">Complete Photo Verification</string>
+    <string name="perform_uploading">Uploading photo...</string>
+    <string name="perform_progress_title">Progress</string>
+    <string name="perform_status_location_permission">Location Permission</string>
+    <string name="perform_status_location_permission_value">Grant, then tap verify</string>
+    <string name="perform_status_gps">GPS Verification</string>
+    <string name="perform_status_photo">Photo Verification</string>
+    <string name="perform_status_waiting">Waiting</string>
+    <string name="perform_status_verified">Verified</string>
+    <string name="perform_status_completed">Completed</string>
+    <string name="perform_status_reward_granted">%1$dP granted</string>
+    <string name="perform_status_reward_pending">Pending</string>
+    <string name="perform_status_not_verified_yet">You haven\'t verified your location yet.</string>
+    <string name="perform_status_button_active">Button Active</string>
+    <string name="perform_status_after_location">After location verification</string>
+    <string name="toast_location_unavailable">Location services are unavailable.</string>
+    <string name="toast_enable_gps">Please turn on GPS to use your location.</string>
+    <string name="toast_location_permission_required">Location permission is required.</string>
+    <string name="toast_camera_permission_required">Camera permission is required.</string>
+    <string name="toast_verify_location_first">Please verify your location first.</string>
+    <string name="perform_step2_desc_completed_with_reward">Photo verification is complete and %1$dP has been granted.</string>
+    <string name="perform_step2_desc_completed">Photo verification is complete.</string>
+    <string name="perform_step2_desc_ready">Location is verified. Completing photo verification grants %1$dP.</string>
+    <string name="perform_step2_desc_locked">Verify your location first to unlock photo verification.</string>
+    <string name="perform_btn_retry">Retry</string>
+
+    <!-- 미션 수행 뷰모델 메시지 -->
+    <string name="perform_state_completed_status">Location verified · mission completed.</string>
+    <string name="perform_state_verified_coords">Location verified: %1$.5f, %2$.5f</string>
+    <string name="perform_error_no_location">Couldn\'t get your current location.</string>
+    <string name="perform_error_no_mission_location">This mission has no location info.</string>
+    <string name="perform_state_verified_distance">Location verified · %1$.0fm from the target</string>
+    <string name="perform_state_out_of_range">You\'re outside the verification range · %1$.0fm away</string>
+    <string name="perform_error_no_progress">No mission progress info found.</string>
+    <string name="perform_toast_retry_near_location">Please try again near the mission location.</string>
+    <string name="perform_toast_location_verified_reward">Location verified. %1$dP granted.</string>
+    <string name="perform_toast_location_verified">Location verified.</string>
+    <string name="perform_toast_location_verify_failed">Failed to process location verification.</string>
+    <string name="perform_toast_photo_cancelled">Photo capture cancelled.</string>
+    <string name="perform_toast_take_photo_first">Please take a photo first.</string>
+    <string name="perform_toast_photo_read_failed">Couldn\'t read the photo. Please retake it.</string>
+    <string name="perform_state_photo_needs_review">Photo uploaded · pending admin review before final confirmation.</string>
+    <string name="perform_state_mission_completed">Location verified · mission completed.</string>
+    <string name="perform_toast_already_completed">This mission has already been completed.</string>
+    <string name="perform_toast_photo_uploaded_review">Photo uploaded. %1$dP granted · pending admin review.</string>
+    <string name="perform_toast_photo_verified_reward">Photo verified. %1$dP granted.</string>
+    <string name="perform_toast_photo_verified">Photo verified.</string>
+    <string name="perform_error_photo_mismatch">The photo doesn\'t match the mission. Please retake it at the mission location/subject.</string>
+    <string name="perform_toast_photo_mismatch">Verification failed — the photo doesn\'t match the mission.</string>
+    <string name="perform_error_finalize_failed">Failed to finalize. Please try again.</string>
+    <string name="perform_toast_finalize_failed">Failed to finalize.</string>
+    <string name="perform_error_upload_failed">Failed to upload photo. Check your network and try again.</string>
+    <string name="perform_toast_upload_failed">Failed to upload photo.</string>
+
+    <!-- 마이페이지 -->
+    <string name="profile_title">My Page</string>
+    <string name="profile_guest_nickname">Guest</string>
+    <string name="profile_guest_email">guest</string>
+    <string name="profile_stat_points">Points</string>
+    <string name="profile_stat_ranking">My Ranking</string>
+    <string name="profile_stat_in_progress">In-Progress Missions</string>
+    <string name="profile_stat_completed">Completed Missions</string>
+    <string name="profile_activity_summary_title">Activity Summary</string>
+    <string name="profile_activity_summary_both">You\'ve completed %1$d mission(s) so far, and %2$d are in progress.</string>
+    <string name="profile_activity_summary_progress_only">You have %1$d mission(s) in progress. Just a bit more to your first completion.</string>
+    <string name="profile_activity_summary_none">You haven\'t started any missions yet. Try one from Home or the Mission tab.</string>
+    <string name="profile_next_goal">Next goal: complete one more mission and earn more points.</string>
+    <string name="profile_menu_nickname">Change Nickname</string>
+    <string name="profile_menu_language">언어 / Language</string>
+    <string name="profile_menu_ranking">View Ranking</string>
+    <string name="profile_menu_logout">Log Out</string>
+    <string name="profile_dialog_nickname_title">Change Nickname</string>
+    <string name="profile_dialog_nickname_label">New nickname</string>
+    <string name="profile_dialog_save">Save</string>
+    <string name="profile_dialog_cancel">Cancel</string>
+    <string name="profile_dialog_close">Close</string>
+    <string name="profile_toast_nickname_empty">Please enter a nickname.</string>
+    <string name="profile_toast_nickname_updated">Nickname updated.</string>
+    <string name="profile_toast_nickname_update_failed">Failed to update nickname.</string>
+
+    <!-- 관리자 홈 -->
+    <string name="admin_home_title">Admin</string>
+    <string name="admin_home_mode_title">Admin mode</string>
+    <string name="admin_home_mode_desc">Manage missions and users.</string>
+    <string name="admin_home_missions_title">Mission management</string>
+    <string name="admin_home_missions_desc">Create and update missions.</string>
+    <string name="admin_home_users_title">User management</string>
+    <string name="admin_home_users_desc">Review user activity.</string>
+    <string name="admin_home_photo_review_title">Photo review</string>
+    <string name="admin_home_photo_review_desc">Approve or reject flagged mission photos.</string>
+
+    <!-- 관리자 미션 목록 -->
+    <string name="admin_mission_list_title">Mission Management</string>
+    <string name="admin_mission_add">Add New Mission</string>
+    <string name="admin_edit">Edit</string>
+    <string name="admin_delete">Delete</string>
+    <string name="admin_mission_delete_title">Delete Mission</string>
+    <string name="admin_mission_delete_confirm">Delete mission \'%1$s\'?</string>
+    <string name="admin_cancel">Cancel</string>
+
+    <!-- 관리자 사용자 관리 -->
+    <string name="admin_user_mgmt_title">User Management</string>
+    <string name="admin_user_total">%1$d total users</string>
+    <string name="admin_user_summary">%1$d admins · sorted by points</string>
+    <string name="admin_user_completed_chip">Completed %1$d</string>
+    <string name="admin_user_in_progress_chip">In Progress %1$d</string>
+    <string name="admin_user_badge">ADMIN</string>
+    <string name="admin_user_revoke">Revoke Admin</string>
+    <string name="admin_user_grant">Grant Admin</string>
+    <string name="admin_toast_admin_revoked">Admin access revoked.</string>
+    <string name="admin_toast_admin_granted">Admin access granted.</string>
+    <string name="admin_user_default_name">User</string>
+
+    <!-- 관리자 사진 검수 -->
+    <string name="admin_photo_review_title">Photo Review</string>
+    <string name="admin_photo_review_empty">No photos to review.</string>
+    <string name="admin_photo_review_queue_count">%1$d ambiguous auto-verification(s)</string>
+    <string name="admin_photo_review_deleted_mission">Deleted mission</string>
+    <string name="admin_photo_review_photo_desc">Verification photo</string>
+    <string name="admin_photo_review_model_label">Model verdict: %1$s</string>
+    <string name="admin_photo_review_score_label">\'%1$s\' score %2$.2f</string>
+    <string name="admin_photo_review_similarity_label"> · cover photo similarity %1$.2f</string>
+    <string name="admin_photo_review_reject">Reject</string>
+    <string name="admin_photo_review_approve">Approve</string>
+    <string name="admin_photo_review_reject_title">Reject Photo</string>
+    <string name="admin_photo_review_reject_body">Rejecting \'%1$s\' will claw back %2$dP and the user will need to verify with a photo again.</string>
+    <string name="admin_photo_review_reject_reason_label">Reject reason (optional)</string>
+    <string name="admin_toast_approved">Approved.</string>
+    <string name="admin_toast_rejected">Rejected. The user will be asked to verify again.</string>
+    <string name="admin_toast_already_processed">This item has already been processed.</string>
+    <string name="admin_toast_reject_failed">Failed to process the rejection.</string>
+
+    <!-- 관리자 미션 편집 -->
+    <string name="admin_mission_edit_title">Edit Mission</string>
+    <string name="admin_mission_add_title">Add Mission</string>
+    <string name="admin_mission_field_title">Mission Title</string>
+    <string name="admin_mission_field_desc">Mission Description</string>
+    <string name="admin_mission_field_category">Category</string>
+    <string name="admin_mission_field_points">Points</string>
+    <string name="admin_mission_field_image_url">Image URL</string>
+    <string name="admin_mission_field_location_section">Location (optional — used for distance-based recommendations)</string>
+    <string name="admin_mission_field_latitude">Latitude (e.g. 37.5559)</string>
+    <string name="admin_mission_field_longitude">Longitude (e.g. 126.9707)</string>
+    <string name="admin_toast_required_fields">Please fill in the required fields.</string>
+    <string name="admin_toast_invalid_latlng">Please enter a valid latitude/longitude.</string>
+    <string name="admin_toast_mission_updated">Mission updated.</string>
+    <string name="admin_toast_mission_added">Mission added.</string>
+    <string name="admin_toast_save_failed">Failed to save.</string>
+    <string name="admin_mission_saving">Saving...</string>
+    <string name="admin_mission_save_edit">Save Changes</string>
+    <string name="admin_mission_save_add">Add Mission</string>
+
+    <!-- 포인트 내역 -->
+    <string name="point_history_title">Point History</string>
+    <string name="point_history_mission_fallback">Mission</string>
+    <string name="point_history_reason_location">Location Verification</string>
+    <string name="point_history_reason_photo">Photo Verification</string>
+    <string name="point_history_empty_title">No points earned yet.</string>
+    <string name="point_history_empty_desc">Complete a mission and it\'ll show up here.</string>
+    <string name="point_history_sum_title">Total Points Earned</string>
+    <string name="point_history_count">%1$d entries</string>
+
+    <!-- 진행 중 미션 -->
+    <string name="in_progress_title">In-Progress Missions</string>
+    <string name="in_progress_mission_fallback">In-Progress Mission</string>
+    <string name="in_progress_empty_title">No missions in progress.</string>
+    <string name="in_progress_empty_desc">Start a new mission from the Mission tab and it\'ll show up here.</string>
+    <string name="in_progress_progress_label">Progress %1$s</string>
+    <string name="in_progress_btn_continue">Continue</string>
+
+    <!-- 완료한 미션 -->
+    <string name="completed_title">Completed Missions</string>
+    <string name="completed_mission_fallback">Completed Mission</string>
+    <string name="completed_empty_title">No completed missions yet.</string>
+    <string name="completed_empty_desc">Verify a mission all the way through and it\'ll show up here.</string>
+    <string name="completed_progress_label">Verified %1$s</string>
+    <string name="completed_btn_view">View Mission Again</string>
+
+    <!-- 랭킹 -->
+    <string name="ranking_title">Ranking</string>
+    <string name="ranking_tab_all">Overall Ranking</string>
+    <string name="ranking_tab_mine">My Ranking</string>
+    <string name="ranking_default_name">Traveler</string>
+    <string name="ranking_you">You</string>
+
+    <!-- 미션 지도 -->
+    <string name="map_bubble_single">%1$s\n%2$dP · View Detail</string>
+    <string name="map_bubble_group">%1$d missions · tap to select</string>
+    <string name="map_empty">No missions with a registered location. Check the list instead.</string>
+    <string name="map_summary">%1$d missions · tap a bubble for detail</string>
+    <string name="map_dialog_title">Missions at this location</string>
+    <string name="map_dialog_item">%1$s · %2$dP</string>
+    <string name="map_dialog_close">Close</string>
+
+    <!-- 랜딩 -->
+    <string name="landing_badge">Seoul mission guide</string>
+    <string name="landing_headline">Complete missions along your travel route\nand collect points and memories together.</string>
+    <string name="landing_pill_route">Route-based</string>
+    <string name="landing_pill_onsite">On-site Missions</string>
+    <string name="landing_pill_reward">Point Rewards</string>
+    <string name="landing_start_title">Get Started</string>
+    <string name="landing_start_desc">Sign up to save your mission progress and points.</string>
+    <string name="landing_btn_signup">Sign Up</string>
+    <string name="landing_btn_login">Log In</string>
+    <string name="landing_guest_title">Browse</string>
+    <string name="landing_guest_desc">Check out the app first without an account.</string>
+    <string name="landing_guest_enter">Enter</string>
+
+    <!-- 로그인 -->
+    <string name="login_title">Log in</string>
+    <string name="login_email_label">Email</string>
+    <string name="login_password_label">Password</string>
+    <string name="login_toast_empty_fields">Enter email and password.</string>
+    <string name="login_toast_failed">Login failed.</string>
+    <string name="login_btn">Log in</string>
+
+    <!-- 회원가입 -->
+    <string name="signup_title">Sign up</string>
+    <string name="signup_name_label">Name</string>
+    <string name="signup_email_label">Email</string>
+    <string name="signup_password_label">Password</string>
+    <string name="signup_toast_empty_fields">Fill in all fields.</string>
+    <string name="signup_toast_failed">Sign up failed.</string>
+    <string name="signup_toast_profile_save_failed">Profile save failed.</string>
+    <string name="signup_btn">Create account</string>
+
+    <!-- 취향 선택 -->
+    <string name="preference_title">Tell us your travel style</string>
+    <string name="preference_desc">Pick all the styles you\'re interested in and we\'ll recommend missions for you on Home.</string>
+    <string name="preference_selected_count">%1$d selected</string>
+    <string name="preference_toast_min_one">Please select at least one style.</string>
+    <string name="preference_toast_save_failed">Failed to save. Please try again.</string>
+    <string name="preference_btn_done">Done</string>
 
     <!-- 홈 -->
     <string name="home_tagline">Discover a new mission today!</string>

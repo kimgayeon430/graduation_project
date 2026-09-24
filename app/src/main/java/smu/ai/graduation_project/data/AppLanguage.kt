@@ -3,6 +3,7 @@ package smu.ai.graduation_project.data
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
+import androidx.annotation.StringRes
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -69,6 +70,15 @@ fun Context.wrapWithStoredLocale(): Context {
     config.setLocale(locale)
     return createConfigurationContext(config)
 }
+
+/**
+ * Compose 밖(ViewModel 등)에서 저장된 언어로 문자열을 읽는다. `applicationContext.getString` 은
+ * [MainActivity.attachBaseContext] 의 Configuration 래핑을 타지 않아 시스템 언어로 고정되므로,
+ * 호출마다 [wrapWithStoredLocale] 로 다시 감싸 항상 최신 언어 설정을 반영한다.
+ */
+fun Context.getLocalizedString(@StringRes resId: Int, vararg formatArgs: Any): String =
+    if (formatArgs.isEmpty()) wrapWithStoredLocale().getString(resId)
+    else wrapWithStoredLocale().getString(resId, *formatArgs)
 
 /**
  * `field`(한국어) 와 `${field}En`(영어) 중 현재 언어에 맞는 값을 읽는다.

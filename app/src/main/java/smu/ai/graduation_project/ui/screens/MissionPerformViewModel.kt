@@ -7,10 +7,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
+import smu.ai.graduation_project.R
 import smu.ai.graduation_project.data.FirebaseMissionRepository
 import smu.ai.graduation_project.data.MissionRepository
 import smu.ai.graduation_project.data.OnnxPhotoVerifier
 import smu.ai.graduation_project.data.PhotoVerifier
+import smu.ai.graduation_project.data.getLocalizedString
 import smu.ai.graduation_project.domain.LocationVerification
 import smu.ai.graduation_project.domain.MissionCompletion
 import smu.ai.graduation_project.domain.PhotoVerificationConfig
@@ -45,6 +47,9 @@ class MissionPerformViewModel(
 
     private var missionId: String = ""
     private var uid: String? = null
+
+    private fun str(resId: Int, vararg args: Any): String =
+        getApplication<Application>().getLocalizedString(resId, *args)
 
     /** 화면 진입 시 미션 정보 + 사용자 진행 상태를 불러온다. */
     fun loadData(missionId: String, uid: String?) {
@@ -82,8 +87,9 @@ class MissionPerformViewModel(
                         stage2RewardGranted = state.stage2RewardGranted,
                         photoUrl = state.photoUrl,
                         verificationText = when {
-                            completed -> "위치 인증 완료 · 미션 완료 상태입니다."
-                            state.locationVerified -> "위치 인증 완료: %.5f, %.5f".format(
+                            completed -> str(R.string.perform_state_completed_status)
+                            state.locationVerified -> str(
+                                R.string.perform_state_verified_coords,
                                 state.verifiedLatitude ?: 0.0,
                                 state.verifiedLongitude ?: 0.0
                             )
@@ -106,16 +112,16 @@ class MissionPerformViewModel(
     /** 화면에서 받아온 현재 위치로 1단계 인증을 처리한다. */
     fun onLocationResult(location: Location?) {
         if (uid == null) {
-            finishVerify("로그인이 필요합니다.")
+            finishVerify(str(R.string.toast_login_required))
             return
         }
         if (location == null) {
-            finishVerify("현재 위치를 가져오지 못했습니다.")
+            finishVerify(str(R.string.perform_error_no_location))
             return
         }
         val target = uiState.missionLocation
         if (target == null) {
-            finishVerify("미션 위치 정보가 없습니다.")
+            finishVerify(str(R.string.perform_error_no_mission_location))
             return
         }
 
@@ -132,15 +138,15 @@ class MissionPerformViewModel(
         uiState = uiState.copy(
             locationVerified = isNearEnough,
             verificationText = if (isNearEnough) {
-                "위치 인증 완료 · 목표 지점까지 %.0fm".format(distanceMeters)
+                str(R.string.perform_state_verified_distance, distanceMeters)
             } else {
-                "현재 위치가 인증 범위를 벗어났습니다 · %.0fm 떨어져 있어요".format(distanceMeters)
+                str(R.string.perform_state_out_of_range, distanceMeters)
             }
         )
 
         val docId = uiState.missionDocId
         if (docId == null) {
-            finishVerify("미션 진행 정보가 없습니다.")
+            finishVerify(str(R.string.perform_error_no_progress))
             return
         }
 
@@ -157,16 +163,16 @@ class MissionPerformViewModel(
                     isVerifying = false,
                     stage1RewardGranted = if (isNearEnough) true else uiState.stage1RewardGranted,
                     toastMessage = when {
-                        !isNearEnough -> "미션 위치 근처에서 다시 시도해주세요."
-                        result.rewardGranted > 0 -> "위치 인증 완료. ${result.rewardGranted}P가 지급되었습니다."
-                        else -> "위치 인증이 완료되었습니다."
+                        !isNearEnough -> str(R.string.perform_toast_retry_near_location)
+                        result.rewardGranted > 0 -> str(R.string.perform_toast_location_verified_reward, result.rewardGranted)
+                        else -> str(R.string.perform_toast_location_verified)
                     }
                 )
             },
             onError = {
                 uiState = uiState.copy(
                     isVerifying = false,
-                    toastMessage = "위치 인증 처리에 실패했습니다."
+                    toastMessage = str(R.string.perform_toast_location_verify_failed)
                 )
             }
         )
@@ -183,7 +189,7 @@ class MissionPerformViewModel(
     }
 
     fun onPhotoCaptureCancelled() {
-        uiState = uiState.copy(toastMessage = "사진 촬영이 취소되었습니다.")
+        uiState = uiState.copy(toastMessage = str(R.string.perform_toast_photo_cancelled))
     }
 
     /**
@@ -192,24 +198,24 @@ class MissionPerformViewModel(
     fun uploadPhotoAndComplete(photoBytes: ByteArray?) {
         val state = uiState
         if (uid == null) {
-            emitToast("로그인이 필요합니다.")
+            emitToast(str(R.string.toast_login_required))
             return
         }
         val docId = state.missionDocId
         if (docId == null) {
-            emitToast("미션 진행 정보가 없습니다.")
+            emitToast(str(R.string.perform_error_no_progress))
             return
         }
         if (!state.locationVerified) {
-            emitToast("먼저 위치 인증을 완료해주세요.")
+            emitToast(str(R.string.toast_verify_location_first))
             return
         }
         if (state.capturedPhotoUri == null) {
-            emitToast("먼저 사진을 촬영해주세요.")
+            emitToast(str(R.string.perform_toast_take_photo_first))
             return
         }
         if (photoBytes == null || photoBytes.isEmpty()) {
-            emitToast("사진을 읽지 못했습니다. 다시 촬영해주세요.")
+            emitToast(str(R.string.perform_toast_photo_read_failed))
             return
         }
         if (state.missionCompleted || state.isUploading) return
@@ -234,16 +240,16 @@ class MissionPerformViewModel(
                     stage2RewardGranted = true,
                     photoUrl = result.photoUrl,
                     verificationText = if (result.needsReview) {
-                        "사진 업로드 완료 · 관리자 검수 후 최종 확정됩니다."
+                        str(R.string.perform_state_photo_needs_review)
                     } else {
-                        "위치 인증 완료 · 미션이 완료되었습니다."
+                        str(R.string.perform_state_mission_completed)
                     },
                     toastMessage = when {
-                        result.alreadyCompleted -> "이미 완료 처리된 미션입니다."
+                        result.alreadyCompleted -> str(R.string.perform_toast_already_completed)
                         result.needsReview && result.rewardGranted > 0 ->
-                            "사진 업로드 완료. ${result.rewardGranted}P 지급 · 관리자 검수 예정입니다."
-                        result.rewardGranted > 0 -> "사진 인증 완료. ${result.rewardGranted}P가 지급되었습니다."
-                        else -> "사진 인증 완료."
+                            str(R.string.perform_toast_photo_uploaded_review, result.rewardGranted)
+                        result.rewardGranted > 0 -> str(R.string.perform_toast_photo_verified_reward, result.rewardGranted)
+                        else -> str(R.string.perform_toast_photo_verified)
                     },
                     navigateBack = true
                 )
@@ -254,18 +260,18 @@ class MissionPerformViewModel(
                     MissionRepository.MissionCompleteException.Stage.VERIFY -> uiState.copy(
                         isUploading = false,
                         uploadError = exception?.reason
-                            ?: "사진이 미션과 맞지 않아요. 미션 장소·대상을 다시 촬영해 주세요.",
-                        toastMessage = "사진이 미션과 맞지 않아 인증하지 못했어요."
+                            ?: str(R.string.perform_error_photo_mismatch),
+                        toastMessage = str(R.string.perform_toast_photo_mismatch)
                     )
                     MissionRepository.MissionCompleteException.Stage.FINALIZE -> uiState.copy(
                         isUploading = false,
-                        uploadError = "완료 처리에 실패했습니다. 다시 시도해주세요.",
-                        toastMessage = "완료 처리에 실패했습니다."
+                        uploadError = str(R.string.perform_error_finalize_failed),
+                        toastMessage = str(R.string.perform_toast_finalize_failed)
                     )
                     else -> uiState.copy(
                         isUploading = false,
-                        uploadError = "사진 업로드에 실패했습니다. 네트워크를 확인하고 다시 시도해주세요.",
-                        toastMessage = "사진 업로드에 실패했습니다."
+                        uploadError = str(R.string.perform_error_upload_failed),
+                        toastMessage = str(R.string.perform_toast_upload_failed)
                     )
                 }
             }

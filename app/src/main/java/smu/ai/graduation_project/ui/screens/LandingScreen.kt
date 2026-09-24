@@ -32,9 +32,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import smu.ai.graduation_project.R
 import smu.ai.graduation_project.ui.theme.CardGray
 import smu.ai.graduation_project.ui.theme.GradientEnd
 import smu.ai.graduation_project.ui.theme.GradientStart
@@ -81,23 +83,23 @@ fun LandingScreen(
                     ) {
                         Icon(Icons.Default.AutoAwesome, null, tint = Color.White, modifier = Modifier.size(16.dp))
                         Spacer(Modifier.width(6.dp))
-                        Text("Seoul mission guide", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                        Text(stringResource(R.string.landing_badge), color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Medium)
                     }
                 }
                 Spacer(Modifier.height(24.dp))
                 Text("TripQuest", color = Color.White, fontSize = 34.sp, fontWeight = FontWeight.ExtraBold)
                 Spacer(Modifier.height(10.dp))
                 Text(
-                    "여행 동선을 따라 미션을 수행하고\n포인트와 기록을 함께 쌓아보세요.",
+                    stringResource(R.string.landing_headline),
                     color = Color.White.copy(alpha = 0.92f),
                     lineHeight = 24.sp,
                     fontSize = 16.sp
                 )
                 Spacer(Modifier.height(26.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    LandingInfoPill(Icons.Default.Map, "동선 기반")
-                    LandingInfoPill(Icons.Default.Explore, "현장 미션")
-                    LandingInfoPill(Icons.Default.EmojiEvents, "포인트 보상")
+                    LandingInfoPill(Icons.Default.Map, stringResource(R.string.landing_pill_route))
+                    LandingInfoPill(Icons.Default.Explore, stringResource(R.string.landing_pill_onsite))
+                    LandingInfoPill(Icons.Default.EmojiEvents, stringResource(R.string.landing_pill_reward))
                 }
             }
 
@@ -111,9 +113,9 @@ fun LandingScreen(
                     modifier = Modifier.padding(22.dp),
                     verticalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
-                    Text("시작하기", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color(0xFF232323))
+                    Text(stringResource(R.string.landing_start_title), fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color(0xFF232323))
                     Text(
-                        "회원가입 후 미션 진행 상황과 포인트를 저장할 수 있어요.",
+                        stringResource(R.string.landing_start_desc),
                         color = Color.Gray,
                         fontSize = 14.sp,
                         lineHeight = 20.sp
@@ -127,7 +129,7 @@ fun LandingScreen(
                         shape = RoundedCornerShape(16.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = MainPurple)
                     ) {
-                        Text("회원가입", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                        Text(stringResource(R.string.landing_btn_signup), fontWeight = FontWeight.Bold, fontSize = 16.sp)
                     }
 
                     OutlinedButton(
@@ -138,7 +140,7 @@ fun LandingScreen(
                         shape = RoundedCornerShape(16.dp),
                         border = androidx.compose.foundation.BorderStroke(1.5.dp, LightPurple)
                     ) {
-                        Text("로그인", color = Color(0xFF2B2B2B), fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                        Text(stringResource(R.string.landing_btn_login), color = Color(0xFF2B2B2B), fontWeight = FontWeight.Bold, fontSize = 16.sp)
                     }
 
                     Surface(
@@ -163,11 +165,11 @@ fun LandingScreen(
                             }
                             Spacer(Modifier.width(12.dp))
                             Column(modifier = Modifier.weight(1f)) {
-                                Text("둘러보기", fontWeight = FontWeight.Bold, color = Color(0xFF2F2F2F))
-                                Text("계정 없이 먼저 화면을 확인할 수 있어요.", color = Color.Gray, fontSize = 12.sp)
+                                Text(stringResource(R.string.landing_guest_title), fontWeight = FontWeight.Bold, color = Color(0xFF2F2F2F))
+                                Text(stringResource(R.string.landing_guest_desc), color = Color.Gray, fontSize = 12.sp)
                             }
                             Text(
-                                text = "입장",
+                                text = stringResource(R.string.landing_guest_enter),
                                 color = MainPurple,
                                 fontWeight = FontWeight.Bold,
                                 modifier = Modifier.clickable(onClick = onGuest)

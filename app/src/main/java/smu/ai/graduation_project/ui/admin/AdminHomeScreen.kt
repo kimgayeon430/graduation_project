@@ -31,9 +31,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import smu.ai.graduation_project.R
 import smu.ai.graduation_project.ui.theme.CardGray
 import smu.ai.graduation_project.ui.theme.LightPurple
 import smu.ai.graduation_project.ui.theme.MainPurple
@@ -56,7 +58,7 @@ fun AdminHomeScreen(
                 .padding(16.dp),
             contentAlignment = Alignment.Center
         ) {
-            Text("Admin", fontSize = 20.sp, fontWeight = FontWeight.Bold)
+            Text(stringResource(R.string.admin_home_title), fontSize = 20.sp, fontWeight = FontWeight.Bold)
         }
 
         Spacer(modifier = Modifier.height(24.dp))
@@ -75,8 +77,8 @@ fun AdminHomeScreen(
                 Icon(Icons.Default.AdminPanelSettings, null, tint = MainPurple, modifier = Modifier.size(48.dp))
                 Spacer(modifier = Modifier.width(16.dp))
                 Column {
-                    Text("Admin mode", fontSize = 18.sp, fontWeight = FontWeight.Bold)
-                    Text("Manage missions and users.", fontSize = 14.sp, color = Color.Gray)
+                    Text(stringResource(R.string.admin_home_mode_title), fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                    Text(stringResource(R.string.admin_home_mode_desc), fontSize = 14.sp, color = Color.Gray)
                 }
             }
         }
@@ -84,22 +86,22 @@ fun AdminHomeScreen(
         Spacer(modifier = Modifier.height(32.dp))
 
         AdminMenuCard(
-            title = "Mission management",
-            desc = "Create and update missions.",
+            title = stringResource(R.string.admin_home_missions_title),
+            desc = stringResource(R.string.admin_home_missions_desc),
             icon = Icons.Default.Assignment,
             onClick = onNavigateToMissionManagement
         )
 
         AdminMenuCard(
-            title = "User management",
-            desc = "Review user activity.",
+            title = stringResource(R.string.admin_home_users_title),
+            desc = stringResource(R.string.admin_home_users_desc),
             icon = Icons.Default.People,
             onClick = onNavigateToUserManagement
         )
 
         AdminMenuCard(
-            title = "Photo review",
-            desc = "Approve or reject flagged mission photos.",
+            title = stringResource(R.string.admin_home_photo_review_title),
+            desc = stringResource(R.string.admin_home_photo_review_desc),
             icon = Icons.Default.PhotoLibrary,
             onClick = onNavigateToPhotoReview
         )

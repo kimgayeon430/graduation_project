@@ -50,6 +50,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -58,6 +59,7 @@ import com.google.firebase.auth.auth
 import com.google.firebase.auth.userProfileChangeRequest
 import com.google.firebase.firestore.Query
 import com.google.firebase.firestore.firestore
+import smu.ai.graduation_project.R
 import smu.ai.graduation_project.data.AppLanguage
 import smu.ai.graduation_project.data.LanguagePreference
 import smu.ai.graduation_project.ui.components.ProfileMenuItem
@@ -80,8 +82,10 @@ fun ProfileScreen(
     val db = Firebase.firestore
     val context = LocalContext.current
 
-    var nickname by remember { mutableStateOf(currentUser?.displayName ?: "Guest") }
-    var email by remember { mutableStateOf(currentUser?.email ?: "guest") }
+    val guestNickname = stringResource(R.string.profile_guest_nickname)
+    val guestEmail = stringResource(R.string.profile_guest_email)
+    var nickname by remember { mutableStateOf(currentUser?.displayName ?: guestNickname) }
+    var email by remember { mutableStateOf(currentUser?.email ?: guestEmail) }
     var level by remember { mutableStateOf("Lv.1") }
     var points by remember { mutableIntStateOf(0) }
     var completedCount by remember { mutableIntStateOf(0) }
@@ -95,8 +99,8 @@ fun ProfileScreen(
         currentUser?.uid?.let { uid ->
             db.collection("users").document(uid).addSnapshotListener { snapshot, _ ->
                 if (snapshot != null && snapshot.exists()) {
-                    nickname = snapshot.getString("nickname") ?: currentUser.displayName ?: "Guest"
-                    email = snapshot.getString("mail") ?: currentUser.email ?: "guest"
+                    nickname = snapshot.getString("nickname") ?: currentUser.displayName ?: guestNickname
+                    email = snapshot.getString("mail") ?: currentUser.email ?: guestEmail
                     level = snapshot.getString("level") ?: "Lv.1"
                     points = snapshot.getLong("points")?.toInt() ?: 0
                     if (!showNicknameDialog) {
@@ -131,7 +135,7 @@ fun ProfileScreen(
     Scaffold(
         topBar = {
             CenterAlignedTopAppBar(
-                title = { Text("마이페이지", fontWeight = FontWeight.Bold) },
+                title = { Text(stringResource(R.string.profile_title), fontWeight = FontWeight.Bold) },
                 actions = {
                     IconButton(onClick = onLogout) {
                         Icon(Icons.AutoMirrored.Filled.ExitToApp, null)
@@ -205,14 +209,14 @@ fun ProfileScreen(
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 StatCard(
-                    title = "보유 포인트",
+                    title = stringResource(R.string.profile_stat_points),
                     value = String.format("%,dP", points),
                     icon = Icons.Default.Stars,
                     modifier = Modifier.weight(1f),
                     onClick = onNavigateToPointHistory
                 )
                 StatCard(
-                    title = "내 랭킹",
+                    title = stringResource(R.string.profile_stat_ranking),
                     value = if (rank > 0) "#$rank" else "-",
                     icon = Icons.Default.EmojiEvents,
                     modifier = Modifier.weight(1f)
@@ -224,14 +228,14 @@ fun ProfileScreen(
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 StatCard(
-                    title = "진행 중 미션",
+                    title = stringResource(R.string.profile_stat_in_progress),
                     value = progressCount.toString(),
                     icon = Icons.Default.HourglassTop,
                     modifier = Modifier.weight(1f),
                     onClick = onNavigateToInProgressMissions
                 )
                 StatCard(
-                    title = "완료한 미션",
+                    title = stringResource(R.string.profile_stat_completed),
                     value = completedCount.toString(),
                     icon = Icons.Default.Flag,
                     modifier = Modifier.weight(1f),
@@ -248,12 +252,12 @@ fun ProfileScreen(
                     modifier = Modifier.padding(18.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Text("활동 요약", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                    Text(stringResource(R.string.profile_activity_summary_title), fontWeight = FontWeight.Bold, fontSize = 18.sp)
                     Text(
                         text = when {
-                            completedCount > 0 -> "지금까지 ${completedCount}개의 미션을 완료했고, 현재 ${progressCount}개를 진행 중이에요."
-                            progressCount > 0 -> "지금 ${progressCount}개의 미션을 진행 중이에요. 첫 완료까지 조금만 더 가면 됩니다."
-                            else -> "아직 시작한 미션이 없어요. 홈이나 미션 목록에서 첫 미션을 시작해보세요."
+                            completedCount > 0 -> stringResource(R.string.profile_activity_summary_both, completedCount, progressCount)
+                            progressCount > 0 -> stringResource(R.string.profile_activity_summary_progress_only, progressCount)
+                            else -> stringResource(R.string.profile_activity_summary_none)
                         },
                         color = Color.Gray,
                         lineHeight = 20.sp,
@@ -263,7 +267,7 @@ fun ProfileScreen(
                         Icon(Icons.Default.LocalFireDepartment, null, tint = Orange, modifier = Modifier.size(18.dp))
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
-                            text = "다음 목표: 미션 1개 더 완료하고 포인트를 쌓아보세요.",
+                            text = stringResource(R.string.profile_next_goal),
                             color = Color(0xFF444444),
                             fontSize = 13.sp
                         )
@@ -278,29 +282,32 @@ fun ProfileScreen(
                 shape = RoundedCornerShape(18.dp)
             ) {
                 Column(modifier = Modifier.padding(vertical = 8.dp)) {
-                    ProfileMenuItem("닉네임 변경", Icons.Default.Edit) {
+                    ProfileMenuItem(stringResource(R.string.profile_menu_nickname), Icons.Default.Edit) {
                         nicknameDraft = nickname
                         showNicknameDialog = true
                     }
-                    ProfileMenuItem("언어 / Language", Icons.Default.Language) {
+                    ProfileMenuItem(stringResource(R.string.profile_menu_language), Icons.Default.Language) {
                         showLanguageDialog = true
                     }
-                    ProfileMenuItem("랭킹 보기", Icons.Default.EmojiEvents, onClick = onNavigateToRanking)
-                    ProfileMenuItem("로그아웃", Icons.AutoMirrored.Filled.ExitToApp, onClick = onLogout)
+                    ProfileMenuItem(stringResource(R.string.profile_menu_ranking), Icons.Default.EmojiEvents, onClick = onNavigateToRanking)
+                    ProfileMenuItem(stringResource(R.string.profile_menu_logout), Icons.AutoMirrored.Filled.ExitToApp, onClick = onLogout)
                 }
             }
         }
     }
 
     if (showNicknameDialog) {
+        val emptyMessage = stringResource(R.string.profile_toast_nickname_empty)
+        val updatedMessage = stringResource(R.string.profile_toast_nickname_updated)
+        val failedMessage = stringResource(R.string.profile_toast_nickname_update_failed)
         AlertDialog(
             onDismissRequest = { showNicknameDialog = false },
-            title = { Text("닉네임 변경") },
+            title = { Text(stringResource(R.string.profile_dialog_nickname_title)) },
             text = {
                 OutlinedTextField(
                     value = nicknameDraft,
                     onValueChange = { nicknameDraft = it },
-                    label = { Text("새 닉네임") },
+                    label = { Text(stringResource(R.string.profile_dialog_nickname_label)) },
                     singleLine = true
                 )
             },
@@ -308,7 +315,7 @@ fun ProfileScreen(
                 TextButton(onClick = {
                     val trimmed = nicknameDraft.trim()
                     if (trimmed.isEmpty()) {
-                        Toast.makeText(context, "닉네임을 입력하세요.", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, emptyMessage, Toast.LENGTH_SHORT).show()
                         return@TextButton
                     }
                     val user = Firebase.auth.currentUser
@@ -319,18 +326,18 @@ fun ProfileScreen(
                         .addOnSuccessListener {
                             nickname = trimmed
                             showNicknameDialog = false
-                            Toast.makeText(context, "닉네임이 변경되었습니다.", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, updatedMessage, Toast.LENGTH_SHORT).show()
                         }
                         .addOnFailureListener {
-                            Toast.makeText(context, "닉네임 변경에 실패했습니다.", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, failedMessage, Toast.LENGTH_SHORT).show()
                         }
                 }) {
-                    Text("저장")
+                    Text(stringResource(R.string.profile_dialog_save))
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showNicknameDialog = false }) {
-                    Text("취소")
+                    Text(stringResource(R.string.profile_dialog_cancel))
                 }
             }
         )
@@ -368,7 +375,7 @@ fun ProfileScreen(
             },
             confirmButton = {
                 TextButton(onClick = { showLanguageDialog = false }) {
-                    Text("닫기")
+                    Text(stringResource(R.string.profile_dialog_close))
                 }
             }
         )

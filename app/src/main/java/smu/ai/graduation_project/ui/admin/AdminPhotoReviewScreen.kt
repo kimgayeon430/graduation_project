@@ -42,6 +42,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -50,6 +51,7 @@ import com.google.firebase.Firebase
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.SetOptions
 import com.google.firebase.firestore.firestore
+import smu.ai.graduation_project.R
 import smu.ai.graduation_project.domain.MissionCompletion
 import smu.ai.graduation_project.ui.theme.CardGray
 import smu.ai.graduation_project.ui.theme.MainPurple
@@ -86,6 +88,8 @@ fun AdminPhotoReviewScreen(onNavigateBack: () -> Unit) {
     var queue by remember { mutableStateOf<List<PhotoReviewItem>>(emptyList()) }
     var rejectTarget by remember { mutableStateOf<PhotoReviewItem?>(null) }
     var rejectReason by remember { mutableStateOf("") }
+    val deletedMissionPlaceholder = stringResource(R.string.admin_photo_review_deleted_mission)
+    val defaultUserName = stringResource(R.string.admin_user_default_name)
 
     LaunchedEffect(Unit) {
         db.collection("user_missions")
@@ -105,9 +109,9 @@ fun AdminPhotoReviewScreen(onNavigateBack: () -> Unit) {
                             val user = doc.getString("userId")?.let { userById[it] }
                             PhotoReviewItem(
                                 docId = doc.id,
-                                missionTitle = mission?.getString("title") ?: "삭제된 미션",
+                                missionTitle = mission?.getString("title") ?: deletedMissionPlaceholder,
                                 missionCategory = mission?.getString("category") ?: "-",
-                                userName = user?.getString("nickname") ?: user?.getString("name") ?: "사용자",
+                                userName = user?.getString("nickname") ?: user?.getString("name") ?: defaultUserName,
                                 photoUrl = doc.getString("photoUrl").orEmpty(),
                                 verifyScore = doc.getDouble("photoVerifyScore") ?: 0.0,
                                 verifyLabel = doc.getString("photoVerifyLabel").orEmpty(),
@@ -121,6 +125,11 @@ fun AdminPhotoReviewScreen(onNavigateBack: () -> Unit) {
             }
     }
 
+    val approvedMessage = stringResource(R.string.admin_toast_approved)
+    val rejectedMessage = stringResource(R.string.admin_toast_rejected)
+    val alreadyProcessedMessage = stringResource(R.string.admin_toast_already_processed)
+    val rejectFailedMessage = stringResource(R.string.admin_toast_reject_failed)
+
     fun approve(item: PhotoReviewItem) {
         db.collection("user_missions").document(item.docId).update(
             mapOf(
@@ -129,7 +138,7 @@ fun AdminPhotoReviewScreen(onNavigateBack: () -> Unit) {
                 "photoReviewedAt" to FieldValue.serverTimestamp()
             )
         ).addOnSuccessListener {
-            android.widget.Toast.makeText(context, "승인했습니다.", android.widget.Toast.LENGTH_SHORT).show()
+            android.widget.Toast.makeText(context, approvedMessage, android.widget.Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -161,17 +170,17 @@ fun AdminPhotoReviewScreen(onNavigateBack: () -> Unit) {
             transaction.set(userRef, mapOf("points" to maxOf(0, currentPoints - granted)), SetOptions.merge())
             true
         }.addOnSuccessListener { done ->
-            val message = if (done == true) "반려했습니다. 사용자에게 재인증이 요청됩니다." else "이미 처리된 건입니다."
+            val message = if (done == true) rejectedMessage else alreadyProcessedMessage
             android.widget.Toast.makeText(context, message, android.widget.Toast.LENGTH_SHORT).show()
         }.addOnFailureListener {
-            android.widget.Toast.makeText(context, "반려 처리에 실패했습니다.", android.widget.Toast.LENGTH_SHORT).show()
+            android.widget.Toast.makeText(context, rejectFailedMessage, android.widget.Toast.LENGTH_SHORT).show()
         }
     }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("사진 검수", fontWeight = FontWeight.Bold) },
+                title = { Text(stringResource(R.string.admin_photo_review_title), fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, null)
@@ -189,7 +198,7 @@ fun AdminPhotoReviewScreen(onNavigateBack: () -> Unit) {
                     .padding(innerPadding),
                 contentAlignment = Alignment.Center
             ) {
-                Text("검수할 사진이 없습니다.", color = Color.Gray)
+                Text(stringResource(R.string.admin_photo_review_empty), color = Color.Gray)
             }
         } else {
             LazyColumn(
@@ -201,7 +210,7 @@ fun AdminPhotoReviewScreen(onNavigateBack: () -> Unit) {
             ) {
                 item {
                     Text(
-                        "자동 판정이 애매한 ${queue.size}건",
+                        stringResource(R.string.admin_photo_review_queue_count, queue.size),
                         color = Color.Gray,
                         fontSize = 13.sp
                     )
@@ -225,7 +234,7 @@ fun AdminPhotoReviewScreen(onNavigateBack: () -> Unit) {
                             if (item.photoUrl.isNotBlank()) {
                                 AsyncImage(
                                     model = item.photoUrl,
-                                    contentDescription = "인증 사진",
+                                    contentDescription = stringResource(R.string.admin_photo_review_photo_desc),
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .height(220.dp)
@@ -235,9 +244,9 @@ fun AdminPhotoReviewScreen(onNavigateBack: () -> Unit) {
 
                             Surface(color = Color.White, shape = RoundedCornerShape(10.dp)) {
                                 Text(
-                                    "모델 판정: ${item.verifyLabel.ifBlank { "-" }} · " +
-                                        "'${item.missionCategory}' 점수 %.2f".format(item.verifyScore) +
-                                        (item.verifySimilarity?.let { " · 대표사진 유사도 %.2f".format(it) } ?: "") +
+                                    stringResource(R.string.admin_photo_review_model_label, item.verifyLabel.ifBlank { "-" }) + " · " +
+                                        stringResource(R.string.admin_photo_review_score_label, item.missionCategory, item.verifyScore) +
+                                        (item.verifySimilarity?.let { stringResource(R.string.admin_photo_review_similarity_label, it) } ?: "") +
                                         (if (item.modelVersion.isNotBlank()) " · ${item.modelVersion}" else ""),
                                     modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
                                     color = Color(0xFF444444),
@@ -253,14 +262,14 @@ fun AdminPhotoReviewScreen(onNavigateBack: () -> Unit) {
                                     },
                                     modifier = Modifier.weight(1f)
                                 ) {
-                                    Text("반려", color = Color(0xFFD9534F))
+                                    Text(stringResource(R.string.admin_photo_review_reject), color = Color(0xFFD9534F))
                                 }
                                 Button(
                                     onClick = { approve(item) },
                                     colors = ButtonDefaults.buttonColors(containerColor = MainPurple),
                                     modifier = Modifier.weight(1f)
                                 ) {
-                                    Text("승인")
+                                    Text(stringResource(R.string.admin_photo_review_approve))
                                 }
                             }
                         }
@@ -274,14 +283,14 @@ fun AdminPhotoReviewScreen(onNavigateBack: () -> Unit) {
     rejectTarget?.let { target ->
         AlertDialog(
             onDismissRequest = { rejectTarget = null },
-            title = { Text("사진 반려") },
+            title = { Text(stringResource(R.string.admin_photo_review_reject_title)) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("'${target.missionTitle}' 인증을 반려하면 ${target.stage2Points}P가 회수되고 사용자는 다시 사진 인증을 해야 합니다.")
+                    Text(stringResource(R.string.admin_photo_review_reject_body, target.missionTitle, target.stage2Points))
                     OutlinedTextField(
                         value = rejectReason,
                         onValueChange = { rejectReason = it },
-                        label = { Text("반려 사유 (선택)") },
+                        label = { Text(stringResource(R.string.admin_photo_review_reject_reason_label)) },
                         modifier = Modifier.fillMaxWidth()
                     )
                 }
@@ -291,11 +300,11 @@ fun AdminPhotoReviewScreen(onNavigateBack: () -> Unit) {
                     reject(target, rejectReason.trim())
                     rejectTarget = null
                 }) {
-                    Text("반려", color = Color(0xFFD9534F))
+                    Text(stringResource(R.string.admin_photo_review_reject), color = Color(0xFFD9534F))
                 }
             },
             dismissButton = {
-                TextButton(onClick = { rejectTarget = null }) { Text("취소") }
+                TextButton(onClick = { rejectTarget = null }) { Text(stringResource(R.string.admin_cancel)) }
             }
         )
     }

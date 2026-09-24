@@ -37,11 +37,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.google.firebase.Firebase
 import com.google.firebase.firestore.firestore
+import smu.ai.graduation_project.R
 import smu.ai.graduation_project.model.Mission
 import smu.ai.graduation_project.ui.theme.CardGray
 import smu.ai.graduation_project.ui.theme.MainPurple
@@ -56,13 +58,14 @@ fun AdminMissionListScreen(
     val db = Firebase.firestore
     var missions by remember { mutableStateOf<List<Mission>>(emptyList()) }
     var missionToDelete by remember { mutableStateOf<Mission?>(null) }
+    val missionTitlePlaceholder = stringResource(R.string.mission_no_title)
 
     LaunchedEffect(Unit) {
         db.collection("missions").addSnapshotListener { snapshot, _ ->
             missions = snapshot?.documents?.map { doc ->
                 Mission(
                     id = doc.id,
-                    title = doc.getString("title") ?: "제목 없는 미션",
+                    title = doc.getString("title") ?: missionTitlePlaceholder,
                     desc = doc.getString("desc") ?: "",
                     points = doc.getLong("points")?.toInt() ?: 0,
                     category = doc.getString("category") ?: "투어",
@@ -75,7 +78,7 @@ fun AdminMissionListScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("미션 관리", fontWeight = FontWeight.Bold) },
+                title = { Text(stringResource(R.string.admin_mission_list_title), fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, null)
@@ -101,7 +104,7 @@ fun AdminMissionListScreen(
                 ) {
                     Icon(Icons.Default.Add, null)
                     Spacer(modifier = Modifier.padding(4.dp))
-                    Text("새 미션 추가")
+                    Text(stringResource(R.string.admin_mission_add))
                 }
             }
 
@@ -128,7 +131,7 @@ fun AdminMissionListScreen(
                             ) {
                                 Icon(Icons.Default.Edit, null)
                                 Spacer(modifier = Modifier.padding(2.dp))
-                                Text("수정")
+                                Text(stringResource(R.string.admin_edit))
                             }
                             Button(
                                 onClick = { missionToDelete = mission },
@@ -137,7 +140,7 @@ fun AdminMissionListScreen(
                             ) {
                                 Icon(Icons.Default.Delete, null)
                                 Spacer(modifier = Modifier.padding(2.dp))
-                                Text("삭제")
+                                Text(stringResource(R.string.admin_delete))
                             }
                         }
                     }
@@ -149,19 +152,19 @@ fun AdminMissionListScreen(
     missionToDelete?.let { target ->
         AlertDialog(
             onDismissRequest = { missionToDelete = null },
-            title = { Text("미션 삭제") },
-            text = { Text("'${target.title}' 미션을 삭제할까요?") },
+            title = { Text(stringResource(R.string.admin_mission_delete_title)) },
+            text = { Text(stringResource(R.string.admin_mission_delete_confirm, target.title)) },
             confirmButton = {
                 TextButton(onClick = {
                     db.collection("missions").document(target.id).delete()
                     missionToDelete = null
                 }) {
-                    Text("삭제")
+                    Text(stringResource(R.string.admin_delete))
                 }
             },
             dismissButton = {
                 TextButton(onClick = { missionToDelete = null }) {
-                    Text("취소")
+                    Text(stringResource(R.string.admin_cancel))
                 }
             }
         )

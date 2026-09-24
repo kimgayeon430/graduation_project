@@ -25,6 +25,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.view.doOnLayout
@@ -38,6 +39,8 @@ import com.naver.maps.map.CameraUpdate
 import com.naver.maps.map.MapView
 import com.naver.maps.map.NaverMap
 import com.naver.maps.map.overlay.InfoWindow
+import smu.ai.graduation_project.R
+import smu.ai.graduation_project.data.getLocalizedString
 import smu.ai.graduation_project.model.Mission
 
 @Composable
@@ -85,9 +88,9 @@ fun MissionMapScreen(
                     adapter = object : InfoWindow.DefaultTextAdapter(context) {
                         override fun getText(infoWindow: InfoWindow): CharSequence =
                             if (group.size == 1) {
-                                "${group.first().title}\n${group.first().points}P · 상세 보기"
+                                context.getLocalizedString(R.string.map_bubble_single, group.first().title, group.first().points)
                             } else {
-                                "미션 ${group.size}개 · 눌러서 선택"
+                                context.getLocalizedString(R.string.map_bubble_group, group.size)
                             }
                     }
                     setOnClickListener {
@@ -132,8 +135,8 @@ fun MissionMapScreen(
             shadowElevation = 3.dp) {
             val count = groups.values.sumOf { it.size }
             Text(
-                text = if (count == 0) "위치가 등록된 미션이 없습니다. 목록에서 확인해 주세요."
-                else "미션 ${count}개 · 말풍선을 눌러 상세 보기",
+                text = if (count == 0) stringResource(R.string.map_empty)
+                else stringResource(R.string.map_summary, count),
                 modifier = Modifier.padding(12.dp)
             )
         }
@@ -142,19 +145,19 @@ fun MissionMapScreen(
     if (selectedMissions.isNotEmpty()) {
         AlertDialog(
             onDismissRequest = { selectedIds = emptyList() },
-            title = { Text("이 장소의 미션") },
+            title = { Text(stringResource(R.string.map_dialog_title)) },
             text = {
                 LazyColumn {
                     items(selectedMissions, key = { it.id }) { mission ->
                         TextButton(onClick = {
                             selectedIds = emptyList()
                             currentOnClick(mission.id)
-                        }) { Text("${mission.title} · ${mission.points}P") }
+                        }) { Text(stringResource(R.string.map_dialog_item, mission.title, mission.points)) }
                     }
                 }
             },
             confirmButton = {
-                TextButton(onClick = { selectedIds = emptyList() }) { Text("닫기") }
+                TextButton(onClick = { selectedIds = emptyList() }) { Text(stringResource(R.string.map_dialog_close)) }
             }
         )
     }

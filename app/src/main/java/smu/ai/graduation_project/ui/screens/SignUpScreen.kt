@@ -29,11 +29,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.google.firebase.Firebase
 import com.google.firebase.auth.auth
 import com.google.firebase.auth.userProfileChangeRequest
 import com.google.firebase.firestore.firestore
+import smu.ai.graduation_project.R
 import smu.ai.graduation_project.ui.theme.MainPurple
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -49,11 +51,14 @@ fun SignUpScreen(
     val context = LocalContext.current
     val auth = Firebase.auth
     val db = Firebase.firestore
+    val emptyFieldsMessage = stringResource(R.string.signup_toast_empty_fields)
+    val signupFailedMessage = stringResource(R.string.signup_toast_failed)
+    val profileSaveFailedMessage = stringResource(R.string.signup_toast_profile_save_failed)
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Sign up") },
+                title = { Text(stringResource(R.string.signup_title)) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, null)
@@ -74,7 +79,7 @@ fun SignUpScreen(
                 value = name,
                 onValueChange = { name = it },
                 modifier = Modifier.fillMaxWidth(),
-                label = { Text("Name") },
+                label = { Text(stringResource(R.string.signup_name_label)) },
                 leadingIcon = { Icon(Icons.Default.Person, null) },
                 enabled = !isLoading
             )
@@ -82,7 +87,7 @@ fun SignUpScreen(
                 value = email,
                 onValueChange = { email = it },
                 modifier = Modifier.fillMaxWidth(),
-                label = { Text("Email") },
+                label = { Text(stringResource(R.string.signup_email_label)) },
                 leadingIcon = { Icon(Icons.Default.Email, null) },
                 enabled = !isLoading
             )
@@ -90,7 +95,7 @@ fun SignUpScreen(
                 value = password,
                 onValueChange = { password = it },
                 modifier = Modifier.fillMaxWidth(),
-                label = { Text("Password") },
+                label = { Text(stringResource(R.string.signup_password_label)) },
                 leadingIcon = { Icon(Icons.Default.Lock, null) },
                 enabled = !isLoading
             )
@@ -102,7 +107,7 @@ fun SignUpScreen(
             Button(
                 onClick = {
                     if (name.isBlank() || email.isBlank() || password.isBlank()) {
-                        Toast.makeText(context, "Fill in all fields.", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, emptyFieldsMessage, Toast.LENGTH_SHORT).show()
                         return@Button
                     }
 
@@ -113,7 +118,7 @@ fun SignUpScreen(
                                 isLoading = false
                                 Toast.makeText(
                                     context,
-                                    task.exception?.message ?: "Sign up failed.",
+                                    task.exception?.message ?: signupFailedMessage,
                                     Toast.LENGTH_SHORT
                                 ).show()
                                 return@addOnCompleteListener
@@ -150,7 +155,7 @@ fun SignUpScreen(
                                             isLoading = false
                                             Toast.makeText(
                                                 context,
-                                                error.message ?: "Profile save failed.",
+                                                error.message ?: profileSaveFailedMessage,
                                                 Toast.LENGTH_SHORT
                                             ).show()
                                             onSignUpSuccess()
@@ -162,7 +167,7 @@ fun SignUpScreen(
                 enabled = !isLoading,
                 colors = ButtonDefaults.buttonColors(containerColor = MainPurple)
             ) {
-                Text("Create account")
+                Text(stringResource(R.string.signup_btn))
             }
         }
     }

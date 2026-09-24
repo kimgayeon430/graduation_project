@@ -55,6 +55,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -66,6 +67,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.google.firebase.Firebase
 import com.google.firebase.auth.auth
+import smu.ai.graduation_project.R
 import smu.ai.graduation_project.ui.theme.CardGray
 import smu.ai.graduation_project.ui.theme.LightPurple
 import smu.ai.graduation_project.ui.theme.MainPurple
@@ -145,17 +147,17 @@ fun MissionPerformScreen(
 
     fun requestLocation() {
         if (Firebase.auth.currentUser == null) {
-            Toast.makeText(context, "로그인이 필요합니다.", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, context.getString(R.string.toast_login_required), Toast.LENGTH_SHORT).show()
             return
         }
         if (locationManager == null) {
-            Toast.makeText(context, "위치 서비스를 사용할 수 없습니다.", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, context.getString(R.string.toast_location_unavailable), Toast.LENGTH_SHORT).show()
             return
         }
         val gpsEnabled = locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)
         val networkEnabled = locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER)
         if (!gpsEnabled && !networkEnabled) {
-            Toast.makeText(context, "위치를 사용하려면 GPS를 켜주세요.", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, context.getString(R.string.toast_enable_gps), Toast.LENGTH_SHORT).show()
             return
         }
 
@@ -179,7 +181,7 @@ fun MissionPerformScreen(
         if (granted) {
             requestLocation()
         } else {
-            Toast.makeText(context, "위치 권한이 필요합니다.", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, context.getString(R.string.toast_location_permission_required), Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -229,7 +231,7 @@ fun MissionPerformScreen(
         if (granted) {
             launchCamera()
         } else {
-            Toast.makeText(context, "카메라 권한이 필요합니다.", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, context.getString(R.string.toast_camera_permission_required), Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -243,7 +245,7 @@ fun MissionPerformScreen(
 
     fun startPhotoCapture() {
         if (!state.locationVerified) {
-            Toast.makeText(context, "먼저 위치 인증을 완료해주세요.", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, context.getString(R.string.toast_verify_location_first), Toast.LENGTH_SHORT).show()
             return
         }
         val hasCamera = ContextCompat.checkSelfPermission(
@@ -259,7 +261,7 @@ fun MissionPerformScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("미션 수행", fontWeight = FontWeight.Bold) },
+                title = { Text(stringResource(R.string.perform_title), fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, null)
@@ -288,11 +290,21 @@ fun MissionPerformScreen(
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     Text(state.missionTitle, fontWeight = FontWeight.ExtraBold, fontSize = 26.sp, color = Color(0xFF2C2C2C))
-                    Text("첫 단계는 현재 위치를 인증하는 것입니다. GPS 권한을 허용하고 현장에서 인증 버튼을 눌러주세요.", color = Color.Gray, lineHeight = 21.sp)
-                    Text("포인트 지급: 1단계 ${state.stage1Reward}P · 2단계 ${state.stage2Reward}P", color = Color(0xFF5A4DB4), fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                    Text(stringResource(R.string.perform_intro_body), color = Color.Gray, lineHeight = 21.sp)
+                    Text(
+                        stringResource(R.string.perform_reward_line, state.stage1Reward, state.stage2Reward),
+                        color = Color(0xFF5A4DB4),
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 14.sp
+                    )
                     state.missionLocation?.let {
                         Text(
-                            "목표 위치: %.4f, %.4f · 반경 ${state.allowedRadiusMeters.toInt()}m 안에서 인증".format(it.latitude, it.longitude),
+                            stringResource(
+                                R.string.perform_target_location,
+                                it.latitude,
+                                it.longitude,
+                                state.allowedRadiusMeters.toInt()
+                            ),
                             color = MainPurple,
                             fontSize = 13.sp,
                             fontWeight = FontWeight.Medium
@@ -325,9 +337,12 @@ fun MissionPerformScreen(
                         }
                         Spacer(modifier = Modifier.width(12.dp))
                         Column {
-                            Text("1단계 · GPS 위치 인증", fontWeight = FontWeight.Bold, fontSize = 17.sp)
+                            Text(stringResource(R.string.perform_step1_title), fontWeight = FontWeight.Bold, fontSize = 17.sp)
+                            val verificationText = state.verificationText.ifEmpty { stringResource(R.string.perform_status_not_verified_yet) }
                             Text(
-                                if (state.stage1RewardGranted && state.locationVerified) "${state.verificationText} · ${state.stage1Reward}P 지급 완료" else state.verificationText,
+                                if (state.stage1RewardGranted && state.locationVerified) {
+                                    verificationText + stringResource(R.string.perform_reward_granted_suffix, state.stage1Reward)
+                                } else verificationText,
                                 color = Color.Gray,
                                 fontSize = 13.sp
                             )
@@ -344,7 +359,10 @@ fun MissionPerformScreen(
                         if (state.isVerifying) {
                             CircularProgressIndicator(color = Color.White, modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
                         } else {
-                            Text(if (state.locationVerified) "위치 다시 인증하기" else "위치 인증하기", fontWeight = FontWeight.Bold)
+                            Text(
+                                stringResource(if (state.locationVerified) R.string.perform_btn_reverify else R.string.perform_btn_verify),
+                                fontWeight = FontWeight.Bold
+                            )
                         }
                     }
                 }
@@ -374,14 +392,18 @@ fun MissionPerformScreen(
                         }
                         Spacer(modifier = Modifier.width(12.dp))
                         Column {
-                            Text("2단계 · 사진 인증", fontWeight = FontWeight.Bold, fontSize = 17.sp)
+                            Text(stringResource(R.string.perform_step2_title), fontWeight = FontWeight.Bold, fontSize = 17.sp)
                             Text(
                                 if (state.missionCompleted) {
-                                    if (state.stage2RewardGranted) "사진 인증까지 완료됐고 ${state.stage2Reward}P 지급도 반영됐습니다." else "사진 인증까지 완료된 상태입니다."
+                                    if (state.stage2RewardGranted) {
+                                        stringResource(R.string.perform_step2_desc_completed_with_reward, state.stage2Reward)
+                                    } else {
+                                        stringResource(R.string.perform_step2_desc_completed)
+                                    }
                                 } else if (state.locationVerified) {
-                                    "위치 인증이 끝났습니다. 사진 인증 완료 시 ${state.stage2Reward}P가 지급됩니다."
+                                    stringResource(R.string.perform_step2_desc_ready, state.stage2Reward)
                                 } else {
-                                    "위치 인증이 끝나야 사진 인증 단계로 진행할 수 있습니다."
+                                    stringResource(R.string.perform_step2_desc_locked)
                                 },
                                 color = Color.Gray,
                                 fontSize = 13.sp
@@ -394,7 +416,7 @@ fun MissionPerformScreen(
                     if (previewModel != null) {
                         AsyncImage(
                             model = previewModel,
-                            contentDescription = "인증 사진 미리보기",
+                            contentDescription = stringResource(R.string.perform_photo_preview_desc),
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(200.dp)
@@ -418,7 +440,7 @@ fun MissionPerformScreen(
                             ) {
                                 Icon(Icons.Default.CameraAlt, null, modifier = Modifier.size(18.dp))
                                 Spacer(modifier = Modifier.width(8.dp))
-                                Text("사진 촬영하기", fontWeight = FontWeight.Bold)
+                                Text(stringResource(R.string.perform_btn_photo_capture), fontWeight = FontWeight.Bold)
                             }
                         } else {
                             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -428,7 +450,7 @@ fun MissionPerformScreen(
                                     modifier = Modifier.weight(1f),
                                     shape = RoundedCornerShape(16.dp)
                                 ) {
-                                    Text("다시 촬영")
+                                    Text(stringResource(R.string.perform_btn_retake))
                                 }
                                 Button(
                                     onClick = { viewModel.uploadPhotoAndComplete(readCapturedPhotoBytes()) },
@@ -440,13 +462,16 @@ fun MissionPerformScreen(
                                     if (state.isUploading) {
                                         CircularProgressIndicator(color = Color.White, modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
                                     } else {
-                                        Text(if (state.uploadError != null) "다시 시도" else "사진 인증 완료", fontWeight = FontWeight.Bold)
+                                        Text(
+                                            stringResource(if (state.uploadError != null) R.string.perform_btn_retry else R.string.perform_btn_photo_complete),
+                                            fontWeight = FontWeight.Bold
+                                        )
                                     }
                                 }
                             }
                         }
                         if (state.isUploading) {
-                            Text("사진 업로드 중입니다...", color = Color.Gray, fontSize = 12.sp)
+                            Text(stringResource(R.string.perform_uploading), color = Color.Gray, fontSize = 12.sp)
                         }
                     }
                 }
@@ -462,10 +487,35 @@ fun MissionPerformScreen(
                     modifier = Modifier.padding(18.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Text("진행 상태", fontWeight = FontWeight.Bold, fontSize = 18.sp)
-                    StatusRow("위치 권한", "허용 후 인증 버튼 실행", Icons.Default.Place)
-                    StatusRow("GPS 인증", if (state.locationVerified) "인증 완료 · ${if (state.stage1RewardGranted) "${state.stage1Reward}P 지급" else "지급 대기"}" else "대기 중", Icons.Default.LocationSearching)
-                    StatusRow("사진 인증", if (state.missionCompleted) "완료됨 · ${if (state.stage2RewardGranted) "${state.stage2Reward}P 지급" else "지급 대기"}" else if (state.locationVerified) "버튼 활성화" else "위치 인증 후 진행", Icons.Default.CheckCircle)
+                    Text(stringResource(R.string.perform_progress_title), fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                    StatusRow(
+                        stringResource(R.string.perform_status_location_permission),
+                        stringResource(R.string.perform_status_location_permission_value),
+                        Icons.Default.Place
+                    )
+                    val rewardText = stringResource(R.string.perform_status_reward_pending)
+                    StatusRow(
+                        stringResource(R.string.perform_status_gps),
+                        if (state.locationVerified) {
+                            stringResource(R.string.perform_status_verified) + " · " +
+                                if (state.stage1RewardGranted) stringResource(R.string.perform_status_reward_granted, state.stage1Reward) else rewardText
+                        } else {
+                            stringResource(R.string.perform_status_waiting)
+                        },
+                        Icons.Default.LocationSearching
+                    )
+                    StatusRow(
+                        stringResource(R.string.perform_status_photo),
+                        if (state.missionCompleted) {
+                            stringResource(R.string.perform_status_completed) + " · " +
+                                if (state.stage2RewardGranted) stringResource(R.string.perform_status_reward_granted, state.stage2Reward) else rewardText
+                        } else if (state.locationVerified) {
+                            stringResource(R.string.perform_status_button_active)
+                        } else {
+                            stringResource(R.string.perform_status_after_location)
+                        },
+                        Icons.Default.CheckCircle
+                    )
                 }
             }
         }

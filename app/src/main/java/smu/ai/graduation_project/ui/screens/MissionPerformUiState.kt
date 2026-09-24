@@ -25,7 +25,8 @@ data class MissionPerformUiState(
     val stage1RewardGranted: Boolean = false,
     val stage2RewardGranted: Boolean = false,
 
-    val verificationText: String = "아직 위치 인증을 하지 않았습니다.",
+    /** 빈 문자열이면 화면이 [smu.ai.graduation_project.R.string.perform_status_not_verified_yet] 를 대신 표시한다. */
+    val verificationText: String = "",
 
     val capturedPhotoUri: Uri? = null,
     val photoUrl: String? = null,

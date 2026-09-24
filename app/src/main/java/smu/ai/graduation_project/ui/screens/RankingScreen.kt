@@ -28,6 +28,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -35,6 +36,7 @@ import com.google.firebase.Firebase
 import com.google.firebase.auth.auth
 import com.google.firebase.firestore.Query
 import com.google.firebase.firestore.firestore
+import smu.ai.graduation_project.R
 import smu.ai.graduation_project.model.UserRank
 import smu.ai.graduation_project.ui.components.RankingListItem
 import smu.ai.graduation_project.ui.components.TopThreeSection
@@ -47,7 +49,8 @@ fun RankingScreen() {
     val currentUser = Firebase.auth.currentUser
     var selectedTab by remember { mutableIntStateOf(0) }
     var rankingList by remember { mutableStateOf<List<UserRank>>(emptyList()) }
-    val tabs = listOf("전체 랭킹", "내 랭킹")
+    val tabs = listOf(stringResource(R.string.ranking_tab_all), stringResource(R.string.ranking_tab_mine))
+    val defaultName = stringResource(R.string.ranking_default_name)
 
     LaunchedEffect(Unit) {
         db.collection("users")
@@ -57,7 +60,7 @@ fun RankingScreen() {
                     rankingList = snapshot.documents.mapIndexed { index, doc ->
                         UserRank(
                             rank = index + 1,
-                            name = doc.getString("nickname") ?: "Traveler",
+                            name = doc.getString("nickname") ?: defaultName,
                             points = doc.getLong("points")?.toInt() ?: 0,
                             uid = doc.id
                         )
@@ -86,7 +89,7 @@ fun RankingScreen() {
             .background(Color.White)
     ) {
         CenterAlignedTopAppBar(
-            title = { Text("랭킹", fontWeight = FontWeight.Bold, fontSize = 20.sp) },
+            title = { Text(stringResource(R.string.ranking_title), fontWeight = FontWeight.Bold, fontSize = 20.sp) },
             actions = {
                 IconButton(onClick = { }) {
                     Icon(Icons.AutoMirrored.Filled.HelpCenter, null)
@@ -138,7 +141,7 @@ fun RankingScreen() {
                         visibleRanking.drop(3).forEachIndexed { index, userRank ->
                             RankingListItem(
                                 rank = userRank.rank,
-                                name = if (userRank.uid == currentUser?.uid) "You" else userRank.name,
+                                name = if (userRank.uid == currentUser?.uid) stringResource(R.string.ranking_you) else userRank.name,
                                 points = userRank.points,
                                 isMe = userRank.uid == currentUser?.uid
                             )

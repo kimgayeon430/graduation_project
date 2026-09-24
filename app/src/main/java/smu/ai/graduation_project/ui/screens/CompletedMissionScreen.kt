@@ -44,6 +44,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -51,6 +52,7 @@ import coil.compose.AsyncImage
 import com.google.firebase.Firebase
 import com.google.firebase.auth.auth
 import com.google.firebase.firestore.firestore
+import smu.ai.graduation_project.R
 import smu.ai.graduation_project.data.LanguagePreference
 import smu.ai.graduation_project.data.localizedString
 import smu.ai.graduation_project.model.Mission
@@ -72,6 +74,7 @@ fun CompletedMissionScreen(
     val db = Firebase.firestore
     var missions by remember { mutableStateOf<List<Mission>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
+    val missionFallback = stringResource(R.string.completed_mission_fallback)
 
     LaunchedEffect(user?.uid) {
         val uid = user?.uid
@@ -107,7 +110,7 @@ fun CompletedMissionScreen(
                             loaded[index] = Mission(
                                 id = missionId,
                                 title = missionDoc.localizedString("title", LanguagePreference.current, "")
-                                    .ifBlank { userMissionDoc.getString("title") ?: "완료한 미션" },
+                                    .ifBlank { userMissionDoc.getString("title") ?: missionFallback },
                                 desc = missionDoc.localizedString("desc", LanguagePreference.current),
                                 points = missionDoc.getLong("points")?.toInt() ?: 0,
                                 category = missionDoc.getString("category") ?: "투어",
@@ -136,7 +139,7 @@ fun CompletedMissionScreen(
         containerColor = Color.White,
         topBar = {
             TopAppBar(
-                title = { Text("완료한 미션", fontWeight = FontWeight.Bold) },
+                title = { Text(stringResource(R.string.completed_title), fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, null)
@@ -167,9 +170,9 @@ fun CompletedMissionScreen(
                     contentAlignment = Alignment.Center
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("완료한 미션이 없습니다.", fontWeight = FontWeight.Bold, fontSize = 20.sp)
+                        Text(stringResource(R.string.completed_empty_title), fontWeight = FontWeight.Bold, fontSize = 20.sp)
                         Spacer(modifier = Modifier.height(8.dp))
-                        Text("미션을 끝까지 인증하면 여기에 쌓입니다.", color = Color.Gray)
+                        Text(stringResource(R.string.completed_empty_desc), color = Color.Gray)
                     }
                 }
             }
@@ -257,7 +260,7 @@ private fun CompletedMissionCard(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Default.CheckCircle, null, tint = Color(0xFF70BE63), modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.width(6.dp))
-                    Text("인증 완료 ${mission.progressText}", fontWeight = FontWeight.Bold, color = Color(0xFF353535))
+                    Text(stringResource(R.string.completed_progress_label, mission.progressText), fontWeight = FontWeight.Bold, color = Color(0xFF353535))
                 }
                 LinearProgressIndicator(
                     progress = { mission.progress },
@@ -276,7 +279,7 @@ private fun CompletedMissionCard(
                 colors = ButtonDefaults.buttonColors(containerColor = MainPurple),
                 shape = RoundedCornerShape(16.dp)
             ) {
-                Text("미션 다시 보기", fontWeight = FontWeight.Bold)
+                Text(stringResource(R.string.completed_btn_view), fontWeight = FontWeight.Bold)
             }
         }
     }

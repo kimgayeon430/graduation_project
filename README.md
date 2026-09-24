@@ -22,6 +22,7 @@
 - 홈에서 취향·완료 이력 기반 미션 추천 (규칙 점수 + 완료 로그 학습 re-ranker 하이브리드, 완료한 미션 제외)
 - 누적 포인트 기반 사용자 랭킹
 - 프로필에서 포인트, 레벨 및 미션 현황 확인
+- 마이페이지에서 한국어 / English UI 언어 전환 (앱 전체 화면·하단 메뉴바에 즉시 반영)
 
 ### 관리자
 
@@ -171,6 +172,16 @@
 - 마커/정보창을 누르면 해당 미션 상세로 이동합니다.
 - `MapView` 는 Compose `AndroidView` 로 감싸고 `Lifecycle` 이벤트와 `rememberSaveable` 로 상태(카메라 위치 등)를 화면 회전에도 유지합니다.
 - 네이버 지도 인증 키(`NCP_KEY_ID`)는 `local.properties` → `manifestPlaceholders` 로 주입되어 VCS 에 올라가지 않습니다.
+
+## 다국어 지원 (한국어 / English)
+
+마이페이지 → **언어 / Language** 에서 한국어·영어를 선택하면 앱 전체(하단 메뉴바, 관리자 화면 포함)가 즉시 해당 언어로 전환됩니다.
+
+- **UI 문구**: `values/strings.xml`(기본, 한국어) / `values-en/strings.xml`(영어) 리소스로 관리하며, 두 파일은 키가 1:1로 대응합니다.
+- **적용 방식**: 선택한 언어는 `SharedPreferences`(`LanguagePreference`)에 저장되고, `MainActivity.attachBaseContext` 가 이를 읽어 `Configuration` 을 감싼 Context 로 액티비티를 재생성합니다. `AppCompatDelegate.setApplicationLocales` 는 `ComponentActivity`(AppCompatActivity 아님)에서 리소스가 즉시 갱신되지 않아 쓰지 않고, 수동 Locale/Configuration 전환 방식을 사용합니다.
+- **Compose 밖(ViewModel 등)**: `Context.getLocalizedString()` 확장 함수가 호출 시점마다 저장된 언어로 다시 감싼 Context 에서 문자열을 읽어, 화면 재구성 없이도 최신 언어를 반영합니다. (`MissionPerformViewModel` 의 위치·사진 인증 안내 메시지 등)
+- **미션 콘텐츠(제목/설명)**: Firestore에 `title`/`desc`(한국어)와 `titleEn`/`descEn`(영어)로 함께 저장하고, `DocumentSnapshot.localizedString()` 이 현재 언어에 맞는 필드를 고릅니다. 영어 번역이 비어 있으면 한국어로 안전하게 폴백합니다.
+- **내부 상태값**: 미션 카테고리(`투어`/`맛집`/`체험`/`쇼핑`)와 진행 상태(`진행중`/`완료`/`미 진행`) 코드는 Firestore·내부 로직에서 항상 한국어 값을 그대로 쓰고, 화면에 표시할 때만 `categoryLabel()` / `missionStatusLabel()` 로 번역합니다.
 
 ## 앱 내비게이션
 

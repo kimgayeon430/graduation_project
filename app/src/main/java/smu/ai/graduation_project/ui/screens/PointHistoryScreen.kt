@@ -37,6 +37,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -44,6 +45,7 @@ import com.google.firebase.Firebase
 import com.google.firebase.Timestamp
 import com.google.firebase.auth.auth
 import com.google.firebase.firestore.firestore
+import smu.ai.graduation_project.R
 import smu.ai.graduation_project.data.LanguagePreference
 import smu.ai.graduation_project.data.localizedString
 import smu.ai.graduation_project.ui.theme.LightPurple
@@ -76,6 +78,9 @@ fun PointHistoryScreen(onNavigateBack: () -> Unit) {
 
     var entries by remember { mutableStateOf<List<PointEntry>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
+    val missionFallback = stringResource(R.string.point_history_mission_fallback)
+    val reasonLocation = stringResource(R.string.point_history_reason_location)
+    val reasonPhoto = stringResource(R.string.point_history_reason_photo)
 
     LaunchedEffect(uid) {
         if (uid == null) {
@@ -101,11 +106,11 @@ fun PointHistoryScreen(onNavigateBack: () -> Unit) {
                     val missionId = doc.getString("missionId").orEmpty()
                     if (doc.getBoolean("stage1RewardGranted") == true) {
                         val p = doc.getLong("stage1RewardPoints")?.toInt() ?: 0
-                        if (p > 0) raw += Raw(missionId, "위치 인증", p, doc.getTimestamp("stage1VerifiedAt"), false)
+                        if (p > 0) raw += Raw(missionId, reasonLocation, p, doc.getTimestamp("stage1VerifiedAt"), false)
                     }
                     if (doc.getBoolean("stage2RewardGranted") == true) {
                         val p = doc.getLong("stage2RewardPoints")?.toInt() ?: 0
-                        if (p > 0) raw += Raw(missionId, "사진 인증", p, doc.getTimestamp("completedAt"), true)
+                        if (p > 0) raw += Raw(missionId, reasonPhoto, p, doc.getTimestamp("completedAt"), true)
                     }
                 }
 
@@ -124,7 +129,7 @@ fun PointHistoryScreen(onNavigateBack: () -> Unit) {
                         .map {
                             PointEntry(
                                 missionTitle = titles[it.missionId]
-                                    ?: it.missionId.ifBlank { "미션" },
+                                    ?: it.missionId.ifBlank { missionFallback },
                                 reason = it.reason,
                                 points = it.points,
                                 at = it.at,
@@ -162,7 +167,7 @@ fun PointHistoryScreen(onNavigateBack: () -> Unit) {
         containerColor = Color.White,
         topBar = {
             TopAppBar(
-                title = { Text("포인트 내역", fontWeight = FontWeight.Bold) },
+                title = { Text(stringResource(R.string.point_history_title), fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, null)
@@ -188,9 +193,9 @@ fun PointHistoryScreen(onNavigateBack: () -> Unit) {
                 contentAlignment = Alignment.Center
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("아직 받은 포인트가 없어요.", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                    Text(stringResource(R.string.point_history_empty_title), fontWeight = FontWeight.Bold, fontSize = 18.sp)
                     Spacer(modifier = Modifier.height(8.dp))
-                    Text("미션을 완료하면 여기에 적립 내역이 쌓입니다.", color = Color.Gray, fontSize = 13.sp)
+                    Text(stringResource(R.string.point_history_empty_desc), color = Color.Gray, fontSize = 13.sp)
                 }
             }
 
@@ -208,7 +213,7 @@ fun PointHistoryScreen(onNavigateBack: () -> Unit) {
                         shape = RoundedCornerShape(20.dp)
                     ) {
                         Column(modifier = Modifier.padding(20.dp)) {
-                            Text("적립 포인트 합계", color = Color.Gray, fontSize = 13.sp)
+                            Text(stringResource(R.string.point_history_sum_title), color = Color.Gray, fontSize = 13.sp)
                             Spacer(modifier = Modifier.height(4.dp))
                             Text(
                                 text = String.format(Locale.KOREA, "%,dP", entries.sumOf { it.points }),
@@ -216,7 +221,7 @@ fun PointHistoryScreen(onNavigateBack: () -> Unit) {
                                 fontSize = 26.sp,
                                 color = MainPurple
                             )
-                            Text("총 ${entries.size}건", color = Color.Gray, fontSize = 12.sp)
+                            Text(stringResource(R.string.point_history_count, entries.size), color = Color.Gray, fontSize = 12.sp)
                         }
                     }
                     Spacer(modifier = Modifier.height(6.dp))

@@ -60,6 +60,7 @@ Android 애플리케이션을 개발한다. 사용자는 취향에 맞는 미션
 - 홈에서 선호 카테고리를 우선한 규칙 기반 미션 추천(완료한 미션 제외)
 - 누적 포인트 기반 사용자 랭킹, 프로필에서 포인트·레벨·미션 현황 확인
 - 마이페이지에서 **보유 포인트를 누르면 적립 내역**(미션별 위치·사진 인증 보상)을 확인
+- 마이페이지에서 **한국어 / English UI 언어 전환** — 하단 메뉴바·관리자 화면을 포함한 앱 전체 화면과 미션 콘텐츠(제목·설명)가 즉시 선택한 언어로 전환
 
 ### 2.2 관리자 기능
 
@@ -574,6 +575,7 @@ held-out 데이터로도 분리력이 개선된다(J 0.21 → 0.33). 표본이 �
 - [x] 모델 에셋 로딩 계측 테스트 (`OnnxPhotoVerifierTest` 6건, `RerankerSourceTest` 4건) — 실기기(Galaxy S8, API 28)에서 실제 에셋으로 추론·로딩 검증. 두 로더 모두 실패를 `runCatching` 으로 삼켜 **무증상 고장**(사진: 전건 검수 큐행 / 추천: 규칙 기반 폴백)이 나므로, 재학습 모델 교체 시 신호 순서·라벨 불일치를 잡는 방어선
 - [x] 참조 이미지 임베딩 유사도(6.7절) — `CLIP ViT-B/32` 임베딩 인코더 채택(pooled feature 재사용은 분리도 AUC 0.60 으로 기각, `ml/embedding_separability.py`). 온디바이스 `OnnxClipPhotoEmbedder`(88.6MB int8, HF Hub 런타임 다운로드+`filesDir` 캐시), 판정 규칙 `PhotoVerification.verify` 에 유사도 ±1단계 결합, 참조 임베딩 사전계산 `ml/embed_missions.py`, EXIF 회전 정합(`ImagePreprocess` + `androidx.exifinterface`). 단위 테스트 신규 13건 포함 `PhotoVerificationTest` 18 + `PhotoGateTest` 8 통과, `testDebugUnitTest`·`compileReleaseKotlin` BUILD SUCCESSFUL. 실기기(Galaxy S8) 계측 테스트 통과 + 유사도 신호 실동작·구제 경로 확인(6.7.7). 임계값(rescue 0.50 / suspect 0.68)은 공개 scene 프록시 기반 잠정치
 - [x] 다중 참조 이미지(최대 유사도, 6.7.8) — 오프라인 프로토타입(J 0.33→0.47)으로 효과 확인 후 실제 구현. `referenceEmbedding: FloatArray?` → `referenceEmbeddings: List<FloatArray>`, `PhotoEmbedding.maxCosineOrNull` 로 전 계층(`PhotoVerification`/`PhotoGate`/`MissionRepository`/`FirebaseMissionRepository`/`MissionPerformViewModel`) 반영. Firestore 가 배열의 배열을 지원하지 않아 원소를 `{"v":[...]}` 맵으로 감싼 구조로 수정(발견·수정 과정 포함). 8개 미션 실제 백필 + held-out 검증(J 0.21→0.33) 완료. `PhotoVerificationTest`/`PhotoGateTest` 다중 참조 테스트 추가
+- [x] 마이페이지 한국어/English UI 언어 전환 — `LanguagePreference`(`SharedPreferences`) 저장값을 `MainActivity.attachBaseContext` 가 `Configuration` 으로 감싸 액티비티 재생성 시 반영(수동 Locale 전환; `ComponentActivity` 에서는 `AppCompatDelegate.setApplicationLocales` 가 즉시 갱신되지 않아 미사용). 랜딩·로그인·회원가입·홈·미션 목록/상세/지도/수행·취향 선택·마이페이지·포인트 내역·진행 중/완료 미션·랭킹·관리자 5개 화면 전 UI 문구를 `values/strings.xml`(한국어)·`values-en/strings.xml`(영어) 리소스로 분리(1:1 키 대응). Compose 밖(ViewModel)의 문구는 호출 시점마다 저장된 언어를 다시 읽는 `Context.getLocalizedString()` 확장으로 처리. 미션 제목·설명은 Firestore `title`/`titleEn`, `desc`/`descEn` 필드를 `localizedString()` 이 선택(영어 미번역 시 한국어로 폴백)하고, 카테고리·진행 상태 같은 내부 코드값은 항상 한국어로 유지한 채 표시할 때만 번역
 
 ### 7.2 남은 작업
 

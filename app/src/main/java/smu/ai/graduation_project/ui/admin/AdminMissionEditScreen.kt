@@ -30,6 +30,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.google.firebase.Firebase
@@ -37,6 +38,7 @@ import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.GeoPoint
 import com.google.firebase.firestore.SetOptions
 import com.google.firebase.firestore.firestore
+import smu.ai.graduation_project.R
 import smu.ai.graduation_project.ui.theme.MainPurple
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -78,7 +80,7 @@ fun AdminMissionEditScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(if (isEdit) "미션 수정" else "미션 추가", fontWeight = FontWeight.Bold) },
+                title = { Text(stringResource(if (isEdit) R.string.admin_mission_edit_title else R.string.admin_mission_add_title), fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, null)
@@ -97,20 +99,25 @@ fun AdminMissionEditScreen(
                 .padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            OutlinedTextField(title, { title = it }, modifier = Modifier.fillMaxWidth(), label = { Text("미션 제목") })
-            OutlinedTextField(desc, { desc = it }, modifier = Modifier.fillMaxWidth(), minLines = 4, label = { Text("미션 설명") })
-            OutlinedTextField(category, { category = it }, modifier = Modifier.fillMaxWidth(), label = { Text("카테고리") })
-            OutlinedTextField(points.toString(), { points = it.toIntOrNull() ?: 0 }, modifier = Modifier.fillMaxWidth(), label = { Text("포인트") })
-            OutlinedTextField(imageUrl, { imageUrl = it }, modifier = Modifier.fillMaxWidth(), label = { Text("이미지 URL") })
+            OutlinedTextField(title, { title = it }, modifier = Modifier.fillMaxWidth(), label = { Text(stringResource(R.string.admin_mission_field_title)) })
+            OutlinedTextField(desc, { desc = it }, modifier = Modifier.fillMaxWidth(), minLines = 4, label = { Text(stringResource(R.string.admin_mission_field_desc)) })
+            OutlinedTextField(category, { category = it }, modifier = Modifier.fillMaxWidth(), label = { Text(stringResource(R.string.admin_mission_field_category)) })
+            OutlinedTextField(points.toString(), { points = it.toIntOrNull() ?: 0 }, modifier = Modifier.fillMaxWidth(), label = { Text(stringResource(R.string.admin_mission_field_points)) })
+            OutlinedTextField(imageUrl, { imageUrl = it }, modifier = Modifier.fillMaxWidth(), label = { Text(stringResource(R.string.admin_mission_field_image_url)) })
 
-            Text("위치 (선택 — 거리 기반 추천에 사용)", fontWeight = FontWeight.Bold)
-            OutlinedTextField(latitude, { latitude = it }, modifier = Modifier.fillMaxWidth(), label = { Text("위도 latitude (예: 37.5559)") })
-            OutlinedTextField(longitude, { longitude = it }, modifier = Modifier.fillMaxWidth(), label = { Text("경도 longitude (예: 126.9707)") })
+            Text(stringResource(R.string.admin_mission_field_location_section), fontWeight = FontWeight.Bold)
+            OutlinedTextField(latitude, { latitude = it }, modifier = Modifier.fillMaxWidth(), label = { Text(stringResource(R.string.admin_mission_field_latitude)) })
+            OutlinedTextField(longitude, { longitude = it }, modifier = Modifier.fillMaxWidth(), label = { Text(stringResource(R.string.admin_mission_field_longitude)) })
 
+            val requiredFieldsMessage = stringResource(R.string.admin_toast_required_fields)
+            val invalidLatLngMessage = stringResource(R.string.admin_toast_invalid_latlng)
+            val updatedMessage = stringResource(R.string.admin_toast_mission_updated)
+            val addedMessage = stringResource(R.string.admin_toast_mission_added)
+            val saveFailedMessage = stringResource(R.string.admin_toast_save_failed)
             Button(
                 onClick = {
                     if (title.isBlank() || desc.isBlank() || category.isBlank()) {
-                        Toast.makeText(context, "필수 항목을 입력하세요.", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, requiredFieldsMessage, Toast.LENGTH_SHORT).show()
                         return@Button
                     }
                     val latText = latitude.trim()
@@ -121,7 +128,7 @@ fun AdminMissionEditScreen(
                     if (hasLocationInput &&
                         (lat == null || lng == null || lat !in -90.0..90.0 || lng !in -180.0..180.0)
                     ) {
-                        Toast.makeText(context, "위도/경도를 올바르게 입력하세요.", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, invalidLatLngMessage, Toast.LENGTH_SHORT).show()
                         return@Button
                     }
                     isSaving = true
@@ -144,18 +151,24 @@ fun AdminMissionEditScreen(
                     }
                     task.addOnSuccessListener {
                         isSaving = false
-                        Toast.makeText(context, if (isEdit) "미션이 수정되었습니다." else "미션이 추가되었습니다.", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, if (isEdit) updatedMessage else addedMessage, Toast.LENGTH_SHORT).show()
                         onSaveSuccess()
                     }.addOnFailureListener {
                         isSaving = false
-                        Toast.makeText(context, "저장에 실패했습니다.", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, saveFailedMessage, Toast.LENGTH_SHORT).show()
                     }
                 },
                 enabled = !isSaving,
                 modifier = Modifier.fillMaxWidth(),
                 colors = ButtonDefaults.buttonColors(containerColor = MainPurple)
             ) {
-                Text(if (isSaving) "저장 중..." else if (isEdit) "수정 완료" else "미션 추가")
+                Text(
+                    stringResource(
+                        if (isSaving) R.string.admin_mission_saving
+                        else if (isEdit) R.string.admin_mission_save_edit
+                        else R.string.admin_mission_save_add
+                    )
+                )
             }
         }
     }

@@ -40,6 +40,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -47,7 +48,9 @@ import com.google.firebase.Firebase
 import com.google.firebase.auth.auth
 import com.google.firebase.firestore.SetOptions
 import com.google.firebase.firestore.firestore
+import smu.ai.graduation_project.R
 import smu.ai.graduation_project.domain.TravelPreference
+import smu.ai.graduation_project.ui.components.categoryLabel
 import smu.ai.graduation_project.ui.theme.CardGray
 import smu.ai.graduation_project.ui.theme.LightPurple
 import smu.ai.graduation_project.ui.theme.MainPurple
@@ -82,9 +85,9 @@ fun PreferenceScreen(
                 .padding(24.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Text("여행 취향을 알려주세요", fontSize = 24.sp, fontWeight = FontWeight.Bold)
+            Text(stringResource(R.string.preference_title), fontSize = 24.sp, fontWeight = FontWeight.Bold)
             Text(
-                "관심 있는 스타일을 모두 선택하면 홈에서 맞춤 미션을 추천해드려요.",
+                stringResource(R.string.preference_desc),
                 color = Color.Gray,
                 fontSize = 14.sp
             )
@@ -114,7 +117,7 @@ fun PreferenceScreen(
                     ) {
                         Icon(icon, contentDescription = null, tint = if (isOn) MainPurple else Color.Gray)
                         Text(
-                            label,
+                            categoryLabel(label),
                             modifier = Modifier.weight(1f),
                             fontWeight = FontWeight.SemiBold,
                             color = if (isOn) MainPurple else Color(0xFF3A3A3A)
@@ -129,16 +132,18 @@ fun PreferenceScreen(
             }
 
             Text(
-                "선택 ${selected.size}개",
+                stringResource(R.string.preference_selected_count, selected.size),
                 color = if (selected.isEmpty()) Color.Gray else MainPurple,
                 fontSize = 13.sp
             )
 
+            val minOneMessage = stringResource(R.string.preference_toast_min_one)
+            val saveFailedMessage = stringResource(R.string.preference_toast_save_failed)
             Button(
                 onClick = {
                     val chosen = TravelPreference.normalize(selected)
                     if (!TravelPreference.canComplete(chosen)) {
-                        Toast.makeText(context, "취향을 최소 1개 선택해주세요.", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, minOneMessage, Toast.LENGTH_SHORT).show()
                         return@Button
                     }
                     if (uid == null) {
@@ -154,7 +159,7 @@ fun PreferenceScreen(
                         }
                         .addOnFailureListener {
                             isSaving = false
-                            Toast.makeText(context, "저장에 실패했어요. 다시 시도해주세요.", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, saveFailedMessage, Toast.LENGTH_SHORT).show()
                         }
                 },
                 enabled = selected.isNotEmpty() && !isSaving,
@@ -171,7 +176,7 @@ fun PreferenceScreen(
                         strokeWidth = 2.dp
                     )
                 } else {
-                    Text("완료", fontWeight = FontWeight.Bold)
+                    Text(stringResource(R.string.preference_btn_done), fontWeight = FontWeight.Bold)
                 }
             }
         }

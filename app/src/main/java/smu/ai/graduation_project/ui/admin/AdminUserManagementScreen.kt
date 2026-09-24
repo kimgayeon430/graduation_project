@@ -46,11 +46,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.google.firebase.Firebase
 import com.google.firebase.firestore.firestore
+import smu.ai.graduation_project.R
 import smu.ai.graduation_project.ui.theme.CardGray
 import smu.ai.graduation_project.ui.theme.LightPurple
 import smu.ai.graduation_project.ui.theme.MainPurple
@@ -73,6 +75,7 @@ fun AdminUserManagementScreen(onNavigateBack: () -> Unit) {
     val context = LocalContext.current
     var users by remember { mutableStateOf<List<AdminUserItem>>(emptyList()) }
     var adminCount by remember { mutableIntStateOf(0) }
+    val defaultUserName = stringResource(R.string.admin_user_default_name)
 
     LaunchedEffect(Unit) {
         db.collection("users").addSnapshotListener { userSnapshot, _ ->
@@ -87,7 +90,7 @@ fun AdminUserManagementScreen(onNavigateBack: () -> Unit) {
                         val personalMissions = missionDocs.filter { it.getString("userId") == uid }
                         AdminUserItem(
                             uid = uid,
-                            name = userDoc.getString("nickname") ?: userDoc.getString("name") ?: "User",
+                            name = userDoc.getString("nickname") ?: userDoc.getString("name") ?: defaultUserName,
                             email = userDoc.getString("mail") ?: userDoc.getString("email") ?: "-",
                             level = userDoc.getString("level") ?: "Lv.1",
                             points = userDoc.getLong("points")?.toInt() ?: 0,
@@ -110,7 +113,7 @@ fun AdminUserManagementScreen(onNavigateBack: () -> Unit) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("사용자 관리", fontWeight = FontWeight.Bold) },
+                title = { Text(stringResource(R.string.admin_user_mgmt_title), fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, null)
@@ -148,8 +151,8 @@ fun AdminUserManagementScreen(onNavigateBack: () -> Unit) {
                         }
                         Spacer(modifier = Modifier.width(14.dp))
                         Column {
-                            Text("전체 사용자 ${users.size}명", fontWeight = FontWeight.Bold, fontSize = 18.sp)
-                            Text("관리자 ${adminCount}명 · 포인트 기반 정렬", color = Color.Gray, fontSize = 13.sp)
+                            Text(stringResource(R.string.admin_user_total, users.size), fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                            Text(stringResource(R.string.admin_user_summary, adminCount), color = Color.Gray, fontSize = 13.sp)
                         }
                     }
                 }
@@ -185,7 +188,7 @@ fun AdminUserManagementScreen(onNavigateBack: () -> Unit) {
                             }
                             if (user.isAdmin) {
                                 Surface(color = MainPurple, shape = RoundedCornerShape(50)) {
-                                    Text("ADMIN", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp))
+                                    Text(stringResource(R.string.admin_user_badge), color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp))
                                 }
                             }
                         }
@@ -193,28 +196,30 @@ fun AdminUserManagementScreen(onNavigateBack: () -> Unit) {
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             AdminInfoChip(Icons.Default.EmojiEvents, "${user.points}P")
                             AdminInfoChip(Icons.Default.Person, user.level)
-                            AdminInfoChip(Icons.Default.AdminPanelSettings, "완료 ${user.completedMissions}")
-                            AdminInfoChip(Icons.Default.People, "진행 ${user.inProgressMissions}")
+                            AdminInfoChip(Icons.Default.AdminPanelSettings, stringResource(R.string.admin_user_completed_chip, user.completedMissions))
+                            AdminInfoChip(Icons.Default.People, stringResource(R.string.admin_user_in_progress_chip, user.inProgressMissions))
                         }
 
+                        val revokedMessage = stringResource(R.string.admin_toast_admin_revoked)
+                        val grantedMessage = stringResource(R.string.admin_toast_admin_granted)
                         Button(
                             onClick = {
                                 if (user.isAdmin) {
                                     db.collection("admins").document(user.uid).delete().addOnSuccessListener {
-                                        Toast.makeText(context, "관리자 권한을 해제했습니다.", Toast.LENGTH_SHORT).show()
+                                        Toast.makeText(context, revokedMessage, Toast.LENGTH_SHORT).show()
                                     }
                                 } else {
                                     db.collection("admins").document(user.uid).set(
                                         mapOf("email" to user.email, "name" to user.name)
                                     ).addOnSuccessListener {
-                                        Toast.makeText(context, "관리자로 등록했습니다.", Toast.LENGTH_SHORT).show()
+                                        Toast.makeText(context, grantedMessage, Toast.LENGTH_SHORT).show()
                                     }
                                 }
                             },
                             colors = ButtonDefaults.buttonColors(containerColor = if (user.isAdmin) Color(0xFFD9534F) else MainPurple),
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            Text(if (user.isAdmin) "관리자 권한 해제" else "관리자로 지정")
+                            Text(stringResource(if (user.isAdmin) R.string.admin_user_revoke else R.string.admin_user_grant))
                         }
                     }
                 }

@@ -28,9 +28,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.google.firebase.Firebase
 import com.google.firebase.auth.auth
+import smu.ai.graduation_project.R
 import smu.ai.graduation_project.ui.theme.MainPurple
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -44,11 +46,13 @@ fun LoginScreen(
     var isLoading by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val auth = Firebase.auth
+    val emptyFieldsMessage = stringResource(R.string.login_toast_empty_fields)
+    val loginFailedMessage = stringResource(R.string.login_toast_failed)
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Log in") },
+                title = { Text(stringResource(R.string.login_title)) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, null)
@@ -69,7 +73,7 @@ fun LoginScreen(
                 value = email,
                 onValueChange = { email = it },
                 modifier = Modifier.fillMaxWidth(),
-                label = { Text("Email") },
+                label = { Text(stringResource(R.string.login_email_label)) },
                 leadingIcon = { Icon(Icons.Default.Email, null) },
                 enabled = !isLoading
             )
@@ -77,7 +81,7 @@ fun LoginScreen(
                 value = password,
                 onValueChange = { password = it },
                 modifier = Modifier.fillMaxWidth(),
-                label = { Text("Password") },
+                label = { Text(stringResource(R.string.login_password_label)) },
                 leadingIcon = { Icon(Icons.Default.Lock, null) },
                 enabled = !isLoading
             )
@@ -89,7 +93,7 @@ fun LoginScreen(
             Button(
                 onClick = {
                     if (email.isBlank() || password.isBlank()) {
-                        Toast.makeText(context, "Enter email and password.", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, emptyFieldsMessage, Toast.LENGTH_SHORT).show()
                         return@Button
                     }
 
@@ -102,7 +106,7 @@ fun LoginScreen(
                             } else {
                                 Toast.makeText(
                                     context,
-                                    task.exception?.message ?: "Login failed.",
+                                    task.exception?.message ?: loginFailedMessage,
                                     Toast.LENGTH_SHORT
                                 ).show()
                             }
@@ -112,7 +116,7 @@ fun LoginScreen(
                 enabled = !isLoading,
                 colors = ButtonDefaults.buttonColors(containerColor = MainPurple)
             ) {
-                Text("Log in")
+                Text(stringResource(R.string.login_btn))
             }
         }
     }

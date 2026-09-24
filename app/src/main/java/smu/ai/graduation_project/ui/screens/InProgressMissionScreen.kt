@@ -44,6 +44,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -51,6 +52,7 @@ import coil.compose.AsyncImage
 import com.google.firebase.Firebase
 import com.google.firebase.auth.auth
 import com.google.firebase.firestore.firestore
+import smu.ai.graduation_project.R
 import smu.ai.graduation_project.data.LanguagePreference
 import smu.ai.graduation_project.data.localizedString
 import smu.ai.graduation_project.model.Mission
@@ -68,6 +70,7 @@ fun InProgressMissionScreen(
     val db = Firebase.firestore
     var missions by remember { mutableStateOf<List<Mission>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
+    val missionFallback = stringResource(R.string.in_progress_mission_fallback)
 
     LaunchedEffect(user?.uid) {
         val uid = user?.uid
@@ -104,7 +107,7 @@ fun InProgressMissionScreen(
                             loadedMissions += Mission(
                                 id = missionId,
                                 title = missionDoc.localizedString("title", LanguagePreference.current, "")
-                                    .ifBlank { userMissionDoc.getString("title") ?: "진행 중 미션" },
+                                    .ifBlank { userMissionDoc.getString("title") ?: missionFallback },
                                 desc = missionDoc.localizedString("desc", LanguagePreference.current),
                                 points = missionDoc.getLong("points")?.toInt() ?: 0,
                                 category = missionDoc.getString("category") ?: "투어",
@@ -143,7 +146,7 @@ fun InProgressMissionScreen(
         containerColor = Color.White,
         topBar = {
             TopAppBar(
-                title = { Text("진행 중 미션", fontWeight = FontWeight.Bold) },
+                title = { Text(stringResource(R.string.in_progress_title), fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, null)
@@ -174,9 +177,9 @@ fun InProgressMissionScreen(
                     contentAlignment = Alignment.Center
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("진행 중인 미션이 없습니다.", fontWeight = FontWeight.Bold, fontSize = 20.sp)
+                        Text(stringResource(R.string.in_progress_empty_title), fontWeight = FontWeight.Bold, fontSize = 20.sp)
                         Spacer(modifier = Modifier.height(8.dp))
-                        Text("미션 목록에서 새 미션을 시작하면 여기서 이어서 볼 수 있습니다.", color = Color.Gray)
+                        Text(stringResource(R.string.in_progress_empty_desc), color = Color.Gray)
                     }
                 }
             }
@@ -261,7 +264,7 @@ private fun InProgressMissionCard(
             }
 
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("진행도 ${mission.progressText}", fontWeight = FontWeight.Bold, color = Color(0xFF353535))
+                Text(stringResource(R.string.in_progress_progress_label, mission.progressText), fontWeight = FontWeight.Bold, color = Color(0xFF353535))
                 LinearProgressIndicator(
                     progress = { mission.progress },
                     modifier = Modifier
@@ -281,7 +284,7 @@ private fun InProgressMissionCard(
             ) {
                 Icon(Icons.Default.PlayArrow, null)
                 Spacer(modifier = Modifier.width(6.dp))
-                Text("계속 진행하기", fontWeight = FontWeight.Bold)
+                Text(stringResource(R.string.in_progress_btn_continue), fontWeight = FontWeight.Bold)
             }
         }
     }

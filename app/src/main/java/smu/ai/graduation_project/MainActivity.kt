@@ -31,6 +31,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -222,7 +223,7 @@ private fun MainApp(onLogout: () -> Unit) {
                     items.forEach { screen ->
                         NavigationBarItem(
                             icon = { Icon(screen.icon, null) },
-                            label = { Text(screen.label, fontSize = 10.sp) },
+                            label = { Text(stringResource(screen.labelRes), fontSize = 10.sp) },
                             selected = current?.hierarchy?.any { it.route == screen.route } == true,
                             onClick = {
                                 navController.navigate(screen.route) {
@@ -277,7 +278,7 @@ private fun MainApp(onLogout: () -> Unit) {
                     )
                 } else {
                     LaunchedEffect(Unit) {
-                        android.widget.Toast.makeText(context, "관리자만 접근할 수 있습니다.", android.widget.Toast.LENGTH_SHORT).show()
+                        android.widget.Toast.makeText(context, context.getString(R.string.toast_admin_only), android.widget.Toast.LENGTH_SHORT).show()
                         navController.navigate(Screen.Home.route) {
                             popUpTo(navController.graph.findStartDestination().id) { saveState = true }
                             launchSingleTop = true
@@ -293,7 +294,7 @@ private fun MainApp(onLogout: () -> Unit) {
                     )
                 } else {
                     LaunchedEffect(Unit) {
-                        android.widget.Toast.makeText(context, "관리자만 접근할 수 있습니다.", android.widget.Toast.LENGTH_SHORT).show()
+                        android.widget.Toast.makeText(context, context.getString(R.string.toast_admin_only), android.widget.Toast.LENGTH_SHORT).show()
                         navController.popBackStack()
                     }
                 }
@@ -305,7 +306,7 @@ private fun MainApp(onLogout: () -> Unit) {
                     )
                 } else {
                     LaunchedEffect(Unit) {
-                        android.widget.Toast.makeText(context, "관리자만 접근할 수 있습니다.", android.widget.Toast.LENGTH_SHORT).show()
+                        android.widget.Toast.makeText(context, context.getString(R.string.toast_admin_only), android.widget.Toast.LENGTH_SHORT).show()
                         navController.popBackStack()
                     }
                 }
@@ -319,7 +320,7 @@ private fun MainApp(onLogout: () -> Unit) {
                     )
                 } else {
                     LaunchedEffect(Unit) {
-                        android.widget.Toast.makeText(context, "관리자만 접근할 수 있습니다.", android.widget.Toast.LENGTH_SHORT).show()
+                        android.widget.Toast.makeText(context, context.getString(R.string.toast_admin_only), android.widget.Toast.LENGTH_SHORT).show()
                         navController.popBackStack()
                     }
                 }
@@ -333,7 +334,7 @@ private fun MainApp(onLogout: () -> Unit) {
                     )
                 } else {
                     LaunchedEffect(Unit) {
-                        android.widget.Toast.makeText(context, "관리자만 접근할 수 있습니다.", android.widget.Toast.LENGTH_SHORT).show()
+                        android.widget.Toast.makeText(context, context.getString(R.string.toast_admin_only), android.widget.Toast.LENGTH_SHORT).show()
                         navController.popBackStack()
                     }
                 }
@@ -347,7 +348,7 @@ private fun MainApp(onLogout: () -> Unit) {
                     )
                 } else {
                     LaunchedEffect(Unit) {
-                        android.widget.Toast.makeText(context, "관리자만 접근할 수 있습니다.", android.widget.Toast.LENGTH_SHORT).show()
+                        android.widget.Toast.makeText(context, context.getString(R.string.toast_admin_only), android.widget.Toast.LENGTH_SHORT).show()
                         navController.popBackStack()
                     }
                 }
