@@ -73,7 +73,8 @@ fun ProfileScreen(
     onLogout: () -> Unit,
     onNavigateToInProgressMissions: () -> Unit,
     onNavigateToCompletedMissions: () -> Unit,
-    onNavigateToPointHistory: () -> Unit
+    onNavigateToPointHistory: () -> Unit,
+    onNavigateToRanking: () -> Unit
 ) {
     val currentUser = Firebase.auth.currentUser
     val db = Firebase.firestore
@@ -284,7 +285,7 @@ fun ProfileScreen(
                     ProfileMenuItem("언어 / Language", Icons.Default.Language) {
                         showLanguageDialog = true
                     }
-                    ProfileMenuItem("랭킹 보기", Icons.Default.EmojiEvents) { }
+                    ProfileMenuItem("랭킹 보기", Icons.Default.EmojiEvents, onClick = onNavigateToRanking)
                     ProfileMenuItem("로그아웃", Icons.AutoMirrored.Filled.ExitToApp, onClick = onLogout)
                 }
             }

@@ -352,7 +352,8 @@ private fun MainApp(onLogout: () -> Unit) {
                     onLogout = onLogout,
                     onNavigateToInProgressMissions = { navController.navigate("profile/in-progress") },
                     onNavigateToCompletedMissions = { navController.navigate("profile/completed") },
-                    onNavigateToPointHistory = { navController.navigate("profile/points") }
+                    onNavigateToPointHistory = { navController.navigate("profile/points") },
+                    onNavigateToRanking = { navController.navigate(Screen.Ranking.route) }
                 )
             }
             composable("profile/completed") {
