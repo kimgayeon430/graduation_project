@@ -46,3 +46,6 @@ firebase-debug.log
 firestore-debug.log
 firebase-debug.log
 ui-debug.log
+
+# 디버깅용 adb 스크린샷 스크래치 파일 (실기기 확인용, 커밋 대상 아님)
+/_*.png

@@ -1,5 +1,6 @@
 package smu.ai.graduation_project
 
+import android.content.Context
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -40,6 +41,8 @@ import androidx.navigation.compose.rememberNavController
 import com.google.firebase.Firebase
 import com.google.firebase.auth.auth
 import com.google.firebase.firestore.firestore
+import smu.ai.graduation_project.data.LanguagePreference
+import smu.ai.graduation_project.data.wrapWithStoredLocale
 import smu.ai.graduation_project.navigation.Screen
 import smu.ai.graduation_project.ui.admin.AdminMissionEditScreen
 import smu.ai.graduation_project.ui.admin.AdminHomeScreen
@@ -63,8 +66,13 @@ import smu.ai.graduation_project.ui.theme.Graduation_projectTheme
 import smu.ai.graduation_project.ui.theme.MainPurple
 
 class MainActivity : ComponentActivity() {
+    override fun attachBaseContext(newBase: Context) {
+        super.attachBaseContext(newBase.wrapWithStoredLocale())
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        LanguagePreference.syncCurrent(this)
         enableEdgeToEdge()
         setContent {
             Graduation_projectTheme {
