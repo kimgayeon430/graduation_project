@@ -49,21 +49,18 @@ service cloud.firestore {
     }
 
     // 미션 진행 상태: 로그인 사용자는 읽기(앱이 userId 로 질의). 생성은 본인 문서만.
-    // 수정은 본인 또는 관리자. 단, 사용자는 자기 photoNeedsReview 를 true → false 로 되돌릴 수 없다
-    // (검수 승인은 관리자만). 삭제는 관리자만.
+    // 수정은 본인 또는 관리자. 삭제는 관리자만.
+    //
+    // (예전에는 사용자가 자기 photoNeedsReview 를 true→false 로 못 되돌리게 막아 관리자 승인을
+    // 우회하지 못하게 했었다. 하지만 검수 대기 중 재촬영해 AI가 이번엔 자동 PASS를 낸 정상 흐름도
+    // 똑같은 모양의 쓰기라 함께 막혀버렸다 — 서버 없이는 "진짜 재판정"과 "임의 조작"을 규칙만으로
+    // 구분할 수 없으므로(3.6/10장 한계) 이 조건은 제거했다.)
     match /user_missions/{docId} {
       allow read: if signedIn();
       allow create: if signedIn()
         && request.resource.data.userId == request.auth.uid;
       allow update: if isAdmin()
-        || (
-          signedIn()
-          && resource.data.userId == request.auth.uid
-          && !(
-            resource.data.get('photoNeedsReview', false) == true
-            && request.resource.data.get('photoNeedsReview', false) == false
-          )
-        );
+        || (signedIn() && resource.data.userId == request.auth.uid);
       allow delete: if isAdmin();
     }
   }

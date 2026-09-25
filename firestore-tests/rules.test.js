@@ -151,9 +151,9 @@ describe("user_missions/{id}", () => {
     await assertSucceeds(updateDoc(doc(asUser("alice"), "user_missions", "um1"),
       { status: "Completed", progress: 1 }));
   });
-  test("본인은 자기 photoNeedsReview 를 true→false 로 되돌릴 수 없다", async () => {
+  test("본인은 검수 대기 중 재인증으로 photoNeedsReview 를 true→false 로 되돌릴 수 있다", async () => {
     await seedUserMission("um1", { userId: "alice", photoNeedsReview: true });
-    await assertFails(updateDoc(doc(asUser("alice"), "user_missions", "um1"),
+    await assertSucceeds(updateDoc(doc(asUser("alice"), "user_missions", "um1"),
       { photoNeedsReview: false }));
   });
   test("관리자는 검수 승인(photoNeedsReview=false)을 할 수 있다", async () => {

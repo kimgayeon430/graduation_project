@@ -172,6 +172,7 @@ class FirebaseMissionRepository : MissionRepository {
                     photoBytes, missionCategory, photoVerifier, photoVerificationConfig, referenceEmbeddings
                 )
             } catch (e: Exception) {
+                Log.e("PhotoVerify", "ANALYZE 단계 실패: mission=$missionId", e)
                 mainHandler.post {
                     onError(
                         MissionRepository.MissionCompleteException(
@@ -213,6 +214,7 @@ class FirebaseMissionRepository : MissionRepository {
             val photoUrl = try {
                 SupabaseStorage.upload(storagePath, photoBytes)
             } catch (e: Exception) {
+                Log.e("PhotoVerify", "UPLOAD 단계 실패: mission=$missionId path=$storagePath", e)
                 mainHandler.post {
                     onError(
                         MissionRepository.MissionCompleteException(
@@ -294,6 +296,7 @@ class FirebaseMissionRepository : MissionRepository {
                 )
             }.addOnFailureListener { e ->
                 // 사진은 올라갔지만 완료 처리 실패 → 재시도 가능 (포인트 중복 지급은 트랜잭션이 방지)
+                Log.e("PhotoVerify", "FINALIZE 단계 실패: mission=$missionId docId=$userMissionDocId", e)
                 onError(
                     MissionRepository.MissionCompleteException(
                         MissionRepository.MissionCompleteException.Stage.FINALIZE, e

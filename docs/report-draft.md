@@ -160,7 +160,7 @@ firebase.json         # Firebase CLI 설정 (규칙 배포)
   - `admins/{uid}`·`missions` 생성/삭제: 관리자(`admins/{uid}` 문서 존재)만
   - `missions` 의 `completionCount` 필드만은 로그인 사용자가 갱신 가능(완료 시 인기도 신호)
   - `users/{uid}`: 본인 또는 관리자만 수정, 삭제 불가
-  - `user_missions/{id}`: 생성은 본인 문서만, **사용자는 자기 `photoNeedsReview` 를 true→false 로 되돌릴 수 없음**(검수 승인은 관리자만)
+  - `user_missions/{id}`: 생성은 본인 문서만, 수정은 본인 또는 관리자. (예전엔 "사용자는 자기 `photoNeedsReview` 를 true→false 로 되돌릴 수 없음" 조건도 있었으나, 검수 대기 중 재인증해 정상적으로 `PASS` 가 나온 흐름까지 함께 막는 버그가 실기기에서 드러나 제거했다 — 6.8.3)
 - **테스트**: `firestore-tests/` 에서 에뮬레이터 + `@firebase/rules-unit-testing` 으로 20건 검증(8.1절).
 - **한계**: 서버(Cloud Functions)가 없어 포인트 지급/회수의 값 자체는 검증하지 못한다. 서버측 포인트 검증은 향후 과제다. (10장)
 
@@ -600,6 +600,21 @@ held-out 데이터로도 분리력이 개선된다(J 0.21 → 0.33). 표본이 �
 | `NEEDS_REVIEW` | 확인 | 결과를 닫고 이전 화면으로 (완료 여부는 관리자 승인 후 확정, 6.8.1) |
 | `REJECT` | 다시 촬영 / 미션 내용 보기 | 다시 촬영: 같은 화면에서 재촬영(포인트·완료 처리 없음) / 미션 내용 보기: 이전 화면으로 |
 
+#### 6.8.3 실기기 검증 중 발견: 검수 대기 재인증이 `PERMISSION_DENIED` 로 저장 실패
+
+6.8.2 의 전체 화면을 실기기(Galaxy S8)에 설치해 검증하던 중, 검수 대기(`NEEDS_REVIEW`) 상태였던 미션을 재촬영했더니 분석은 정상 완료(`PhotoVerify` 로그: `Proceed`, 유사도 결합으로 `PASS` 승격)됐는데 Firestore 저장 단계에서 "분석은 완료됐지만 결과를 저장하지 못했어요" 오류로 끝나는 것을 발견했다. 이전에는 `Stage.UPLOAD`/`Stage.FINALIZE` 실패의 원인 예외를 로그에 남기지 않아 왜 실패하는지 알 수 없었는데, 6.8.2 작업 중 이 두 단계에 `Log.e` 를 추가해 두어(원인 진단 목적) 실제 원인을 바로 특정할 수 있었다.
+
+```
+FINALIZE 단계 실패: mission=숙대입구 docId=...
+com.google.firebase.firestore.FirebaseFirestoreException: PERMISSION_DENIED: Missing or insufficient permissions.
+```
+
+**원인**: `firestore.rules` 의 `user_missions` 업데이트 규칙에 "사용자는 자기 `photoNeedsReview` 를 true→false 로 되돌릴 수 없다(관리자 승인 우회 방지)"는 조건이 있었다(4장 3.6절). 그런데 검수 대기 중 재촬영해 AI가 이번엔 자동 `PASS` 를 낸 것도 **똑같은 모양의 쓰기**(`photoNeedsReview: true → false`)라 이 규칙에 함께 걸렸다 — "사용자가 검수를 몰래 우회하는 것"과 "재판정으로 실제 통과한 것"을 Firestore 규칙만으로는 구분할 방법이 없다는 3.6절의 한계(서버 없이는 값 자체를 검증 못함)가 실제로 드러난 사례다.
+
+**조치**: 이 조건을 제거했다. 이 규칙이 막던 위협(클라이언트가 임의로 자기 상태를 조작)은 애초에 서버(Cloud Functions) 없이는 완전히 막을 수 없고(10장), 반대로 제거로 인해 새로 열리는 구멍도 없다 — 어차피 `photoNeedsReview` 를 false 로 쓰면서 포인트까지 지급하려면 `resolve()` 의 계산 로직을 거쳐야 하는데, 그 계산은 클라이언트 코드 안에 있어 이 규칙 유무와 무관하게 이미 신뢰 경계 밖이었기 때문이다. `firestore-tests/rules.test.js` 의 해당 테스트를 `assertFails` → `assertSucceeds` 로 뒤집고 에뮬레이터로 20건 전체 재확인한 뒤 `firebase deploy --only firestore:rules --project grad-proj-5e09c` 로 프로덕션에 반영했다.
+
+**교훈**: `Stage.UPLOAD`/`Stage.FINALIZE` 실패를 사용자에게는 "저장 오류"로 뭉뚱그려 보여주되(6.8.2), 실제 원인은 로그로 남겨두는 방어선이 없었다면 이 버그는 "가끔 저장이 안 된다"는 막연한 증상으로만 남았을 것이다. 보안 규칙이 정상적인 재시도 흐름을 막는 이런 종류의 false positive 는 유닛 테스트(규칙 20건)만으로는 못 잡는다 — 규칙 테스트는 "설계한 대로 동작하는가"만 검증하고, "설계 자체가 실제 사용 흐름과 맞는가"는 실기기 사용으로만 드러난다.
+
 ---
 
 ## 7. 구현 현황
@@ -627,6 +642,7 @@ held-out 데이터로도 분리력이 개선된다(J 0.21 → 0.33). 표본이 �
 - [x] 마이페이지 한국어/English/日本語 3개 언어 UI 전환(4.7절) — `LanguagePreference`(`SharedPreferences`) 저장값을 `MainActivity.attachBaseContext` 가 `Configuration` 으로 감싸 액티비티 재생성 시 반영(수동 Locale 전환; `ComponentActivity` 에서는 `AppCompatDelegate.setApplicationLocales` 가 즉시 갱신되지 않아 미사용). 랜딩·로그인·회원가입·홈·미션 목록/상세/지도/수행·취향 선택·마이페이지·포인트 내역·진행 중/완료 미션·랭킹·관리자 5개 화면 전 UI 문구를 `values/strings.xml`(한국어)·`values-en/strings.xml`(영어)·`values-ja/strings.xml`(일본어) 리소스로 분리(1:1 키 대응). Compose 밖(ViewModel)의 문구는 호출 시점마다 저장된 언어를 다시 읽는 `Context.getLocalizedString()` 확장으로 처리. 미션 제목·설명은 Firestore `title`/`titleEn`/`titleJa`, `desc`/`descEn`/`descJa` 필드를 `localizedString()` 이 선택(미번역 시 한국어로 폴백)하고, 카테고리·진행 상태 같은 내부 코드값은 항상 한국어로 유지한 채 표시할 때만 번역
 - [x] 검수 대기(`NEEDS_REVIEW`) 미션이 관리자 승인 전에 완료·포인트 지급되던 버그 수정(6.8.1) — `MissionCompletion.resolve()`/`resolveApproval()` 분리, `AdminPhotoReviewScreen.approve()`/`reject()` 가 실제 완료·보상 처리를 수행하도록 연결, 회귀 테스트 4건 추가
 - [x] 사진 인증 결과를 전체 화면으로 표시(6.8.2) — Toast 대신 `Dialog` 전체 화면 오버레이로 PASS/REVIEW/REJECT 판정·근거·포인트를 보여주고, REJECT 사유를 `RejectReasonCode` 로 분류. AI 분석 실패(`Stage.ANALYZE`)와 저장 실패(`Stage.UPLOAD`/`FINALIZE`)를 구분한 안내로 분리
+- [x] 검수 대기 중 재인증이 `PERMISSION_DENIED` 로 저장 실패하던 `firestore.rules` 버그 발견·수정·재배포(6.8.3) — 실기기 검증 중 발견, `firestore-tests/rules.test.js` 갱신 후 에뮬레이터 20건 재확인
 
 ### 7.2 남은 작업
 
@@ -639,7 +655,8 @@ held-out 데이터로도 분리력이 개선된다(J 0.21 → 0.33). 표본이 �
 - [ ] 크라우드소싱 사진으로 각 클래스 보강(특히 체험) 후 재학습 — 무효는 합성 augmentation 으로 대체 완료, 체험은 도메인 격차(6.4)가 남아 실사진이 필요. 수집 스크립트 `ml/data/import_collected.py` 준비 완료, 실사진 수집 자체는 별도
 - [ ] `user_missions` 로그로 추천 re-ranker 재학습(`--from-firestore`), 시뮬레이터 학습본 대체
 - [x] `firestore.rules` 배포 — 규칙 테스트 20건 통과 재확인 후 `firebase deploy --only firestore:rules --project grad-proj-5e09c` 실행, 프로덕션 반영 완료
-- [ ] 사진 인증 결과 전체 화면(6.8.2) 실기기 확인 — 컴파일·단위 테스트는 통과했으나 PASS/REVIEW/REJECT 세 경우와 화면 회전을 실제 기기에서는 아직 확인하지 못함
+- [x] 사진 인증 결과 전체 화면(6.8.2) 실기기 확인 — Galaxy S8 에서 결과 화면 표시 및 재인증 흐름 확인, 그 과정에서 6.8.3 의 `firestore.rules` 버그를 실사용으로 발견·수정
+- [ ] REVIEW/REJECT 판정과 화면 회전을 포함한 나머지 경우는 실제 기기에서 아직 전부 확인하지 못함
 - [ ] Robolectric 기반 ViewModel/Compose UI 테스트 `[선택]`
 - [ ] 서버측 포인트 검증(Cloud Functions) `[선택]`
 
@@ -667,7 +684,7 @@ held-out 데이터로도 분리력이 개선된다(J 0.21 → 0.33). 표본이 �
 ### 8.1 도메인 규칙 · 보안 규칙
 
 - **JUnit4 단위 테스트**로 거리·보상·완료·취향·추천·사진 판정 규칙을 검증한다(경계값 포함). 사진 인증: `PhotoVerificationTest`, `PhotoGateTest`. 추천: `MissionFeaturesTest`, `LearnedRerankerTest`, `MissionRecommenderRerankedTest`.
-- **Firestore 보안 규칙 테스트** (`firestore-tests/`, `@firebase/rules-unit-testing` + 에뮬레이터, 20건): 게스트/일반/관리자 컨텍스트로 `admins`·`missions`·`users`·`user_missions` 의 읽기·쓰기 허용/거부를 검증한다. 핵심: 일반 사용자가 `missions.completionCount` 외 필드를 못 바꾸고, 자기 `photoNeedsReview` 를 true→false 로 못 되돌린다.
+- **Firestore 보안 규칙 테스트** (`firestore-tests/`, `@firebase/rules-unit-testing` + 에뮬레이터, 20건): 게스트/일반/관리자 컨텍스트로 `admins`·`missions`·`users`·`user_missions` 의 읽기·쓰기 허용/거부를 검증한다. 핵심: 일반 사용자가 `missions.completionCount` 외 필드를 못 바꾸고, 남의 진행 문서는 못 건드린다. (`photoNeedsReview` true→false 차단 테스트는 실사용 버그로 6.8.3 에서 반대로 뒤집었다 — 이제 본인 진행 문서 재인증으로 통과할 수 있다)
 - ViewModel 레벨 테스트는 `android.net.Uri`·`android.location.Location` 의존으로 순수 JUnit 에서 불가하며, Robolectric 도입은 향후 과제로 둔다.
 
 ### 8.2 사진 인증 모델

@@ -17,12 +17,13 @@
 - 미션 목록 ↔ **네이버 지도** 전환: 좌표가 있는 미션을 지도 마커로 모아 보고, 마커를 눌러 상세로 이동
 - 미션별 GPS 위치 인증 (목표 지점 반경 200m 이내)
 - 위치 인증 후 카메라 촬영 → 미리보기 → Supabase Storage 업로드로 사진 인증
+- 사진 인증 후 AI 판정 결과(통과/검토중/반려)를 전체 화면으로 확인 — 사진·판정 사유·요구/예측 카테고리·신뢰도·포인트 지급 여부를 한 화면에서 보고 판정별로 다른 다음 행동(완료 확인 / 다시 촬영 / 미션 내용 보기) 선택
 - 인증 단계별 포인트 지급 및 진행 상태 저장 (중복 지급 방지)
 - 진행 중인 미션 확인 및 이어서 수행
 - 홈에서 취향·완료 이력 기반 미션 추천 (규칙 점수 + 완료 로그 학습 re-ranker 하이브리드, 완료한 미션 제외)
 - 누적 포인트 기반 사용자 랭킹
 - 프로필에서 포인트, 레벨 및 미션 현황 확인
-- 마이페이지에서 한국어 / English UI 언어 전환 (앱 전체 화면·하단 메뉴바에 즉시 반영)
+- 마이페이지에서 한국어 / English / 日本語 3개 언어 UI 전환 (앱 전체 화면·하단 메뉴바에 즉시 반영)
 
 ### 관리자
 
@@ -124,6 +125,15 @@
 - **결합 규칙**: 유사도만으로 통과/거절을 뒤집지 않고 판정을 한 단계씩만 조정합니다(무효 판정이 유사도보다 항상 먼저 — 대표 이미지를 화면에 띄워 재촬영하는 스푸핑은 유사도가 높게 나오므로).
 - **한계**: 참조 이미지 1장으로는 분리력이 약하고(6.7.6), 임계값(`similarityRescueThreshold`/`similaritySuspectThreshold`)은 아직 실사용 로그가 적어 잠정치입니다. `ml/calibrate_similarity.py`(실사용 로그)·`ml/calibrate_similarity_web.py`(웹 프록시)로 계속 보정합니다.
 
+### 판정 결과 화면
+
+AI 판정이 끝나면 Toast 대신 **전체 화면**(`Dialog(usePlatformDefaultWidth = false)`)으로 결과를 보여줍니다. 사진, 판정 상태(PASS/REVIEW/REJECT), 미션이 요구한 카테고리 vs AI가 예측한 카테고리, confidence(정수 %), 포인트 지급 여부, 온디바이스 분석 고지를 보여주고 판정별로 다른 버튼을 둡니다(PASS·REVIEW: 완료/확인, REJECT: 다시 촬영/미션 내용 보기). REJECT 사유는 도메인 계층에서 `RejectReasonCode`(무효 대상/카테고리 불일치/저신뢰)로만 분류하고 실제 문구는 `strings.xml`에서 고릅니다. 온디바이스 AI 분석 자체가 실패하는 경우(`Stage.ANALYZE`)와 분석 후 업로드·저장이 실패하는 경우(`Stage.UPLOAD`/`FINALIZE`)를 구분해 서로 다른 안내를 보여줍니다. 분석 중/결과 모두 `MissionPerformViewModel.uiState`에 있어 화면 회전에도 유지되고, 결과가 떠 있는 동안은 전체 화면 `Dialog`가 화면을 가려 중복 제출을 막습니다.
+
+이 작업 과정에서 실사용 중 발견한 버그 두 가지를 함께 고쳤습니다.
+
+- **검수 대기(`NEEDS_REVIEW`) 미션이 관리자 승인 전에 완료·포인트 지급되던 버그**: `MissionCompletion.resolve()`가 `needsReview` 여부를 보지 않고 항상 완료 처리했습니다. `resolve()`에 `needsReview` 파라미터를 추가하고, 관리자 승인 시점의 완료·보상 전환은 `resolveApproval()`로 분리했습니다.
+- **검수 대기 중 재인증했을 때 `PERMISSION_DENIED`로 저장이 실패하던 버그**: `firestore.rules`가 "사용자는 자기 `photoNeedsReview`를 true→false로 되돌릴 수 없다(관리자 승인 우회 방지)"는 규칙을 갖고 있었는데, 이게 검수 대기 중 재촬영해 AI가 이번엔 자동 PASS를 낸 정상적인 흐름까지 막았습니다. 서버 검증 없이는 "정상 재판정"과 "임의 조작"을 규칙만으로 구분할 수 없어(아래 "향후 개선 계획" 참고) 해당 제약을 제거하고 재배포했습니다(`firestore-tests/rules.test.js` 갱신, 에뮬레이터 테스트 20건 통과 확인).
+
 ### `ml/` 파이프라인
 
 | 파일 | 내용 |
@@ -149,6 +159,9 @@
 - [x] `firestore.rules` 배포 (`grad-proj-5e09c`, 에뮬레이터 테스트 20건 통과 확인 후 배포)
 - [x] 참조 이미지 유사도 결합 (CLIP 임베딩, 6.7절) + 다중 참조 이미지(최대 유사도, 6.7.8) — 실기기 승인/반려 플로우 확인
 - [x] 무효 클래스에 화면 재촬영 합성 augmentation(`recapture()`) 반영 재학습 — invalid recall 0.92→0.93 유지, `build_dataset.py`의 place_id 그룹 분할 버그(합성 무효 파일명이 소수 그룹에 뭉쳐 split이 쏠리던 문제)를 발견·수정한 뒤 재학습해 정상화
+- [x] 검수 대기(`NEEDS_REVIEW`) 미션이 관리자 승인 전에 완료·포인트 지급되던 버그 수정 — `MissionCompletion.resolve()`/`resolveApproval()` 분리
+- [x] 사진 인증 결과를 전체 화면으로 표시 — Toast 대신 `Dialog`로 PASS/REVIEW/REJECT 판정·근거·포인트 표시, AI 분석 실패와 저장 실패를 구분한 안내
+- [x] 검수 대기 중 재인증 시 `PERMISSION_DENIED`로 저장 실패하던 `firestore.rules` 버그 발견·수정·재배포
 - [ ] 크라우드소싱 사진으로 체험 클래스 보강 — 수집 스크립트(`ml/data/import_collected.py`)만 준비됨, 실사진 수집은 별도
 
 ## 추천 re-ranker (`ml/reco/`)
@@ -173,15 +186,16 @@
 - `MapView` 는 Compose `AndroidView` 로 감싸고 `Lifecycle` 이벤트와 `rememberSaveable` 로 상태(카메라 위치 등)를 화면 회전에도 유지합니다.
 - 네이버 지도 인증 키(`NCP_KEY_ID`)는 `local.properties` → `manifestPlaceholders` 로 주입되어 VCS 에 올라가지 않습니다.
 
-## 다국어 지원 (한국어 / English)
+## 다국어 지원 (한국어 / English / 日本語)
 
-마이페이지 → **언어 / Language** 에서 한국어·영어를 선택하면 앱 전체(하단 메뉴바, 관리자 화면 포함)가 즉시 해당 언어로 전환됩니다.
+마이페이지 → **언어 / Language / 言語** 에서 한국어·영어·일본어를 선택하면 앱 전체(하단 메뉴바, 관리자 화면 포함)가 즉시 해당 언어로 전환됩니다.
 
-- **UI 문구**: `values/strings.xml`(기본, 한국어) / `values-en/strings.xml`(영어) 리소스로 관리하며, 두 파일은 키가 1:1로 대응합니다.
+- **UI 문구**: `values/strings.xml`(기본, 한국어) / `values-en/strings.xml`(영어) / `values-ja/strings.xml`(일본어) 리소스로 관리하며, 세 파일은 키가 1:1로 대응합니다.
 - **적용 방식**: 선택한 언어는 `SharedPreferences`(`LanguagePreference`)에 저장되고, `MainActivity.attachBaseContext` 가 이를 읽어 `Configuration` 을 감싼 Context 로 액티비티를 재생성합니다. `AppCompatDelegate.setApplicationLocales` 는 `ComponentActivity`(AppCompatActivity 아님)에서 리소스가 즉시 갱신되지 않아 쓰지 않고, 수동 Locale/Configuration 전환 방식을 사용합니다.
 - **Compose 밖(ViewModel 등)**: `Context.getLocalizedString()` 확장 함수가 호출 시점마다 저장된 언어로 다시 감싼 Context 에서 문자열을 읽어, 화면 재구성 없이도 최신 언어를 반영합니다. (`MissionPerformViewModel` 의 위치·사진 인증 안내 메시지 등)
-- **미션 콘텐츠(제목/설명)**: Firestore에 `title`/`desc`(한국어)와 `titleEn`/`descEn`(영어)로 함께 저장하고, `DocumentSnapshot.localizedString()` 이 현재 언어에 맞는 필드를 고릅니다. 영어 번역이 비어 있으면 한국어로 안전하게 폴백합니다.
+- **미션 콘텐츠(제목/설명)**: Firestore에 `title`/`desc`(한국어)와 `titleEn`/`descEn`(영어), `titleJa`/`descJa`(일본어)로 함께 저장하고, `DocumentSnapshot.localizedString()` 이 현재 언어에 맞는 필드를 고릅니다. 번역이 비어 있으면 한국어로 안전하게 폴백합니다.
 - **내부 상태값**: 미션 카테고리(`투어`/`맛집`/`체험`/`쇼핑`)와 진행 상태(`진행중`/`완료`/`미 진행`) 코드는 Firestore·내부 로직에서 항상 한국어 값을 그대로 쓰고, 화면에 표시할 때만 `categoryLabel()` / `missionStatusLabel()` 로 번역합니다.
+- **검증 습관**: 리소스 파일 3개(ko/en/ja)의 키가 어긋나면 그 언어만 조용히 깨지므로, 새 문구를 추가할 때마다 세 파일의 `<string name="...">` 키 집합을 diff 로 비교합니다.
 
 ## 앱 내비게이션
 
