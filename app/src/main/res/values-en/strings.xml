@@ -126,7 +126,7 @@
     <string name="profile_activity_summary_none">You haven\'t started any missions yet. Try one from Home or the Mission tab.</string>
     <string name="profile_next_goal">Next goal: complete one more mission and earn more points.</string>
     <string name="profile_menu_nickname">Change Nickname</string>
-    <string name="profile_menu_language">언어 / Language</string>
+    <string name="profile_menu_language">언어 / Language / 言語</string>
     <string name="profile_menu_ranking">View Ranking</string>
     <string name="profile_menu_logout">Log Out</string>
     <string name="profile_dialog_nickname_title">Change Nickname</string>

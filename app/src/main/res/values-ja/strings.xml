@@ -126,7 +126,7 @@
     <string name="profile_activity_summary_none">まだ始めたミッションがありません。ホームやミッション一覧から最初のミッションを始めてみましょう。</string>
     <string name="profile_next_goal">次の目標：ミッションをもう1つ完了してポイントを貯めましょう。</string>
     <string name="profile_menu_nickname">ニックネーム変更</string>
-    <string name="profile_menu_language">언어 / Language</string>
+    <string name="profile_menu_language">언어 / Language / 言語</string>
     <string name="profile_menu_ranking">ランキングを見る</string>
     <string name="profile_menu_logout">ログアウト</string>
     <string name="profile_dialog_nickname_title">ニックネーム変更</string>
