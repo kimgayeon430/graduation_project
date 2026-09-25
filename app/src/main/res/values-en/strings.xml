@@ -247,11 +247,10 @@
 
     <!-- 미션 지도 -->
     <string name="map_bubble_single">%1$s\n%2$dP · View Detail</string>
-    <string name="map_bubble_group">%1$d missions · tap to select</string>
+    <string name="map_marker_cluster">%1$d missions</string>
     <string name="map_empty">No missions with a registered location. Check the list instead.</string>
-    <string name="map_summary">%1$d missions · tap a bubble for detail</string>
+    <string name="map_summary">%1$d missions · tap a marker for detail</string>
     <string name="map_dialog_title">Missions at this location</string>
-    <string name="map_dialog_item">%1$s · %2$dP</string>
     <string name="map_dialog_close">Close</string>
 
     <!-- 랜딩 -->

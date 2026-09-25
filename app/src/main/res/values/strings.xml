@@ -249,11 +249,10 @@
 
     <!-- 미션 지도 -->
     <string name="map_bubble_single">%1$s\n%2$dP · 상세 보기</string>
-    <string name="map_bubble_group">미션 %1$d개 · 눌러서 선택</string>
+    <string name="map_marker_cluster">미션 %1$d개</string>
     <string name="map_empty">위치가 등록된 미션이 없습니다. 목록에서 확인해 주세요.</string>
-    <string name="map_summary">미션 %1$d개 · 말풍선을 눌러 상세 보기</string>
+    <string name="map_summary">미션 %1$d개 · 마커를 눌러 상세 보기</string>
     <string name="map_dialog_title">이 장소의 미션</string>
-    <string name="map_dialog_item">%1$s · %2$dP</string>
     <string name="map_dialog_close">닫기</string>
 
     <!-- 랜딩 -->
