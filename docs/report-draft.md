@@ -60,7 +60,8 @@ Android 애플리케이션을 개발한다. 사용자는 취향에 맞는 미션
 - 홈에서 선호 카테고리를 우선한 규칙 기반 미션 추천(완료한 미션 제외)
 - 누적 포인트 기반 사용자 랭킹, 프로필에서 포인트·레벨·미션 현황 확인
 - 마이페이지에서 **보유 포인트를 누르면 적립 내역**(미션별 위치·사진 인증 보상)을 확인
-- 마이페이지에서 **한국어 / English UI 언어 전환** — 하단 메뉴바·관리자 화면을 포함한 앱 전체 화면과 미션 콘텐츠(제목·설명)가 즉시 선택한 언어로 전환
+- 마이페이지에서 **한국어 / English / 日本語 3개 언어 UI 전환** — 하단 메뉴바·관리자 화면을 포함한 앱 전체 화면과 미션 콘텐츠(제목·설명)가 즉시 선택한 언어로 전환 (4.7절)
+- 사진 인증 후 **AI 판정 결과를 전체 화면으로 확인** — 제출한 사진, 판정 상태(통과·검토중·반려), 요구/예측 카테고리, AI 신뢰도, 포인트 지급 여부를 한 화면에서 보고 판정별로 다른 다음 행동(완료 확인 / 다시 촬영 / 미션 내용 보기)을 선택 (6.8절)
 
 ### 2.2 관리자 기능
 
@@ -242,6 +243,24 @@ firebase.json         # Firebase CLI 설정 (규칙 배포)
 
 - `admins/{uid}` 문서 유무로 관리자 화면을 노출한다.
 - 미션 CRUD(위치 좌표 입력 포함), 사용자·미션 진행 현황 조회, 사진 검수 큐(6.5절).
+
+### 4.7 다국어 지원 (i18n)
+
+앱 UI와 미션 콘텐츠를 한국어·English·日本語 3개 언어로 전환할 수 있다. 두 가지 문제를 분리해서 다룬다.
+
+**1) 앱 UI 문구** — `values/strings.xml`(한국어, 기본) / `values-en/strings.xml` / `values-ja/strings.xml` 리소스로 키 1:1 대응해 분리한다. 선택한 언어는 `LanguagePreference`(`SharedPreferences` `app_settings`)에 저장하고, `MainActivity.attachBaseContext` 가 `Context.wrapWithStoredLocale()` 로 `Configuration.setLocale()` 을 적용한 Context 를 감싸 리소스 해석에 반영한다. `LanguagePreference.set()` 은 저장 직후 현재 액티비티를 `recreate()` 해 화면을 바로 갱신한다.
+
+- **`AppCompatDelegate.setApplicationLocales()` 를 쓰지 않은 이유**: 이 앱의 `MainActivity` 는 `ComponentActivity`(`AppCompatActivity` 가 아님)라 언어 변경 시 리소스가 자동으로 다시 갱신되지 않는다. `Configuration` 을 직접 감싸고 액티비티를 재생성하는 수동 방식이 더 확실했다.
+- Compose 밖(ViewModel 등)에서는 `applicationContext.getString()` 이 `attachBaseContext` 의 Configuration 래핑을 타지 않아 시스템 언어로 고정되는 문제가 있어, 호출마다 `wrapWithStoredLocale()` 을 다시 적용하는 `Context.getLocalizedString()` 확장을 만들어 `MissionPerformViewModel` 등의 토스트·상태 문구에 썼다.
+- 내부 로직이 쓰는 코드값(미션 카테고리 "투어"/"맛집"/"체험"/"쇼핑", 진행 상태 "진행중"/"완료"/"미 진행", 사진 인증 무효 라벨 "무효")은 Firestore·도메인 로직에서 항상 한국어 그대로 두고, 화면에 표시할 때만 `CommonComponents.kt` 의 `categoryLabel()`/`missionStatusLabel()` 로 번역한다. 필터링·판정 로직이 문자열 비교에 의존하므로 언어 전환이 내부 상태에 영향을 주지 않는다.
+
+**2) 미션 콘텐츠(제목·설명)** — Firestore `missions/{id}` 문서에 `title`/`desc`(한국어, 필수)와 함께 `titleEn`/`descEn`, `titleJa`/`descJa` 를 선택적으로 둔다. `DocumentSnapshot.localizedString(field, language)` 이 현재 언어에 맞는 접미사 필드를 찾고, 값이 비어 있으면 한국어로 폴백해 번역이 안 된 미션도 빈 텍스트가 되지 않는다.
+
+**검증 습관**: 리소스 파일 3개(ko/en/ja)의 키가 어긋나면 그 언어에서만 조용히 기본 리소스로 새거나(대부분 문제없이 한국어로 보임) 빌드 오류로 드러나지 않는 경우가 있어, 새 문구를 추가할 때마다 세 파일의 `<string name="...">` 키 집합을 diff 로 비교해 맞춘다. 실제로 일본어 지원을 추가하던 중 `perform_*` 토스트 문구 5개가 영어 리소스에서 누락된 것을 이 방법으로 발견했다.
+
+**적용 범위**: 랜딩·로그인·회원가입·취향 선택, 홈·미션 목록·미션 상세·미션 지도·미션 수행, 마이페이지·포인트 내역·진행 중 미션·완료한 미션·랭킹, 하단 메뉴바, 관리자 5개 화면(홈·미션 목록·미션 편집·사용자 관리·사진 검수) 전체.
+
+**남은 한계**: 네이버 지도 `InfoWindow.DefaultTextAdapter` 의 말풍선 텍스트는 Compose 컴포저블이 아니라 콜백이라 `context.getLocalizedString()` 으로 별도 처리한다. 사진 인증 거절 사유(`PhotoVerification.reason`)는 도메인 계층이 Android `Context` 에 의존하지 않는 순수 Kotlin 이라 처음에는 직접 번역할 수 없었는데, 6.8절에서 결과 화면을 새로 만들며 원인을 `RejectReasonCode` enum 으로만 도메인에서 분류하고 실제 다국어 문구는 UI 레이어 `strings.xml` 에서 고르도록 정리해 해소했다.
 
 ---
 
@@ -551,6 +570,36 @@ held-out 데이터로도 분리력이 개선된다(J 0.21 → 0.33). 표본이 �
 
 새 모델(`app/src/main/assets/photo_verifier.onnx` 등)을 실기기(Galaxy S8)에 설치하고 `OnnxPhotoVerifierTest`(6건, 5 통과·1 스킵)로 on-device 로딩·추론을 재확인했다 — 폴백 경로(`"모델 미탑재"` 사유)를 타지 않고 실제 추론이 도는 것을 확인했다.
 
+### 6.8 판정 결과 UX: Toast 에서 전체 화면 결과 화면으로
+
+6.6절까지의 판정 로직·저장 구조는 정확했지만, **사용자에게 결과를 보여주는 방식**에 두 가지 문제가 있었다.
+
+#### 6.8.1 문제 1: `NEEDS_REVIEW` 가 관리자 승인 전인데 "완료"로 보임
+
+`MissionCompletion.resolve()` 가 `needsReview` 여부를 보지 않고 항상 `Completed` 전환 + 포인트 지급을 실행했다. 사진이 관리자 검수 큐로 올라간 상태(승인 전)인데도 사용자 화면에는 미션이 완료된 것으로 표시되어, 6.6절이 설계한 "검수는 사후 부정 적발용" 이라는 전제가 실제로는 관철되지 않고 있었다 — 관리자의 승인이 사실상 요식행위였던 셈이다.
+
+`resolve()` 에 `needsReview: Boolean` 파라미터를 추가해 검수 대기 중에는 `status` 를 `In Progress` 로 유지하고 포인트·완료 처리를 보류하도록 고쳤다. 관리자 승인 시점의 완료·보상 전환은 별도 함수 `resolveApproval()` 로 분리했고(중복 승인 가드 포함), `AdminPhotoReviewScreen.approve()` 가 트랜잭션으로 실제 완료·포인트 지급·`completionCount` 증가를 수행하도록 연결했다. `reject()` 는 제출 시점에 포인트를 준 적이 없으므로(수정 전에는 지급했다가 회수하는 흐름이었다) 회수 로직을 없애고 `In Progress` 로만 되돌리도록 정리했다. `MissionCompletionTest` 에 회귀 테스트 4건을 추가했다.
+
+#### 6.8.2 문제 2: 판정 결과가 Toast 로 잠깐 뜨고 사라짐
+
+사진 제출 직후 "사진 인증 완료" / "관리자 검수 후 포인트 지급" 같은 결과가 `Toast` 로만 표시되고, 화면이 곧바로 이전 화면으로 돌아가(성공 콜백이 결과 메시지와 `navigateBack = true` 를 동시에 세팅) Toast 를 놓치면 무엇이 어떻게 판정됐는지 다시 확인할 방법이 없었다. 특히 `PASS` 와 `NEEDS_REVIEW` 를 구분하지 못해 검수 대기 중인 미션을 "완료된 미션"으로 오인하는 사례로 이어졌다(6.8.1 과 같은 증상의 UI 측 원인).
+
+**해결**: AI 판정이 끝나면 전체 화면으로 결과를 보여주고, 사용자가 명시적으로 버튼을 눌러야 닫히도록 바꿨다. 이 앱에는 BottomSheet 를 쓴 화면이 없고(`AdminPhotoReviewScreen` 의 `AlertDialog` 가 유일한 기존 모달 사례) Navigation 그래프에 결과 전용 경로를 새로 만들면 판정 데이터를 다시 직렬화해 넘겨야 해 더 복잡해지므로, `MissionPerformViewModel` 이 이미 들고 있는 `uiState` 를 그대로 쓰는 `Dialog(usePlatformDefaultWidth = false)` 전체 화면 오버레이를 선택했다.
+
+- **공통 정보**: 제출 사진, 판정 상태(PASS/REVIEW/REJECT), 상태별 제목·설명, 미션이 요구한 카테고리 vs AI 가 예측한 카테고리(`categoryLabel()` 로 번역해 내부 라벨을 그대로 노출하지 않음 — "무효" 라벨도 신규 `category_invalid`("판정 불가")로 번역), confidence(소수점 없는 정수 %, 개발자용 숫자처럼 강조하지 않고 보조 정보로), 포인트 지급 여부, "사진은 기기에서 안전하게 분석되었어요" 온디바이스 고지, 접이식 "분석 정보" 영역에만 모델 버전 노출.
+- **REJECT 사유 분류**: 도메인 계층(`PhotoVerification`)이 사유를 `RejectReasonCode`(무효 대상 / 카테고리 불일치 / 저신뢰) 로만 분류하고, 실제 다국어 문구는 UI 레이어 `strings.xml` 에서 고른다 — `PhotoVerification` 이 Android `Context` 에 의존하지 않는 순수 Kotlin 이라 직접 번역할 수 없기 때문이다(4.7절과 같은 제약).
+  - 무효 대상: `s[무효] ≥ invalidRejectThreshold` 로 REJECT 된 경우
+  - 카테고리 불일치: 다른 카테고리 점수가 미션 카테고리 점수보다 높게 나온 경우
+  - 저신뢰: 그 외(전반적으로 애매하거나 어둡거나 흐린 사진)
+- **오류 구분**: 온디바이스 AI 추론은 네트워크와 무관하므로, `PhotoGate.decide()` 자체가 예기치 않게 실패하는 경우(신규 `Stage.ANALYZE`, "AI 분석 오류")와 판정 이후 업로드·Firestore 저장이 실패하는 경우(`Stage.UPLOAD`/`Stage.FINALIZE`, "저장 오류")를 서로 다른 안내로 분리했다. 기존에는 `decide()` 호출이 try/catch 로 감싸여 있지 않아, 예상 밖 예외가 나면 성공·실패 콜백이 아예 불리지 않고 화면이 "분석 중" 스피너에서 멈추는 잠재 결함이 있었다 — 이번에 함께 고쳤다.
+- **화면 회전·중복 제출**: 분석 중 상태와 결과 모두 `MissionPerformViewModel.uiState`(ViewModel 소유)에 있어 화면 회전에도 그대로 복원된다. 제출 함수는 `isUploading`·`missionCompleted`·`photoResult != null` 세 조건으로 재실행을 막고, 결과가 떠 있는 동안은 `Dialog` 가 화면 전체를 가려 아래 버튼을 다시 누를 수 없다.
+
+| 판정 | 주요 버튼 | 다음 동작 |
+| --- | --- | --- |
+| `PASS` | 완료 | 결과를 닫고 이전 화면으로 |
+| `NEEDS_REVIEW` | 확인 | 결과를 닫고 이전 화면으로 (완료 여부는 관리자 승인 후 확정, 6.8.1) |
+| `REJECT` | 다시 촬영 / 미션 내용 보기 | 다시 촬영: 같은 화면에서 재촬영(포인트·완료 처리 없음) / 미션 내용 보기: 이전 화면으로 |
+
 ---
 
 ## 7. 구현 현황
@@ -575,7 +624,9 @@ held-out 데이터로도 분리력이 개선된다(J 0.21 → 0.33). 표본이 �
 - [x] 모델 에셋 로딩 계측 테스트 (`OnnxPhotoVerifierTest` 6건, `RerankerSourceTest` 4건) — 실기기(Galaxy S8, API 28)에서 실제 에셋으로 추론·로딩 검증. 두 로더 모두 실패를 `runCatching` 으로 삼켜 **무증상 고장**(사진: 전건 검수 큐행 / 추천: 규칙 기반 폴백)이 나므로, 재학습 모델 교체 시 신호 순서·라벨 불일치를 잡는 방어선
 - [x] 참조 이미지 임베딩 유사도(6.7절) — `CLIP ViT-B/32` 임베딩 인코더 채택(pooled feature 재사용은 분리도 AUC 0.60 으로 기각, `ml/embedding_separability.py`). 온디바이스 `OnnxClipPhotoEmbedder`(88.6MB int8, HF Hub 런타임 다운로드+`filesDir` 캐시), 판정 규칙 `PhotoVerification.verify` 에 유사도 ±1단계 결합, 참조 임베딩 사전계산 `ml/embed_missions.py`, EXIF 회전 정합(`ImagePreprocess` + `androidx.exifinterface`). 단위 테스트 신규 13건 포함 `PhotoVerificationTest` 18 + `PhotoGateTest` 8 통과, `testDebugUnitTest`·`compileReleaseKotlin` BUILD SUCCESSFUL. 실기기(Galaxy S8) 계측 테스트 통과 + 유사도 신호 실동작·구제 경로 확인(6.7.7). 임계값(rescue 0.50 / suspect 0.68)은 공개 scene 프록시 기반 잠정치
 - [x] 다중 참조 이미지(최대 유사도, 6.7.8) — 오프라인 프로토타입(J 0.33→0.47)으로 효과 확인 후 실제 구현. `referenceEmbedding: FloatArray?` → `referenceEmbeddings: List<FloatArray>`, `PhotoEmbedding.maxCosineOrNull` 로 전 계층(`PhotoVerification`/`PhotoGate`/`MissionRepository`/`FirebaseMissionRepository`/`MissionPerformViewModel`) 반영. Firestore 가 배열의 배열을 지원하지 않아 원소를 `{"v":[...]}` 맵으로 감싼 구조로 수정(발견·수정 과정 포함). 8개 미션 실제 백필 + held-out 검증(J 0.21→0.33) 완료. `PhotoVerificationTest`/`PhotoGateTest` 다중 참조 테스트 추가
-- [x] 마이페이지 한국어/English UI 언어 전환 — `LanguagePreference`(`SharedPreferences`) 저장값을 `MainActivity.attachBaseContext` 가 `Configuration` 으로 감싸 액티비티 재생성 시 반영(수동 Locale 전환; `ComponentActivity` 에서는 `AppCompatDelegate.setApplicationLocales` 가 즉시 갱신되지 않아 미사용). 랜딩·로그인·회원가입·홈·미션 목록/상세/지도/수행·취향 선택·마이페이지·포인트 내역·진행 중/완료 미션·랭킹·관리자 5개 화면 전 UI 문구를 `values/strings.xml`(한국어)·`values-en/strings.xml`(영어) 리소스로 분리(1:1 키 대응). Compose 밖(ViewModel)의 문구는 호출 시점마다 저장된 언어를 다시 읽는 `Context.getLocalizedString()` 확장으로 처리. 미션 제목·설명은 Firestore `title`/`titleEn`, `desc`/`descEn` 필드를 `localizedString()` 이 선택(영어 미번역 시 한국어로 폴백)하고, 카테고리·진행 상태 같은 내부 코드값은 항상 한국어로 유지한 채 표시할 때만 번역
+- [x] 마이페이지 한국어/English/日本語 3개 언어 UI 전환(4.7절) — `LanguagePreference`(`SharedPreferences`) 저장값을 `MainActivity.attachBaseContext` 가 `Configuration` 으로 감싸 액티비티 재생성 시 반영(수동 Locale 전환; `ComponentActivity` 에서는 `AppCompatDelegate.setApplicationLocales` 가 즉시 갱신되지 않아 미사용). 랜딩·로그인·회원가입·홈·미션 목록/상세/지도/수행·취향 선택·마이페이지·포인트 내역·진행 중/완료 미션·랭킹·관리자 5개 화면 전 UI 문구를 `values/strings.xml`(한국어)·`values-en/strings.xml`(영어)·`values-ja/strings.xml`(일본어) 리소스로 분리(1:1 키 대응). Compose 밖(ViewModel)의 문구는 호출 시점마다 저장된 언어를 다시 읽는 `Context.getLocalizedString()` 확장으로 처리. 미션 제목·설명은 Firestore `title`/`titleEn`/`titleJa`, `desc`/`descEn`/`descJa` 필드를 `localizedString()` 이 선택(미번역 시 한국어로 폴백)하고, 카테고리·진행 상태 같은 내부 코드값은 항상 한국어로 유지한 채 표시할 때만 번역
+- [x] 검수 대기(`NEEDS_REVIEW`) 미션이 관리자 승인 전에 완료·포인트 지급되던 버그 수정(6.8.1) — `MissionCompletion.resolve()`/`resolveApproval()` 분리, `AdminPhotoReviewScreen.approve()`/`reject()` 가 실제 완료·보상 처리를 수행하도록 연결, 회귀 테스트 4건 추가
+- [x] 사진 인증 결과를 전체 화면으로 표시(6.8.2) — Toast 대신 `Dialog` 전체 화면 오버레이로 PASS/REVIEW/REJECT 판정·근거·포인트를 보여주고, REJECT 사유를 `RejectReasonCode` 로 분류. AI 분석 실패(`Stage.ANALYZE`)와 저장 실패(`Stage.UPLOAD`/`FINALIZE`)를 구분한 안내로 분리
 
 ### 7.2 남은 작업
 
@@ -588,6 +639,7 @@ held-out 데이터로도 분리력이 개선된다(J 0.21 → 0.33). 표본이 �
 - [ ] 크라우드소싱 사진으로 각 클래스 보강(특히 체험) 후 재학습 — 무효는 합성 augmentation 으로 대체 완료, 체험은 도메인 격차(6.4)가 남아 실사진이 필요. 수집 스크립트 `ml/data/import_collected.py` 준비 완료, 실사진 수집 자체는 별도
 - [ ] `user_missions` 로그로 추천 re-ranker 재학습(`--from-firestore`), 시뮬레이터 학습본 대체
 - [x] `firestore.rules` 배포 — 규칙 테스트 20건 통과 재확인 후 `firebase deploy --only firestore:rules --project grad-proj-5e09c` 실행, 프로덕션 반영 완료
+- [ ] 사진 인증 결과 전체 화면(6.8.2) 실기기 확인 — 컴파일·단위 테스트는 통과했으나 PASS/REVIEW/REJECT 세 경우와 화면 회전을 실제 기기에서는 아직 확인하지 못함
 - [ ] Robolectric 기반 ViewModel/Compose UI 테스트 `[선택]`
 - [ ] 서버측 포인트 검증(Cloud Functions) `[선택]`
 
@@ -692,6 +744,13 @@ NDCG@5 +0.033 으로 이득의 대부분을 가져온다.
   - `c0d1029` 데이터셋 구축 스크립트 실전화 + 실제 데이터셋 생성(5,300장, HF Hub 업로드)
   - `2db4900` 사진 인증 모델 학습 결과 반영(fullft-1, macro-F1 0.82)
   - 학습된 추천 re-ranker (`MissionFeatures`/`LearnedReranker` + `ml/reco/`)
+  - `625185c` 마이페이지 한/영 언어 전환 전 화면 적용
+  - `4e83053` 일본어 UI 언어 지원 추가
+  - `6d3f8d1` 언어 설정 메뉴 라벨에 言語 추가
+  - `f343c19` 추천 사유 메뉴 라벨 언어(영어, 일본어) 변경
+  - `dbe0d06` 관리자 검수 대상 사진이 승인 전에 완료·포인트 지급되던 문제 수정
+  - `85e0680` 검수 대기 시 잘못된 "사진 인증 완료" 토스트 문구 표시 수정
+  - `be56bd1` 사진 인증 결과를 전체 화면으로 표시
 
 ---
 
