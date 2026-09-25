@@ -32,6 +32,18 @@ data class PhotoResultUi(
 )
 
 /**
+ * PASS 판정 직후 짧게(1~1.5초) 보여주는 성취 연출에 필요한 값. 이 화면을 지나야
+ * [PhotoResultUi] 결과 화면(이미 준비돼 있음)이 이어서 보인다.
+ */
+data class CelebrationUi(
+    val missionTitle: String,
+    val pointsGranted: Int,
+    /** 이번 주(월요일 0시~) 완료한 미션 수. 조회 실패 시 0. */
+    val weeklyCompleted: Int,
+    val weeklyGoal: Int
+)
+
+/**
  * [MissionPerformScreen] 이 그리는 데 필요한 모든 상태.
  * 화면은 이 상태를 표시하고 [MissionPerformViewModel] 의 함수를 호출하는 역할만 한다.
  */
@@ -60,6 +72,8 @@ data class MissionPerformUiState(
 
     /** AI 판정이 끝난 뒤 보여줄 전체 화면 결과. null 이 아니면 화면이 오버레이를 띄운다. */
     val photoResult: PhotoResultUi? = null,
+    /** PASS 일 때만 값이 있다. null 이 아니면 [photoResult] 보다 먼저 이 연출을 보여준다. */
+    val celebration: CelebrationUi? = null,
 
     /** 한 번만 소비되는 일회성 이벤트. */
     val toastMessage: String? = null,

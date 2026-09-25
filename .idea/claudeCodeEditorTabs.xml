@@ -1,29 +1,23 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="ClaudeCodeEditorTabs">
-    <option name="activeSessionId" value="a1a1a6a8-f036-4f15-b06d-985f90b89d7c" />
+    <option name="activeSessionId" value="6088e31b-d2f7-4e01-8f51-7f90ae223745" />
     <option name="openSessionIds">
       <list>
-        <option value="64efbce0-2bc4-419f-b164-3ad1f7498d5e" />
         <option value="0ebc4252-4beb-4ce7-9b61-8a3474cd7f91" />
-        <option value="65a680bf-e87f-49a9-a8d3-fc6a2b0e36ed" />
-        <option value="a1a1a6a8-f036-4f15-b06d-985f90b89d7c" />
+        <option value="6088e31b-d2f7-4e01-8f51-7f90ae223745" />
       </list>
     </option>
     <option name="sessionPaths">
       <map>
         <entry key="0ebc4252-4beb-4ce7-9b61-8a3474cd7f91" value="/sessions/ffd5aece-2b7a-42a4-afff-125b6cfa2dd3" />
-        <entry key="64efbce0-2bc4-419f-b164-3ad1f7498d5e" value="/sessions/d8d02067-c9ac-4157-b5c5-bec83e4c20e2" />
-        <entry key="65a680bf-e87f-49a9-a8d3-fc6a2b0e36ed" value="/sessions/55ed646c-91c5-4bae-8aad-45c37c3f680d" />
-        <entry key="a1a1a6a8-f036-4f15-b06d-985f90b89d7c" value="/sessions/e200b77a-38ba-41b7-b8d9-eabd3e7c7945" />
+        <entry key="6088e31b-d2f7-4e01-8f51-7f90ae223745" value="/sessions/cf706084-3d1a-4a22-b43a-cfcb55063abb" />
       </map>
     </option>
     <option name="sessionTitles">
       <map>
         <entry key="0ebc4252-4beb-4ce7-9b61-8a3474cd7f91" value="프로젝트 구성이랑 깃허브 내용 읽어보고 어떤 작업을 더 해야할지 확인해줘" />
-        <entry key="64efbce0-2bc4-419f-b164-3ad1f7498d5e" value="세션 요약 (다음 세션 전달용) 프로젝트: Travel Mission — 숙명여대 졸업 프" />
-        <entry key="65a680bf-e87f-49a9-a8d3-fc6a2b0e36ed" value="마지막 작업이 사용 언어를 영어/한국어 선택할 수 있는 기능을 추가하는 중이었어 작업을 하" />
-        <entry key="a1a1a6a8-f036-4f15-b06d-985f90b89d7c" value="지금 홈 화면에서 추천 미션 아래에 전채, 투어, 맛집, 체험 , 쇼핑 이렇게 버튼 있는데" />
+        <entry key="6088e31b-d2f7-4e01-8f51-7f90ae223745" value="지금은 사진 인증을 하면 미션 완료, 관리자 검토 대상 이런게 토스트로만 뜨고 사라지잖아" />
       </map>
     </option>
   </component>

@@ -69,6 +69,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.google.firebase.Firebase
 import com.google.firebase.auth.auth
+import kotlinx.coroutines.delay
 import smu.ai.graduation_project.R
 import smu.ai.graduation_project.ui.theme.CardGray
 import smu.ai.graduation_project.ui.theme.LightPurple
@@ -91,6 +92,8 @@ private fun locationAgeMillis(location: Location): Long =
 fun MissionPerformScreen(
     missionId: String,
     onNavigateBack: () -> Unit,
+    onNavigateToMissionList: () -> Unit = {},
+    onNavigateToHome: () -> Unit = {},
     viewModel: MissionPerformViewModel = viewModel()
 ) {
     val context = LocalContext.current
@@ -120,38 +123,60 @@ fun MissionPerformScreen(
         }
     }
 
-    // AI 분석 중 / 분석 결과: 전체 화면으로 띄운다(단순 Toast 로 끝내지 않는다).
-    // 두 상태 모두 ViewModel 의 uiState 에 있으므로 화면 회전에도 그대로 복원된다.
-    if (state.isUploading || state.photoResult != null) {
+    // 일회성 이벤트: 성취 연출은 버튼이 아니라 타이머로 끝난다(1.1초 애니메이션 + 여유).
+    LaunchedEffect(state.celebration) {
+        if (state.celebration != null) {
+            delay(1300)
+            viewModel.onCelebrationFinished()
+        }
+    }
+
+    // AI 분석 중 / 성취 연출(PASS 전용) / 분석 결과: 전체 화면으로 띄운다(단순 Toast 로 끝내지 않는다).
+    // 세 상태 모두 ViewModel 의 uiState 에 있으므로 화면 회전에도 그대로 복원된다.
+    if (state.isUploading || state.celebration != null || state.photoResult != null) {
         Dialog(
             onDismissRequest = {
                 when {
-                    state.isUploading -> Unit
+                    state.isUploading || state.celebration != null -> Unit
                     state.photoResult?.verdict == PhotoVerdictUi.REJECT -> viewModel.onPhotoResultRetake()
+                    state.photoResult?.verdict == PhotoVerdictUi.PASS -> {
+                        viewModel.onPhotoResultDismissed()
+                        onNavigateToMissionList()
+                    }
                     state.photoResult != null -> viewModel.onPhotoResultAcknowledged()
                 }
             },
             properties = DialogProperties(
                 usePlatformDefaultWidth = false,
-                dismissOnBackPress = !state.isUploading,
+                dismissOnBackPress = !(state.isUploading || state.celebration != null),
                 dismissOnClickOutside = false
             )
         ) {
             Surface(modifier = Modifier.fillMaxSize(), color = Color.White) {
-                if (state.isUploading) {
-                    MissionPhotoAnalyzingOverlay()
-                } else {
-                    state.photoResult?.let { result ->
+                when {
+                    state.isUploading -> MissionPhotoAnalyzingOverlay()
+                    state.celebration != null -> MissionSuccessCelebrationOverlay(state.celebration)
+                    else -> state.photoResult?.let { result ->
                         MissionPhotoResultOverlay(
                             result = result,
                             onPrimary = {
-                                if (result.verdict == PhotoVerdictUi.REJECT) {
-                                    viewModel.onPhotoResultRetake()
+                                when (result.verdict) {
+                                    PhotoVerdictUi.REJECT -> viewModel.onPhotoResultRetake()
+                                    PhotoVerdictUi.PASS -> {
+                                        viewModel.onPhotoResultDismissed()
+                                        onNavigateToMissionList()
+                                    }
+                                    PhotoVerdictUi.REVIEW -> viewModel.onPhotoResultAcknowledged()
+                                }
+                            },
+                            onSecondary = {
+                                if (result.verdict == PhotoVerdictUi.PASS) {
+                                    viewModel.onPhotoResultDismissed()
+                                    onNavigateToHome()
                                 } else {
                                     viewModel.onPhotoResultAcknowledged()
                                 }
-                            },
-                            onSecondary = { viewModel.onPhotoResultAcknowledged() }
+                            }
                         )
                     }
                 }

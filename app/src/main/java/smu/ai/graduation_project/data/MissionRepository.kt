@@ -136,4 +136,10 @@ interface MissionRepository {
         onResult: (CompleteResult) -> Unit,
         onError: (Exception) -> Unit
     )
+
+    /**
+     * 이번 주(월요일 0시~) 완료한 미션 수. 사진 인증 성공 연출의 주간 진행 표시에 쓰는
+     * 보조 통계라, 조회에 실패해도 예외를 던지지 않고 0 을 돌려준다.
+     */
+    fun countMissionsCompletedThisWeek(uid: String, onResult: (Int) -> Unit)
 }

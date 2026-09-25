@@ -260,7 +260,21 @@ private fun MainApp(onLogout: () -> Unit) {
             composable("mission_perform/{missionId}") { backStack ->
                 MissionPerformScreen(
                     missionId = backStack.arguments?.getString("missionId").orEmpty(),
-                    onNavigateBack = { navController.popBackStack() }
+                    onNavigateBack = { navController.popBackStack() },
+                    onNavigateToMissionList = {
+                        navController.navigate(Screen.Mission.route) {
+                            popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+                    },
+                    onNavigateToHome = {
+                        navController.navigate(Screen.Home.route) {
+                            popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+                    }
                 )
             }
             composable("profile/in-progress") {

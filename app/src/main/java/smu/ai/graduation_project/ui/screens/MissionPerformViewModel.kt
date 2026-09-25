@@ -18,6 +18,9 @@ import smu.ai.graduation_project.domain.MissionCompletion
 import smu.ai.graduation_project.domain.PhotoVerification
 import smu.ai.graduation_project.domain.PhotoVerificationConfig
 
+/** 성취 연출의 "이번 주 미션 N/5" 목표값. 홈 화면의 주간 진행률 카드와 같은 값을 쓴다. */
+private const val WEEKLY_MISSION_GOAL = 5
+
 /**
  * 미션 수행 화면의 상태 보유 + Firebase 조회·위치 인증·사진 업로드·포인트 지급 흐름 조정.
  * Android 프레임워크 의존(위치 권한/GPS 획득, 카메라 실행)은 화면에 남기고,
@@ -219,8 +222,8 @@ class MissionPerformViewModel(
             emitToast(str(R.string.perform_toast_photo_read_failed))
             return
         }
-        // photoResult != null: 결과 화면이 이미 떠 있는 동안 재제출 방지(빠른 연타 대응).
-        if (state.missionCompleted || state.isUploading || state.photoResult != null) return
+        // photoResult/celebration != null: 결과 화면이 이미 떠 있는 동안 재제출 방지(빠른 연타 대응).
+        if (state.missionCompleted || state.isUploading || state.photoResult != null || state.celebration != null) return
 
         uiState = state.copy(isUploading = true, uploadError = null)
 
@@ -236,37 +239,64 @@ class MissionPerformViewModel(
             referenceEmbeddings = state.missionReferenceEmbeddings
                 .filter { it.isNotEmpty() }.map { it.toFloatArray() },
             onResult = { result ->
-                // 이미 완료 처리된 미션에 재제출된 경우(중복 제출)는 새 판정이 아니므로
-                // 결과 화면 대신 짧은 안내로만 처리한다.
-                uiState = if (result.alreadyCompleted) {
-                    uiState.copy(
-                        isUploading = false,
-                        toastMessage = str(R.string.perform_toast_already_completed)
-                    )
-                } else {
-                    val verdict = if (result.needsReview) PhotoVerdictUi.REVIEW else PhotoVerdictUi.PASS
-                    uiState.copy(
-                        isUploading = false,
-                        // needsReview 면 관리자가 승인하기 전까지는 완료·지급 상태가 아니다.
-                        missionCompleted = !result.needsReview,
-                        stage2RewardGranted = !result.needsReview && result.rewardGranted > 0,
-                        photoUrl = result.photoUrl,
-                        verificationText = if (result.needsReview) {
-                            str(R.string.perform_state_photo_needs_review)
-                        } else {
-                            str(R.string.perform_state_mission_completed)
-                        },
-                        photoResult = PhotoResultUi(
-                            verdict = verdict,
+                when {
+                    // 이미 완료 처리된 미션에 재제출된 경우(중복 제출)는 새 판정이 아니므로
+                    // 결과 화면 대신 짧은 안내로만 처리한다.
+                    result.alreadyCompleted -> {
+                        uiState = uiState.copy(
+                            isUploading = false,
+                            toastMessage = str(R.string.perform_toast_already_completed)
+                        )
+                    }
+                    result.needsReview -> {
+                        uiState = uiState.copy(
+                            isUploading = false,
+                            missionCompleted = false,
+                            stage2RewardGranted = false,
+                            photoUrl = result.photoUrl,
+                            verificationText = str(R.string.perform_state_photo_needs_review),
+                            photoResult = PhotoResultUi(
+                                verdict = PhotoVerdictUi.REVIEW,
+                                displayPhoto = state.capturedPhotoUri ?: result.photoUrl,
+                                missionCategory = state.missionCategory,
+                                predictedLabel = result.topLabel,
+                                confidence = result.topLabel.takeIf { it.isNotEmpty() }?.let { result.matchScore },
+                                pointsGranted = 0,
+                                rejectReasonCode = null,
+                                modelVersion = result.modelVersion
+                            )
+                        )
+                    }
+                    // PASS: 결과 화면은 미리 만들어 두고, 이번 주 완료 수를 마저 받아온 뒤
+                    // 성취 연출과 함께 한 번에 반영한다. 먼저 보여주고 숫자만 나중에 바뀌면 어색하다.
+                    else -> {
+                        val builtResult = PhotoResultUi(
+                            verdict = PhotoVerdictUi.PASS,
                             displayPhoto = state.capturedPhotoUri ?: result.photoUrl,
                             missionCategory = state.missionCategory,
                             predictedLabel = result.topLabel,
                             confidence = result.topLabel.takeIf { it.isNotEmpty() }?.let { result.matchScore },
-                            pointsGranted = if (verdict == PhotoVerdictUi.PASS) result.rewardGranted else 0,
+                            pointsGranted = result.rewardGranted,
                             rejectReasonCode = null,
                             modelVersion = result.modelVersion
                         )
-                    )
+                        repository.countMissionsCompletedThisWeek(uid!!) { weeklyCompleted ->
+                            uiState = uiState.copy(
+                                isUploading = false,
+                                missionCompleted = true,
+                                stage2RewardGranted = result.rewardGranted > 0,
+                                photoUrl = result.photoUrl,
+                                verificationText = str(R.string.perform_state_mission_completed),
+                                photoResult = builtResult,
+                                celebration = CelebrationUi(
+                                    missionTitle = state.missionTitle,
+                                    pointsGranted = result.rewardGranted,
+                                    weeklyCompleted = weeklyCompleted,
+                                    weeklyGoal = WEEKLY_MISSION_GOAL
+                                )
+                            )
+                        }
+                    }
                 }
             },
             onError = { error ->
@@ -334,7 +364,7 @@ class MissionPerformViewModel(
 
     // ---- 사진 인증 결과 화면(전체 화면 오버레이) ----------------------------
 
-    /** PASS/REVIEW "완료"/"확인", REJECT "미션 내용 보기": 결과를 닫고 이전 화면으로 돌아간다. */
+    /** REVIEW "확인", REJECT "미션 내용 보기": 결과를 닫고 이전 화면(미션 상세 등)으로 돌아간다. */
     fun onPhotoResultAcknowledged() {
         uiState = uiState.copy(photoResult = null, navigateBack = true)
     }
@@ -342,5 +372,20 @@ class MissionPerformViewModel(
     /** REJECT "다시 촬영": 결과만 닫고 같은 화면에서 새로 촬영할 수 있게 한다. */
     fun onPhotoResultRetake() {
         uiState = uiState.copy(photoResult = null, capturedPhotoUri = null, uploadError = null)
+    }
+
+    /**
+     * PASS "다음 미션 보기"/"홈으로": 이전 화면으로 되돌아가는 게 아니라 다른 탭으로 이동하므로
+     * (화면이 `navController.navigate()` 로 직접 처리), 여기서는 결과 상태만 정리한다.
+     */
+    fun onPhotoResultDismissed() {
+        uiState = uiState.copy(photoResult = null)
+    }
+
+    // ---- 성취 연출(PASS 전용, 1~1.5초) --------------------------------------
+
+    /** 연출 애니메이션이 끝나면 화면이 호출한다 — 결과 화면(이미 준비돼 있음)으로 이어진다. */
+    fun onCelebrationFinished() {
+        uiState = uiState.copy(celebration = null)
     }
 }

@@ -1,5 +1,12 @@
 package smu.ai.graduation_project.ui.screens
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -9,6 +16,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -32,27 +40,39 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import kotlin.math.PI
+import kotlin.math.cos
 import kotlin.math.roundToInt
+import kotlin.math.sin
+import kotlin.random.Random
 import smu.ai.graduation_project.R
 import smu.ai.graduation_project.domain.PhotoVerification
 import smu.ai.graduation_project.ui.components.categoryLabel
 import smu.ai.graduation_project.ui.theme.CardGray
 import smu.ai.graduation_project.ui.theme.LightPurple
 import smu.ai.graduation_project.ui.theme.MainPurple
+import smu.ai.graduation_project.ui.theme.Orange
 
 private val ReviewAmber = Color(0xFFE38B2C)
 private val ReviewAmberBg = Color(0xFFFFF7E8)
@@ -84,6 +104,134 @@ fun MissionPhotoAnalyzingOverlay() {
             fontSize = 14.sp
         )
     }
+}
+
+/**
+ * PASS 판정 직후 1~1.5초 보여주는 성취 연출. [PhotoResultUi] 화면은 이미 준비돼 있고,
+ * 애니메이션이 끝나면 화면(타이머)이 [MissionPerformViewModel.onCelebrationFinished] 를 불러
+ * 이 연출을 닫으면 그 결과 화면이 자연스럽게 이어서 보인다.
+ */
+@Composable
+fun MissionSuccessCelebrationOverlay(celebration: CelebrationUi) {
+    val haptic = LocalHapticFeedback.current
+    val progress = remember { Animatable(0f) }
+    LaunchedEffect(Unit) {
+        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+        progress.animateTo(1f, animationSpec = tween(durationMillis = 1100, easing = LinearEasing))
+    }
+
+    val badgeScale by animateFloatAsState(
+        targetValue = if (progress.value > 0.03f) 1f else 0f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
+        label = "celebrationBadgeScale"
+    )
+    val pointsVisible = progress.value > 0.15f
+    val pointsOffsetY by animateFloatAsState(
+        targetValue = if (pointsVisible) -18f else 8f,
+        animationSpec = tween(durationMillis = 450),
+        label = "celebrationPointsOffset"
+    )
+    val pointsAlpha by animateFloatAsState(
+        targetValue = if (pointsVisible) 1f else 0f,
+        animationSpec = tween(durationMillis = 400),
+        label = "celebrationPointsAlpha"
+    )
+    val particles = remember { List(18) { ConfettiParticle.random() } }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(LightPurple)
+    ) {
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val burstOrigin = Offset(size.width / 2f, size.height * 0.38f)
+            particles.forEach { particle -> drawConfettiParticle(particle, progress.value, burstOrigin) }
+        }
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(32.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Icon(
+                Icons.Default.CheckCircle,
+                null,
+                tint = MainPurple,
+                modifier = Modifier
+                    .size(88.dp)
+                    .scale(badgeScale)
+            )
+            Spacer(modifier = Modifier.height(20.dp))
+            Text(
+                stringResource(R.string.perform_celebration_title),
+                fontWeight = FontWeight.ExtraBold,
+                fontSize = 26.sp,
+                color = Color(0xFF2C2C2C)
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                stringResource(R.string.perform_celebration_subtitle, celebration.missionTitle),
+                color = Color.Gray,
+                fontSize = 14.sp,
+                textAlign = TextAlign.Center,
+                lineHeight = 20.sp
+            )
+            if (celebration.pointsGranted > 0) {
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    stringResource(R.string.perform_celebration_points_format, celebration.pointsGranted),
+                    fontWeight = FontWeight.ExtraBold,
+                    fontSize = 22.sp,
+                    color = MainPurple,
+                    modifier = Modifier
+                        .offset(y = pointsOffsetY.dp)
+                        .alpha(pointsAlpha)
+                )
+            }
+            Spacer(modifier = Modifier.height(14.dp))
+            Text(
+                stringResource(
+                    R.string.perform_celebration_weekly_progress,
+                    celebration.weeklyCompleted,
+                    celebration.weeklyGoal
+                ),
+                color = Color.Gray,
+                fontSize = 13.sp
+            )
+        }
+    }
+}
+
+/** 작은 색색의 파티클 하나의 궤적. 중심에서 바깥으로 터지며 서서히 떨어지고 옅어진다. */
+private data class ConfettiParticle(
+    val angleRad: Float,
+    val distancePx: Float,
+    val radiusPx: Float,
+    val color: Color,
+    val delay: Float
+) {
+    companion object {
+        private val palette = listOf(MainPurple, Color(0xFFB8A9FF), Color(0xFF8F7BFF), Orange)
+        fun random() = ConfettiParticle(
+            angleRad = Random.nextFloat() * (2f * PI.toFloat()),
+            distancePx = Random.nextFloat() * 260f + 120f,
+            radiusPx = Random.nextFloat() * 5f + 3f,
+            color = palette.random(),
+            delay = Random.nextFloat() * 0.15f
+        )
+    }
+}
+
+private fun DrawScope.drawConfettiParticle(particle: ConfettiParticle, progress: Float, origin: Offset) {
+    val local = ((progress - particle.delay) / (1f - particle.delay)).coerceIn(0f, 1f)
+    if (local <= 0f) return
+    val distance = particle.distancePx * local
+    val gravity = local * local * 140f
+    val x = origin.x + cos(particle.angleRad) * distance
+    val y = origin.y + sin(particle.angleRad) * distance + gravity
+    val alpha = if (local < 0.6f) 1f else (1f - (local - 0.6f) / 0.4f).coerceIn(0f, 1f)
+    drawCircle(color = particle.color.copy(alpha = alpha), radius = particle.radiusPx, center = Offset(x, y))
 }
 
 /**
@@ -234,13 +382,22 @@ fun MissionPhotoResultOverlay(
         Spacer(modifier = Modifier.height(28.dp))
 
         when (result.verdict) {
-            PhotoVerdictUi.PASS -> Button(
-                onClick = onPrimary,
-                modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.buttonColors(containerColor = MainPurple),
-                shape = RoundedCornerShape(16.dp)
-            ) {
-                Text(stringResource(R.string.perform_result_btn_done), fontWeight = FontWeight.Bold)
+            PhotoVerdictUi.PASS -> Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Button(
+                    onClick = onPrimary,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(containerColor = MainPurple),
+                    shape = RoundedCornerShape(16.dp)
+                ) {
+                    Text(stringResource(R.string.perform_result_btn_next_mission), fontWeight = FontWeight.Bold)
+                }
+                OutlinedButton(
+                    onClick = onSecondary,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp)
+                ) {
+                    Text(stringResource(R.string.perform_result_btn_go_home))
+                }
             }
             PhotoVerdictUi.REVIEW -> Button(
                 onClick = onPrimary,

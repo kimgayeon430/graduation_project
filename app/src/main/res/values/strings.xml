@@ -134,6 +134,8 @@
     <string name="perform_result_reject_reason_category_mismatch">미션과 다른 종류의 사진으로 판단했어요.</string>
     <string name="perform_result_btn_retake">다시 촬영</string>
     <string name="perform_result_btn_view_mission">미션 내용 보기</string>
+    <string name="perform_result_btn_next_mission">다음 미션 보기</string>
+    <string name="perform_result_btn_go_home">홈으로</string>
     <string name="perform_result_expected_category_label">미션이 요구한 카테고리</string>
     <string name="perform_result_predicted_category_label">AI가 예측한 카테고리</string>
     <string name="perform_result_confidence_label">AI 신뢰도</string>
