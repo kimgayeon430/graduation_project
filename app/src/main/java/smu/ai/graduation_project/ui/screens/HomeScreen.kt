@@ -12,21 +12,13 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.CardGiftcard
-import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.Landscape
-import androidx.compose.material.icons.filled.LocationCity
-import androidx.compose.material.icons.filled.Notifications
-import androidx.compose.material.icons.filled.Restaurant
-import androidx.compose.material.icons.filled.ShoppingBag
 import androidx.compose.material.icons.filled.Stars
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -76,7 +68,6 @@ import smu.ai.graduation_project.domain.MissionRecommender
 import smu.ai.graduation_project.domain.MissionScorer
 import smu.ai.graduation_project.domain.RecommendationContext
 import smu.ai.graduation_project.model.Mission
-import smu.ai.graduation_project.ui.components.categoryLabel
 import smu.ai.graduation_project.ui.theme.CardGray
 import smu.ai.graduation_project.ui.theme.GradientEnd
 import smu.ai.graduation_project.ui.theme.GradientStart
@@ -236,14 +227,7 @@ fun HomeScreen(onNavigateToDetail: (String) -> Unit) {
             .verticalScroll(rememberScrollState())
             .padding(16.dp)
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text("Seoul Quest", color = MainPurple, fontWeight = FontWeight.Bold, fontSize = 24.sp)
-            Icon(Icons.Default.Notifications, contentDescription = null, tint = Color.Gray)
-        }
+        Text("Seoul Quest", color = MainPurple, fontWeight = FontWeight.Bold, fontSize = 24.sp)
 
         Spacer(modifier = Modifier.height(24.dp))
 
@@ -413,32 +397,6 @@ fun HomeScreen(onNavigateToDetail: (String) -> Unit) {
                         fontSize = 12.sp,
                         color = Color.Gray
                     )
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(24.dp))
-
-        val categories = listOf(
-            "전체" to Icons.Default.GridView,
-            "투어" to Icons.Default.LocationCity,
-            "맛집" to Icons.Default.Restaurant,
-            "체험" to Icons.Default.CameraAlt,
-            "쇼핑" to Icons.Default.ShoppingBag
-        )
-        LazyRow(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-            items(categories) { (label, icon) ->
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Surface(
-                        modifier = Modifier.size(56.dp),
-                        shape = RoundedCornerShape(16.dp),
-                        color = CardGray
-                    ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Icon(icon, contentDescription = null, tint = if (label == "전체") MainPurple else Color.Gray)
-                        }
-                    }
-                    Text(categoryLabel(label), fontSize = 12.sp, color = if (label == "전체") MainPurple else Color.Gray)
                 }
             }
         }

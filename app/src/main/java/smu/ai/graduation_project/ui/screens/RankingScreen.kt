@@ -7,13 +7,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.HelpCenter
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.SecondaryTabRow
 import androidx.compose.material3.Tab
@@ -90,11 +86,6 @@ fun RankingScreen() {
     ) {
         CenterAlignedTopAppBar(
             title = { Text(stringResource(R.string.ranking_title), fontWeight = FontWeight.Bold, fontSize = 20.sp) },
-            actions = {
-                IconButton(onClick = { }) {
-                    Icon(Icons.AutoMirrored.Filled.HelpCenter, null)
-                }
-            },
             colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.White)
         )
 
