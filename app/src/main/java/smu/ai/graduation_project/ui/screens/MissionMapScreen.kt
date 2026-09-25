@@ -62,6 +62,10 @@ import smu.ai.graduation_project.ui.theme.Orange
 private val CAPTION_TEXT_COLOR = android.graphics.Color.parseColor("#333333")
 private val CAPTION_HALO_COLOR = android.graphics.Color.WHITE
 
+// Missions within roughly this many degrees (~80m) are treated as the same spot and clustered
+// into one pin, instead of requiring bit-for-bit identical coordinates.
+private const val CLUSTER_GRID_DEGREES = 0.0008
+
 @Composable
 fun MissionMapScreen(
     missions: List<Mission>,
@@ -81,7 +85,15 @@ fun MissionMapScreen(
             val lng = it.longitude
             lat != null && lng != null && lat.isFinite() && lng.isFinite() &&
                 lat in -90.0..90.0 && lng in -180.0..180.0
-        }.groupBy { LatLng(requireNotNull(it.latitude), requireNotNull(it.longitude)) }
+        }.groupBy { mission ->
+            val lat = requireNotNull(mission.latitude)
+            val lng = requireNotNull(mission.longitude)
+            Math.round(lat / CLUSTER_GRID_DEGREES) to Math.round(lng / CLUSTER_GRID_DEGREES)
+        }.values.map { group ->
+            val lat = group.map { requireNotNull(it.latitude) }.average()
+            val lng = group.map { requireNotNull(it.longitude) }.average()
+            LatLng(lat, lng) to group
+        }
     }
     var selectedIds by remember { mutableStateOf<List<String>>(emptyList()) }
     val selectedMissions = missions.filter { it.id in selectedIds }
@@ -151,7 +163,7 @@ fun MissionMapScreen(
                 markers.add(marker)
             }
             // Fit after layout so every mission is initially within the viewport.
-            val coordinates = groups.keys.toList()
+            val coordinates = groups.map { it.first }
             if (holder.fittedCoordinates != coordinates) {
                 holder.view.doOnLayout {
                     if (active && !holder.destroyed) {
@@ -186,7 +198,7 @@ fun MissionMapScreen(
             color = Color.White,
             shadowElevation = 4.dp
         ) {
-            val count = groups.values.sumOf { it.size }
+            val count = groups.sumOf { it.second.size }
             Row(
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
                 verticalAlignment = Alignment.CenterVertically,
