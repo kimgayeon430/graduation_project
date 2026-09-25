@@ -12,9 +12,9 @@ import java.util.Locale
 
 /**
  * 앱 표시 언어. 두 가지에 쓰인다.
- *  1) 미션 콘텐츠(제목/설명): Firestore에 `title`/`desc`(한국어)와 `titleEn`/`descEn`(영어)로 저장되고,
- *     [localizedString] 이 이 값에 따라 고른다.
- *  2) 앱 UI 문구(핵심 사용자 화면): `strings.xml`(기본, 한국어) / `values-en/strings.xml`(영어) 리소스가,
+ *  1) 미션 콘텐츠(제목/설명): Firestore에 `title`/`desc`(한국어), `titleEn`/`descEn`(영어), `titleJa`/`descJa`(일본어)로
+ *     저장되고, [localizedString] 이 이 값에 따라 고른다.
+ *  2) 앱 UI 문구(핵심 사용자 화면): `strings.xml`(기본, 한국어) / `values-en/strings.xml`(영어) / `values-ja/strings.xml`(일본어) 리소스가,
  *     [MainActivity.attachBaseContext] 가 [wrapWithStoredLocale] 로 감싼 Configuration 에 따라 전환된다.
  *     `AppCompatDelegate.setApplicationLocales` 는 이 앱처럼 `ComponentActivity`(AppCompatActivity 아님)에서는
  *     리소스가 즉시 갱신되지 않아(자동 재생성 훅이 없음) 쓰지 않는다 — 수동 Locale/Configuration 방식이 더 확실하다.
@@ -22,7 +22,8 @@ import java.util.Locale
  */
 enum class AppLanguage(val code: String, val label: String) {
     KOREAN("ko", "한국어"),
-    ENGLISH("en", "English");
+    ENGLISH("en", "English"),
+    JAPANESE("ja", "日本語");
 
     companion object {
         fun fromCode(code: String?): AppLanguage = entries.firstOrNull { it.code == code } ?: KOREAN
@@ -85,8 +86,13 @@ fun Context.getLocalizedString(@StringRes resId: Int, vararg formatArgs: Any): S
  * 영어 필드가 비어 있으면 한국어로 안전하게 폴백한다(번역 누락 미션이 빈 텍스트로 보이지 않도록).
  */
 fun DocumentSnapshot.localizedString(field: String, language: AppLanguage, fallback: String = ""): String {
-    if (language == AppLanguage.ENGLISH) {
-        getString("${field}En")?.takeIf { it.isNotBlank() }?.let { return it }
+    val suffix = when (language) {
+        AppLanguage.ENGLISH -> "En"
+        AppLanguage.JAPANESE -> "Ja"
+        AppLanguage.KOREAN -> null
+    }
+    if (suffix != null) {
+        getString("$field$suffix")?.takeIf { it.isNotBlank() }?.let { return it }
     }
     return getString(field) ?: fallback
 }

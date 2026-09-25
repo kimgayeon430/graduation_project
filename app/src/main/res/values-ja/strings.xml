@@ -1,0 +1,309 @@
+<resources>
+    <!-- 하단 메뉴바 -->
+    <string name="nav_home">ホーム</string>
+    <string name="nav_mission">ミッション</string>
+    <string name="nav_admin">管理者</string>
+    <string name="nav_ranking">ランキング</string>
+    <string name="nav_profile">マイページ</string>
+    <string name="toast_admin_only">管理者のみアクセスできます。</string>
+
+    <!-- 공용 -->
+    <string name="category_all">全体</string>
+    <string name="category_tour">ツアー</string>
+    <string name="category_food">グルメ</string>
+    <string name="category_experience">体験</string>
+    <string name="category_shopping">ショッピング</string>
+    <string name="shared_reward_label">報酬</string>
+    <string name="status_in_progress">進行中</string>
+    <string name="status_completed">完了</string>
+    <string name="status_not_started">未開始</string>
+    <string name="retry">再試行</string>
+
+    <!-- 미션 목록 -->
+    <string name="mission_list_title">ミッション一覧</string>
+    <string name="mission_map_title">ミッションマップ</string>
+    <string name="view_list">リスト表示</string>
+    <string name="view_map">マップ表示</string>
+    <string name="error_load_missions">ミッションを読み込めませんでした。接続状態を確認してもう一度お試しください。</string>
+    <string name="error_load_progress">ミッションの進行状況を読み込めませんでした。</string>
+    <string name="mission_no_title">タイトルのないミッション</string>
+
+    <!-- 미션 상세 -->
+    <string name="detail_title">ミッション詳細</string>
+    <string name="detail_image_placeholder">ミッション代表画像</string>
+    <string name="detail_desc_fallback">まだミッションの説明が登録されていません。</string>
+    <string name="detail_how_to_title">参加方法</string>
+    <string name="detail_step1_title">1. ミッション開始</string>
+    <string name="detail_step1_body">ボタンを押してミッションを開始し、進行状況を保存します。</string>
+    <string name="detail_step2_title">2. 場所を訪問または体験</string>
+    <string name="detail_step2_body">ミッションの説明に合った場所を訪れるか、行動を行います。</string>
+    <string name="detail_step3_title">3. 認証して完了</string>
+    <string name="detail_step3_body">実行画面に移動して認証を終えるとポイントが付与されます。</string>
+    <string name="toast_login_required">ログインが必要です。</string>
+    <string name="toast_already_completed">すでに完了したミッションです。</string>
+    <string name="toast_save_failed">ミッション情報をサーバーに保存できませんでした。</string>
+    <string name="detail_btn_completed">完了したミッション</string>
+    <string name="detail_btn_start">ミッションを開始する</string>
+
+    <!-- 미션 수행 (GPS·사진 인증) -->
+    <string name="perform_title">ミッション実行</string>
+    <string name="perform_intro_body">最初のステップは現在地の認証です。GPS権限を許可して、現地で認証ボタンを押してください。</string>
+    <string name="perform_reward_line">ポイント付与：ステップ1 %1$dP・ステップ2 %2$dP</string>
+    <string name="perform_target_location">目標位置：%1$.4f, %2$.4f・半径%3$dm以内で認証</string>
+    <string name="perform_step1_title">ステップ1・GPS位置認証</string>
+    <string name="perform_reward_granted_suffix"> ・%1$dP付与完了</string>
+    <string name="perform_btn_reverify">位置を再認証する</string>
+    <string name="perform_btn_verify">位置を認証する</string>
+    <string name="perform_step2_title">ステップ2・写真認証</string>
+    <string name="perform_photo_preview_desc">認証写真プレビュー</string>
+    <string name="perform_btn_retake">再撮影</string>
+    <string name="perform_btn_photo_capture">写真を撮影する</string>
+    <string name="perform_btn_photo_complete">写真認証完了</string>
+    <string name="perform_uploading">写真をアップロード中です...</string>
+    <string name="perform_progress_title">進行状況</string>
+    <string name="perform_status_location_permission">位置権限</string>
+    <string name="perform_status_location_permission_value">許可後に認証ボタンを実行</string>
+    <string name="perform_status_gps">GPS認証</string>
+    <string name="perform_status_photo">写真認証</string>
+    <string name="perform_status_waiting">待機中</string>
+    <string name="perform_status_verified">認証完了</string>
+    <string name="perform_status_completed">完了済み</string>
+    <string name="perform_status_reward_granted">%1$dP付与</string>
+    <string name="perform_status_reward_pending">付与待ち</string>
+    <string name="perform_status_not_verified_yet">まだ位置認証をしていません。</string>
+    <string name="perform_status_button_active">ボタン有効化</string>
+    <string name="perform_status_after_location">位置認証後に進行</string>
+    <string name="perform_step2_desc_completed_with_reward">写真認証まで完了し、%1$dPの付与も反映されました。</string>
+    <string name="perform_step2_desc_completed">写真認証まで完了した状態です。</string>
+    <string name="perform_step2_desc_ready">位置認証が完了しました。写真認証を完了すると%1$dPが付与されます。</string>
+    <string name="perform_step2_desc_locked">位置認証が完了すると写真認証に進めます。</string>
+    <string name="perform_btn_retry">再試行</string>
+    <string name="toast_location_unavailable">位置情報サービスを利用できません。</string>
+    <string name="toast_enable_gps">位置情報を使用するにはGPSをオンにしてください。</string>
+    <string name="toast_location_permission_required">位置情報の権限が必要です。</string>
+    <string name="toast_camera_permission_required">カメラの権限が必要です。</string>
+    <string name="toast_verify_location_first">まず位置認証を完了してください。</string>
+
+    <!-- 미션 수행 뷰모델 메시지 -->
+    <string name="perform_state_completed_status">位置認証完了・ミッション完了状態です。</string>
+    <string name="perform_state_verified_coords">位置認証完了：%1$.5f, %2$.5f</string>
+    <string name="perform_error_no_location">現在地を取得できませんでした。</string>
+    <string name="perform_error_no_mission_location">ミッションの位置情報がありません。</string>
+    <string name="perform_state_verified_distance">位置認証完了・目標地点まで%1$.0fm</string>
+    <string name="perform_state_out_of_range">現在地が認証範囲外です・%1$.0fm離れています</string>
+    <string name="perform_error_no_progress">ミッションの進行情報がありません。</string>
+    <string name="perform_toast_retry_near_location">ミッションの場所付近で再度お試しください。</string>
+    <string name="perform_toast_location_verified_reward">位置認証が完了しました。%1$dPが付与されました。</string>
+    <string name="perform_toast_location_verified">位置認証が完了しました。</string>
+    <string name="perform_toast_location_verify_failed">位置認証処理に失敗しました。</string>
+    <string name="perform_toast_photo_cancelled">写真撮影がキャンセルされました。</string>
+    <string name="perform_toast_take_photo_first">まず写真を撮影してください。</string>
+    <string name="perform_toast_photo_read_failed">写真を読み込めませんでした。再度撮影してください。</string>
+    <string name="perform_state_photo_needs_review">写真アップロード完了・管理者の検収後に確定されます。</string>
+    <string name="perform_state_mission_completed">位置認証完了・ミッションが完了しました。</string>
+    <string name="perform_toast_already_completed">すでに完了処理されたミッションです。</string>
+    <string name="perform_toast_photo_uploaded_review">写真アップロード完了・管理者の検収後にポイントが付与されます。</string>
+    <string name="perform_toast_photo_verified_reward">写真認証が完了しました。%1$dPが付与されました。</string>
+    <string name="perform_toast_photo_verified">写真認証が完了しました。</string>
+    <string name="perform_error_photo_mismatch">写真がミッションと一致しません。ミッションの場所・対象を再度撮影してください。</string>
+    <string name="perform_toast_photo_mismatch">写真がミッションと一致せず認証できませんでした。</string>
+    <string name="perform_error_finalize_failed">完了処理に失敗しました。再度お試しください。</string>
+    <string name="perform_toast_finalize_failed">完了処理に失敗しました。</string>
+    <string name="perform_error_upload_failed">写真のアップロードに失敗しました。ネットワークを確認して再度お試しください。</string>
+    <string name="perform_toast_upload_failed">写真のアップロードに失敗しました。</string>
+
+    <!-- 마이페이지 -->
+    <string name="profile_title">マイページ</string>
+    <string name="profile_guest_nickname">ゲスト</string>
+    <string name="profile_guest_email">guest</string>
+    <string name="profile_stat_points">保有ポイント</string>
+    <string name="profile_stat_ranking">私のランキング</string>
+    <string name="profile_stat_in_progress">進行中のミッション</string>
+    <string name="profile_stat_completed">完了したミッション</string>
+    <string name="profile_activity_summary_title">活動サマリー</string>
+    <string name="profile_activity_summary_both">これまでに%1$d個のミッションを完了し、現在%2$d個を進行中です。</string>
+    <string name="profile_activity_summary_progress_only">現在%1$d個のミッションを進行中です。最初の完了まであと少しです。</string>
+    <string name="profile_activity_summary_none">まだ始めたミッションがありません。ホームやミッション一覧から最初のミッションを始めてみましょう。</string>
+    <string name="profile_next_goal">次の目標：ミッションをもう1つ完了してポイントを貯めましょう。</string>
+    <string name="profile_menu_nickname">ニックネーム変更</string>
+    <string name="profile_menu_language">언어 / Language</string>
+    <string name="profile_menu_ranking">ランキングを見る</string>
+    <string name="profile_menu_logout">ログアウト</string>
+    <string name="profile_dialog_nickname_title">ニックネーム変更</string>
+    <string name="profile_dialog_nickname_label">新しいニックネーム</string>
+    <string name="profile_dialog_save">保存</string>
+    <string name="profile_dialog_cancel">キャンセル</string>
+    <string name="profile_dialog_close">閉じる</string>
+    <string name="profile_toast_nickname_empty">ニックネームを入力してください。</string>
+    <string name="profile_toast_nickname_updated">ニックネームが変更されました。</string>
+    <string name="profile_toast_nickname_update_failed">ニックネームの変更に失敗しました。</string>
+
+    <!-- 관리자 홈 -->
+    <string name="admin_home_title">管理者</string>
+    <string name="admin_home_mode_title">管理者モード</string>
+    <string name="admin_home_mode_desc">ミッションとユーザーを管理します。</string>
+    <string name="admin_home_missions_title">ミッション管理</string>
+    <string name="admin_home_missions_desc">ミッションを作成・修正します。</string>
+    <string name="admin_home_users_title">ユーザー管理</string>
+    <string name="admin_home_users_desc">ユーザーの活動を確認します。</string>
+    <string name="admin_home_photo_review_title">写真検収</string>
+    <string name="admin_home_photo_review_desc">報告されたミッション認証写真を承認または却下します。</string>
+
+    <!-- 관리자 미션 목록 -->
+    <string name="admin_mission_list_title">ミッション管理</string>
+    <string name="admin_mission_add">新規ミッション追加</string>
+    <string name="admin_edit">修正</string>
+    <string name="admin_delete">削除</string>
+    <string name="admin_mission_delete_title">ミッション削除</string>
+    <string name="admin_mission_delete_confirm">\'%1$s\' ミッションを削除しますか？</string>
+    <string name="admin_cancel">キャンセル</string>
+
+    <!-- 관리자 사용자 관리 -->
+    <string name="admin_user_mgmt_title">ユーザー管理</string>
+    <string name="admin_user_total">全体ユーザー %1$d名</string>
+    <string name="admin_user_summary">管理者 %1$d名・ポイント順に並べ替え</string>
+    <string name="admin_user_completed_chip">完了 %1$d</string>
+    <string name="admin_user_in_progress_chip">進行 %1$d</string>
+    <string name="admin_user_badge">管理者</string>
+    <string name="admin_user_revoke">管理者権限を解除</string>
+    <string name="admin_user_grant">管理者に指定</string>
+    <string name="admin_toast_admin_revoked">管理者権限を解除しました。</string>
+    <string name="admin_toast_admin_granted">管理者として登録しました。</string>
+    <string name="admin_user_default_name">ユーザー</string>
+
+    <!-- 관리자 사진 검수 -->
+    <string name="admin_photo_review_title">写真検収</string>
+    <string name="admin_photo_review_empty">検収する写真がありません。</string>
+    <string name="admin_photo_review_queue_count">自動判定が曖昧な%1$d件</string>
+    <string name="admin_photo_review_deleted_mission">削除されたミッション</string>
+    <string name="admin_photo_review_photo_desc">認証写真</string>
+    <string name="admin_photo_review_model_label">モデル判定：%1$s</string>
+    <string name="admin_photo_review_score_label">\'%1$s\' スコア %2$.2f</string>
+    <string name="admin_photo_review_similarity_label"> ・代表写真の類似度 %1$.2f</string>
+    <string name="admin_photo_review_reject">却下</string>
+    <string name="admin_photo_review_approve">承認</string>
+    <string name="admin_photo_review_reject_title">写真の却下</string>
+    <string name="admin_photo_review_reject_body">\'%1$s\' の認証を却下すると%2$dPが回収され、ユーザーは再度写真認証が必要になります。</string>
+    <string name="admin_photo_review_reject_reason_label">却下理由（任意）</string>
+    <string name="admin_toast_approved">承認しました。</string>
+    <string name="admin_toast_rejected">却下しました。ユーザーに再認証を求めます。</string>
+    <string name="admin_toast_already_processed">すでに処理済みの項目です。</string>
+    <string name="admin_toast_reject_failed">却下処理に失敗しました。</string>
+    <string name="admin_toast_approve_failed">承認処理に失敗しました。</string>
+
+    <!-- 관리자 미션 편집 -->
+    <string name="admin_mission_edit_title">ミッション修正</string>
+    <string name="admin_mission_add_title">ミッション追加</string>
+    <string name="admin_mission_field_title">ミッションタイトル</string>
+    <string name="admin_mission_field_desc">ミッション説明</string>
+    <string name="admin_mission_field_category">カテゴリー</string>
+    <string name="admin_mission_field_points">ポイント</string>
+    <string name="admin_mission_field_image_url">画像URL</string>
+    <string name="admin_mission_field_location_section">位置（任意 — 距離ベースのおすすめに使用）</string>
+    <string name="admin_mission_field_latitude">緯度 latitude（例：37.5559）</string>
+    <string name="admin_mission_field_longitude">経度 longitude（例：126.9707）</string>
+    <string name="admin_toast_required_fields">必須項目を入力してください。</string>
+    <string name="admin_toast_invalid_latlng">緯度・経度を正しく入力してください。</string>
+    <string name="admin_toast_mission_updated">ミッションが修正されました。</string>
+    <string name="admin_toast_mission_added">ミッションが追加されました。</string>
+    <string name="admin_toast_save_failed">保存に失敗しました。</string>
+    <string name="admin_mission_saving">保存中...</string>
+    <string name="admin_mission_save_edit">修正完了</string>
+    <string name="admin_mission_save_add">ミッション追加</string>
+
+    <!-- 포인트 내역 -->
+    <string name="point_history_title">ポイント履歴</string>
+    <string name="point_history_mission_fallback">ミッション</string>
+    <string name="point_history_reason_location">位置認証</string>
+    <string name="point_history_reason_photo">写真認証</string>
+    <string name="point_history_empty_title">まだ獲得したポイントがありません。</string>
+    <string name="point_history_empty_desc">ミッションを完了すると、ここに獲得履歴が表示されます。</string>
+    <string name="point_history_sum_title">獲得ポイント合計</string>
+    <string name="point_history_count">合計 %1$d件</string>
+
+    <!-- 진행 중 미션 -->
+    <string name="in_progress_title">進行中のミッション</string>
+    <string name="in_progress_mission_fallback">進行中のミッション</string>
+    <string name="in_progress_empty_title">進行中のミッションがありません。</string>
+    <string name="in_progress_empty_desc">ミッション一覧から新しいミッションを始めると、ここで続きを見られます。</string>
+    <string name="in_progress_progress_label">進行度 %1$s</string>
+    <string name="in_progress_pending_review">管理者の承認待ち</string>
+    <string name="in_progress_btn_continue">続けて進行する</string>
+
+    <!-- 완료한 미션 -->
+    <string name="completed_title">完了したミッション</string>
+    <string name="completed_mission_fallback">完了したミッション</string>
+    <string name="completed_empty_title">完了したミッションがありません。</string>
+    <string name="completed_empty_desc">ミッションを最後まで認証すると、ここに表示されます。</string>
+    <string name="completed_progress_label">認証完了 %1$s</string>
+    <string name="completed_btn_view">ミッションを見る</string>
+
+    <!-- 랭킹 -->
+    <string name="ranking_title">ランキング</string>
+    <string name="ranking_tab_all">全体ランキング</string>
+    <string name="ranking_tab_mine">私のランキング</string>
+    <string name="ranking_default_name">旅行者</string>
+    <string name="ranking_you">私</string>
+
+    <!-- 미션 지도 -->
+    <string name="map_bubble_single">%1$s\n%2$dP・詳細を見る</string>
+    <string name="map_marker_cluster">ミッション%1$d件</string>
+    <string name="map_empty">位置情報が登録されたミッションがありません。一覧でご確認ください。</string>
+    <string name="map_summary">ミッション%1$d件・マーカーを押して詳細を見る</string>
+    <string name="map_dialog_title">この場所のミッション</string>
+    <string name="map_dialog_close">閉じる</string>
+
+    <!-- 랜딩 -->
+    <string name="landing_badge">ソウルミッションガイド</string>
+    <string name="landing_headline">旅の道のりに沿ってミッションを実行し\nポイントと記録を一緒に積み重ねましょう。</string>
+    <string name="landing_pill_route">ルートベース</string>
+    <string name="landing_pill_onsite">現地ミッション</string>
+    <string name="landing_pill_reward">ポイント報酬</string>
+    <string name="landing_start_title">はじめる</string>
+    <string name="landing_start_desc">会員登録するとミッションの進行状況とポイントを保存できます。</string>
+    <string name="landing_btn_signup">会員登録</string>
+    <string name="landing_btn_login">ログイン</string>
+    <string name="landing_guest_title">見てみる</string>
+    <string name="landing_guest_desc">アカウントなしで先に画面を確認できます。</string>
+    <string name="landing_guest_enter">入る</string>
+
+    <!-- 로그인 -->
+    <string name="login_title">ログイン</string>
+    <string name="login_email_label">メールアドレス</string>
+    <string name="login_password_label">パスワード</string>
+    <string name="login_toast_empty_fields">メールアドレスとパスワードを入力してください。</string>
+    <string name="login_toast_failed">ログインに失敗しました。</string>
+    <string name="login_btn">ログイン</string>
+
+    <!-- 회원가입 -->
+    <string name="signup_title">会員登録</string>
+    <string name="signup_name_label">名前</string>
+    <string name="signup_email_label">メールアドレス</string>
+    <string name="signup_password_label">パスワード</string>
+    <string name="signup_toast_empty_fields">すべての項目を入力してください。</string>
+    <string name="signup_toast_failed">会員登録に失敗しました。</string>
+    <string name="signup_toast_profile_save_failed">プロフィールの保存に失敗しました。</string>
+    <string name="signup_btn">アカウントを作成</string>
+
+    <!-- 취향 선택 -->
+    <string name="preference_title">旅行の好みを教えてください</string>
+    <string name="preference_desc">興味のあるスタイルをすべて選択すると、ホームでおすすめミッションをご案内します。</string>
+    <string name="preference_selected_count">選択 %1$d個</string>
+    <string name="preference_toast_min_one">好みを1つ以上選択してください。</string>
+    <string name="preference_toast_save_failed">保存に失敗しました。もう一度お試しください。</string>
+    <string name="preference_btn_done">完了</string>
+
+    <!-- 홈 -->
+    <string name="home_tagline">今日も新しいミッションに挑戦してみましょう！</string>
+    <string name="home_weekly_progress_title">今週のミッション進行率</string>
+    <string name="home_active_mission_title">現在進行中のミッション</string>
+    <string name="home_recommended_title">おすすめミッション</string>
+    <string name="home_view_more">もっと見る&gt;</string>
+    <string name="home_badge_in_progress">進行中</string>
+    <string name="home_badge_recommended">おすすめ</string>
+    <string name="home_btn_continue">ミッションを続ける</string>
+    <string name="home_btn_view">ミッションを見る</string>
+    <string name="home_empty_title">今はおすすめできるミッションがありません</string>
+    <string name="home_empty_desc">新しいミッションが登録されるとここに表示されます。ミッションタブで全ミッションを確認してください。</string>
+    <string name="home_mission_image_desc">%1$s の代表写真</string>
+</resources>
