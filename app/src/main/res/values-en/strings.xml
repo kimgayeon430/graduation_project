@@ -13,6 +13,7 @@
     <string name="category_food">Food</string>
     <string name="category_experience">Experience</string>
     <string name="category_shopping">Shopping</string>
+    <string name="category_invalid">Unrecognized</string>
     <string name="shared_reward_label">Reward</string>
     <string name="status_in_progress">In Progress</string>
     <string name="status_completed">Completed</string>
@@ -111,6 +112,34 @@
     <string name="perform_toast_finalize_failed">Failed to finalize.</string>
     <string name="perform_error_upload_failed">Failed to upload photo. Check your network and try again.</string>
     <string name="perform_toast_upload_failed">Failed to upload photo.</string>
+    <string name="perform_toast_ai_analysis_failed">Couldn\'t analyze the photo. Please try again.</string>
+    <string name="perform_toast_save_failed">Analysis finished, but we couldn\'t save the result.</string>
+
+    <!-- 사진 인증 결과 화면(전체 화면) -->
+    <string name="perform_result_analyzing_title">Analyzing your photo</string>
+    <string name="perform_result_analyzing_desc">Please wait a moment.</string>
+    <string name="perform_result_pass_title">Mission Verified</string>
+    <string name="perform_result_pass_desc">AI confirmed this photo matches the mission.</string>
+    <string name="perform_result_btn_done">Done</string>
+    <string name="perform_result_points_earned">%1$dP earned</string>
+    <string name="perform_result_review_title">Reviewing your photo</string>
+    <string name="perform_result_review_desc">AI couldn\'t decide with full confidence, so an admin will check it.</string>
+    <string name="perform_result_review_sub">Your verification will be finalized once the review is done.</string>
+    <string name="perform_result_btn_confirm">OK</string>
+    <string name="perform_result_reject_title">Please check your photo again</string>
+    <string name="perform_result_reject_reason_invalid_subject">We couldn\'t clearly see anything related to the mission in this photo.</string>
+    <string name="perform_result_reject_reason_low_confidence">The photo looks too dark or blurry to check.</string>
+    <string name="perform_result_reject_reason_category_mismatch">This looks like a different kind of photo than the mission needs.</string>
+    <string name="perform_result_btn_retake">Retake Photo</string>
+    <string name="perform_result_btn_view_mission">View Mission</string>
+    <string name="perform_result_expected_category_label">Mission category</string>
+    <string name="perform_result_predicted_category_label">AI predicted category</string>
+    <string name="perform_result_confidence_label">AI confidence</string>
+    <string name="perform_result_confidence_value">%1$d%% confidence</string>
+    <string name="perform_result_predicted_unknown">Unavailable</string>
+    <string name="perform_result_ondevice_notice">Your photo was analyzed securely on this device.</string>
+    <string name="perform_result_debug_toggle">Analysis details</string>
+    <string name="perform_result_debug_model_version">Model version: %1$s</string>
 
     <!-- 마이페이지 -->
     <string name="profile_title">My Page</string>

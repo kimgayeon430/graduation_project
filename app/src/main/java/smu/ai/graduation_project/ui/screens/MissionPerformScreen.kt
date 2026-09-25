@@ -59,6 +59,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import androidx.core.location.LocationManagerCompat
@@ -115,6 +117,45 @@ fun MissionPerformScreen(
         if (state.navigateBack) {
             viewModel.onNavigateHandled()
             onNavigateBack()
+        }
+    }
+
+    // AI 분석 중 / 분석 결과: 전체 화면으로 띄운다(단순 Toast 로 끝내지 않는다).
+    // 두 상태 모두 ViewModel 의 uiState 에 있으므로 화면 회전에도 그대로 복원된다.
+    if (state.isUploading || state.photoResult != null) {
+        Dialog(
+            onDismissRequest = {
+                when {
+                    state.isUploading -> Unit
+                    state.photoResult?.verdict == PhotoVerdictUi.REJECT -> viewModel.onPhotoResultRetake()
+                    state.photoResult != null -> viewModel.onPhotoResultAcknowledged()
+                }
+            },
+            properties = DialogProperties(
+                usePlatformDefaultWidth = false,
+                dismissOnBackPress = !state.isUploading,
+                dismissOnClickOutside = false
+            )
+        ) {
+            Surface(modifier = Modifier.fillMaxSize(), color = Color.White) {
+                if (state.isUploading) {
+                    MissionPhotoAnalyzingOverlay()
+                } else {
+                    state.photoResult?.let { result ->
+                        MissionPhotoResultOverlay(
+                            result = result,
+                            onPrimary = {
+                                if (result.verdict == PhotoVerdictUi.REJECT) {
+                                    viewModel.onPhotoResultRetake()
+                                } else {
+                                    viewModel.onPhotoResultAcknowledged()
+                                }
+                            },
+                            onSecondary = { viewModel.onPhotoResultAcknowledged() }
+                        )
+                    }
+                }
+            }
         }
     }
 

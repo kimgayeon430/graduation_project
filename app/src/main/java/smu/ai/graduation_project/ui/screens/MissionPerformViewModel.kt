@@ -15,6 +15,7 @@ import smu.ai.graduation_project.data.PhotoVerifier
 import smu.ai.graduation_project.data.getLocalizedString
 import smu.ai.graduation_project.domain.LocationVerification
 import smu.ai.graduation_project.domain.MissionCompletion
+import smu.ai.graduation_project.domain.PhotoVerification
 import smu.ai.graduation_project.domain.PhotoVerificationConfig
 
 /**
@@ -218,7 +219,8 @@ class MissionPerformViewModel(
             emitToast(str(R.string.perform_toast_photo_read_failed))
             return
         }
-        if (state.missionCompleted || state.isUploading) return
+        // photoResult != null: 결과 화면이 이미 떠 있는 동안 재제출 방지(빠른 연타 대응).
+        if (state.missionCompleted || state.isUploading || state.photoResult != null) return
 
         uiState = state.copy(isUploading = true, uploadError = null)
 
@@ -234,40 +236,77 @@ class MissionPerformViewModel(
             referenceEmbeddings = state.missionReferenceEmbeddings
                 .filter { it.isNotEmpty() }.map { it.toFloatArray() },
             onResult = { result ->
-                uiState = uiState.copy(
-                    isUploading = false,
-                    // needsReview 면 관리자가 승인하기 전까지는 완료·지급 상태가 아니다.
-                    missionCompleted = !result.needsReview,
-                    stage2RewardGranted = !result.needsReview && result.rewardGranted > 0,
-                    photoUrl = result.photoUrl,
-                    verificationText = if (result.needsReview) {
-                        str(R.string.perform_state_photo_needs_review)
-                    } else {
-                        str(R.string.perform_state_mission_completed)
-                    },
-                    toastMessage = when {
-                        result.alreadyCompleted -> str(R.string.perform_toast_already_completed)
-                        // needsReview 면 승인 전까지 포인트가 없으므로(rewardGranted == 0) 별도 안내로 우선 분기.
-                        result.needsReview -> str(R.string.perform_toast_photo_uploaded_review)
-                        result.rewardGranted > 0 -> str(R.string.perform_toast_photo_verified_reward, result.rewardGranted)
-                        else -> str(R.string.perform_toast_photo_verified)
-                    },
-                    navigateBack = true
-                )
+                // 이미 완료 처리된 미션에 재제출된 경우(중복 제출)는 새 판정이 아니므로
+                // 결과 화면 대신 짧은 안내로만 처리한다.
+                uiState = if (result.alreadyCompleted) {
+                    uiState.copy(
+                        isUploading = false,
+                        toastMessage = str(R.string.perform_toast_already_completed)
+                    )
+                } else {
+                    val verdict = if (result.needsReview) PhotoVerdictUi.REVIEW else PhotoVerdictUi.PASS
+                    uiState.copy(
+                        isUploading = false,
+                        // needsReview 면 관리자가 승인하기 전까지는 완료·지급 상태가 아니다.
+                        missionCompleted = !result.needsReview,
+                        stage2RewardGranted = !result.needsReview && result.rewardGranted > 0,
+                        photoUrl = result.photoUrl,
+                        verificationText = if (result.needsReview) {
+                            str(R.string.perform_state_photo_needs_review)
+                        } else {
+                            str(R.string.perform_state_mission_completed)
+                        },
+                        photoResult = PhotoResultUi(
+                            verdict = verdict,
+                            displayPhoto = state.capturedPhotoUri ?: result.photoUrl,
+                            missionCategory = state.missionCategory,
+                            predictedLabel = result.topLabel,
+                            confidence = result.topLabel.takeIf { it.isNotEmpty() }?.let { result.matchScore },
+                            pointsGranted = if (verdict == PhotoVerdictUi.PASS) result.rewardGranted else 0,
+                            rejectReasonCode = null,
+                            modelVersion = result.modelVersion
+                        )
+                    )
+                }
             },
             onError = { error ->
                 val exception = error as? MissionRepository.MissionCompleteException
                 uiState = when (exception?.stage) {
                     MissionRepository.MissionCompleteException.Stage.VERIFY -> uiState.copy(
                         isUploading = false,
-                        uploadError = exception?.reason
-                            ?: str(R.string.perform_error_photo_mismatch),
-                        toastMessage = str(R.string.perform_toast_photo_mismatch)
+                        photoResult = PhotoResultUi(
+                            verdict = PhotoVerdictUi.REJECT,
+                            displayPhoto = state.capturedPhotoUri,
+                            missionCategory = state.missionCategory,
+                            predictedLabel = exception?.topLabel.orEmpty(),
+                            confidence = exception?.topLabel?.takeIf { it.isNotEmpty() }?.let {
+                                if (exception.rejectReasonCode == PhotoVerification.RejectReasonCode.INVALID_SUBJECT) {
+                                    exception.invalidScore
+                                } else {
+                                    exception.matchScore
+                                }
+                            },
+                            pointsGranted = 0,
+                            rejectReasonCode = exception?.rejectReasonCode,
+                            modelVersion = ""
+                        )
+                    )
+                    // AI 분석 자체가 실패한 경우(REJECT 판정이 아니라 진짜 오류). 사진은 그대로 있으니 재시도 가능.
+                    MissionRepository.MissionCompleteException.Stage.ANALYZE -> uiState.copy(
+                        isUploading = false,
+                        uploadError = str(R.string.perform_toast_ai_analysis_failed),
+                        toastMessage = str(R.string.perform_toast_ai_analysis_failed)
+                    )
+                    // AI 판정은 끝났지만(통과/검수) 업로드·저장이 실패한 경우.
+                    MissionRepository.MissionCompleteException.Stage.UPLOAD -> uiState.copy(
+                        isUploading = false,
+                        uploadError = str(R.string.perform_error_upload_failed),
+                        toastMessage = str(R.string.perform_toast_save_failed)
                     )
                     MissionRepository.MissionCompleteException.Stage.FINALIZE -> uiState.copy(
                         isUploading = false,
                         uploadError = str(R.string.perform_error_finalize_failed),
-                        toastMessage = str(R.string.perform_toast_finalize_failed)
+                        toastMessage = str(R.string.perform_toast_save_failed)
                     )
                     else -> uiState.copy(
                         isUploading = false,
@@ -291,5 +330,17 @@ class MissionPerformViewModel(
 
     fun onNavigateHandled() {
         uiState = uiState.copy(navigateBack = false)
+    }
+
+    // ---- 사진 인증 결과 화면(전체 화면 오버레이) ----------------------------
+
+    /** PASS/REVIEW "완료"/"확인", REJECT "미션 내용 보기": 결과를 닫고 이전 화면으로 돌아간다. */
+    fun onPhotoResultAcknowledged() {
+        uiState = uiState.copy(photoResult = null, navigateBack = true)
+    }
+
+    /** REJECT "다시 촬영": 결과만 닫고 같은 화면에서 새로 촬영할 수 있게 한다. */
+    fun onPhotoResultRetake() {
+        uiState = uiState.copy(photoResult = null, capturedPhotoUri = null, uploadError = null)
     }
 }

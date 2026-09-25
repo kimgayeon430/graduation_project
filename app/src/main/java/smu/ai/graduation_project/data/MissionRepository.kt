@@ -1,6 +1,7 @@
 package smu.ai.graduation_project.data
 
 import com.google.firebase.firestore.GeoPoint
+import smu.ai.graduation_project.domain.PhotoVerification
 import smu.ai.graduation_project.domain.PhotoVerificationConfig
 
 /**
@@ -44,7 +45,13 @@ interface MissionRepository {
         val alreadyCompleted: Boolean,
         val photoUrl: String,
         /** 자동 사진 판정이 애매해 관리자 검수 대기(`photoNeedsReview`)로 완료됐는지. */
-        val needsReview: Boolean
+        val needsReview: Boolean,
+        /** 미션 카테고리에 대한 모델 점수. 결과 화면의 "AI confidence" 에 쓴다. */
+        val matchScore: Double = 0.0,
+        /** 모델이 낸 최상위 라벨. 모델을 못 불러왔으면 빈 문자열. */
+        val topLabel: String = "",
+        val modelVersion: String = "",
+        val similarity: Double? = null
     )
 
     /** 사진 인증 완료 과정에서 어느 단계가 실패/거부됐는지 구분하기 위한 예외. */
@@ -52,14 +59,22 @@ interface MissionRepository {
         val stage: Stage,
         cause: Throwable? = null,
         /** VERIFY 단계일 때 사용자에게 보여줄 사유. */
-        val reason: String? = null
+        val reason: String? = null,
+        /** VERIFY 단계(REJECT)일 때 모델이 낸 최상위 라벨. */
+        val topLabel: String = "",
+        val matchScore: Double = 0.0,
+        val invalidScore: Double = 0.0,
+        val similarity: Double? = null,
+        /** VERIFY 단계일 때만 값이 있다. 결과 화면의 거절 사유 문구를 고르는 데 쓴다. */
+        val rejectReasonCode: PhotoVerification.RejectReasonCode? = null
     ) : Exception(cause) {
         /**
-         * VERIFY = 사진이 미션과 맞지 않아 업로드 전 거부,
+         * ANALYZE = 온디바이스 AI 분석 자체가 예기치 않게 실패,
+         * VERIFY = 사진이 미션과 맞지 않아 업로드 전 거부(AI 는 정상적으로 판정을 끝냄),
          * UPLOAD = Supabase Storage 업로드 실패,
          * FINALIZE = 업로드 후 Firestore 완료 처리 실패.
          */
-        enum class Stage { VERIFY, UPLOAD, FINALIZE }
+        enum class Stage { ANALYZE, VERIFY, UPLOAD, FINALIZE }
     }
 
     fun loadMissionInfo(

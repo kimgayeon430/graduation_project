@@ -4,6 +4,32 @@ import android.net.Uri
 import com.google.firebase.firestore.GeoPoint
 import smu.ai.graduation_project.domain.LocationVerification
 import smu.ai.graduation_project.domain.MissionRewardPolicy
+import smu.ai.graduation_project.domain.PhotoVerification
+
+/** 사진 인증 결과 화면(전체 화면 오버레이)에 표시할 판정. */
+enum class PhotoVerdictUi { PASS, REVIEW, REJECT }
+
+/**
+ * AI 사진 판정이 끝난 뒤 전체 화면으로 보여줄 결과. [MissionPerformUiState.photoResult] 가
+ * null 이 아니면 화면이 이 값을 바탕으로 결과 오버레이를 띄운다 — 화면 회전에도
+ * [MissionPerformViewModel] 이 들고 있는 상태라 그대로 복원된다.
+ */
+data class PhotoResultUi(
+    val verdict: PhotoVerdictUi,
+    /** 표시할 사진. [Uri](로컬 촬영본) 또는 업로드된 URL 문자열. */
+    val displayPhoto: Any?,
+    /** 미션이 요구한 카테고리(코드값, 예: "투어"). */
+    val missionCategory: String,
+    /** AI 가 예측한 카테고리(코드값). 모델을 못 불러왔으면 빈 문자열. */
+    val predictedLabel: String,
+    /** 0..1. 표시할 만한 값이 없으면(모델 미가동 등) null. */
+    val confidence: Double?,
+    val pointsGranted: Int,
+    /** [PhotoVerdictUi.REJECT] 일 때만 값이 있다. */
+    val rejectReasonCode: PhotoVerification.RejectReasonCode?,
+    /** 모델 버전. "분석 정보" 접이식 영역에만 노출한다. */
+    val modelVersion: String
+)
 
 /**
  * [MissionPerformScreen] 이 그리는 데 필요한 모든 상태.
@@ -31,6 +57,9 @@ data class MissionPerformUiState(
     val capturedPhotoUri: Uri? = null,
     val photoUrl: String? = null,
     val uploadError: String? = null,
+
+    /** AI 판정이 끝난 뒤 보여줄 전체 화면 결과. null 이 아니면 화면이 오버레이를 띄운다. */
+    val photoResult: PhotoResultUi? = null,
 
     /** 한 번만 소비되는 일회성 이벤트. */
     val toastMessage: String? = null,

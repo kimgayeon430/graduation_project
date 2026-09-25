@@ -25,6 +25,9 @@ object PhotoGate {
             override val matchScore: Double = 0.0,
             override val invalidScore: Double = 0.0,
             override val similarity: Double? = null,
+            /** 모델이 낸 최상위 라벨(REJECT 결과 화면에 "AI가 예측한 카테고리"로 보여준다). */
+            val topLabel: String = "",
+            val reasonCode: PhotoVerification.RejectReasonCode = PhotoVerification.RejectReasonCode.LOW_CONFIDENCE,
         ) : Decision
 
         /** 업로드를 진행한다. [needsReview] 면 완료는 하되 관리자 검수 큐에 올린다. */
@@ -62,6 +65,8 @@ object PhotoGate {
                 matchScore = result.matchScore,
                 invalidScore = result.invalidScore,
                 similarity = result.similarity,
+                topLabel = classification?.topLabel ?: "",
+                reasonCode = result.rejectReasonCode ?: PhotoVerification.RejectReasonCode.LOW_CONFIDENCE,
             )
             PhotoVerification.Verdict.NEEDS_REVIEW, PhotoVerification.Verdict.PASS -> Decision.Proceed(
                 needsReview = result.verdict == PhotoVerification.Verdict.NEEDS_REVIEW,

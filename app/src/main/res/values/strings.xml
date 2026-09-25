@@ -15,6 +15,7 @@
     <string name="category_food">맛집</string>
     <string name="category_experience">체험</string>
     <string name="category_shopping">쇼핑</string>
+    <string name="category_invalid">판정 불가</string>
     <string name="shared_reward_label">보상</string>
     <string name="status_in_progress">진행중</string>
     <string name="status_completed">완료</string>
@@ -113,6 +114,34 @@
     <string name="perform_toast_finalize_failed">완료 처리에 실패했습니다.</string>
     <string name="perform_error_upload_failed">사진 업로드에 실패했습니다. 네트워크를 확인하고 다시 시도해주세요.</string>
     <string name="perform_toast_upload_failed">사진 업로드에 실패했습니다.</string>
+    <string name="perform_toast_ai_analysis_failed">사진을 분석하지 못했어요. 다시 시도해 주세요.</string>
+    <string name="perform_toast_save_failed">분석은 완료됐지만 결과를 저장하지 못했어요.</string>
+
+    <!-- 사진 인증 결과 화면(전체 화면) -->
+    <string name="perform_result_analyzing_title">사진을 분석하고 있어요</string>
+    <string name="perform_result_analyzing_desc">잠시만 기다려 주세요.</string>
+    <string name="perform_result_pass_title">미션 인증 완료</string>
+    <string name="perform_result_pass_desc">AI가 미션 조건에 맞는 사진으로 확인했어요.</string>
+    <string name="perform_result_btn_done">완료</string>
+    <string name="perform_result_points_earned">%1$dP 획득</string>
+    <string name="perform_result_review_title">사진을 검토하고 있어요</string>
+    <string name="perform_result_review_desc">AI가 확실하게 판단하지 못해 관리자 확인이 필요해요.</string>
+    <string name="perform_result_review_sub">검토가 완료되면 인증 결과가 반영됩니다.</string>
+    <string name="perform_result_btn_confirm">확인</string>
+    <string name="perform_result_reject_title">사진을 다시 확인해 주세요</string>
+    <string name="perform_result_reject_reason_invalid_subject">미션과 관련된 대상이 사진에서 잘 보이지 않아요.</string>
+    <string name="perform_result_reject_reason_low_confidence">사진이 너무 어둡거나 흐려서 확인하기 어려워요.</string>
+    <string name="perform_result_reject_reason_category_mismatch">미션과 다른 종류의 사진으로 판단했어요.</string>
+    <string name="perform_result_btn_retake">다시 촬영</string>
+    <string name="perform_result_btn_view_mission">미션 내용 보기</string>
+    <string name="perform_result_expected_category_label">미션이 요구한 카테고리</string>
+    <string name="perform_result_predicted_category_label">AI가 예측한 카테고리</string>
+    <string name="perform_result_confidence_label">AI 신뢰도</string>
+    <string name="perform_result_confidence_value">신뢰도 %1$d%%</string>
+    <string name="perform_result_predicted_unknown">확인 불가</string>
+    <string name="perform_result_ondevice_notice">사진은 기기에서 안전하게 분석되었어요.</string>
+    <string name="perform_result_debug_toggle">분석 정보</string>
+    <string name="perform_result_debug_model_version">모델 버전: %1$s</string>
 
     <!-- 마이페이지 -->
     <string name="profile_title">마이페이지</string>

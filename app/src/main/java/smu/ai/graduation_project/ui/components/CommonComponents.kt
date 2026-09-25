@@ -37,6 +37,7 @@ fun categoryLabel(category: String): String = when (category) {
     "맛집" -> stringResource(R.string.category_food)
     "체험" -> stringResource(R.string.category_experience)
     "쇼핑" -> stringResource(R.string.category_shopping)
+    "무효" -> stringResource(R.string.category_invalid)
     else -> category
 }
 

@@ -165,9 +165,22 @@ class FirebaseMissionRepository : MissionRepository {
         // 모델 추론·업로드는 무거운 호출이므로 백그라운드 스레드에서 수행한다.
         uploadExecutor.execute {
             // 0) 온디바이스 모델로 사진을 1차 판정한다. (업로드 전)
-            val decision = PhotoGate.decide(
-                photoBytes, missionCategory, photoVerifier, photoVerificationConfig, referenceEmbeddings
-            )
+            //    이 자체가 예기치 않게 실패하면(REJECT 판정이 아니라 진짜 오류) UPLOAD/FINALIZE 와
+            //    구분되는 ANALYZE 단계로 보고한다 — 안 그러면 콜백이 아예 안 불려 화면이 멈춘다.
+            val decision = try {
+                PhotoGate.decide(
+                    photoBytes, missionCategory, photoVerifier, photoVerificationConfig, referenceEmbeddings
+                )
+            } catch (e: Exception) {
+                mainHandler.post {
+                    onError(
+                        MissionRepository.MissionCompleteException(
+                            MissionRepository.MissionCompleteException.Stage.ANALYZE, e
+                        )
+                    )
+                }
+                return@execute
+            }
             // 유사도 임계값 보정용 진단 로그. REJECT 는 Firestore 에 아무것도 안 남기므로
             // 여기서만 관측 가능하다(보고서 6.7.6). `adb logcat -s PhotoVerify:*`
             Log.i(
@@ -182,7 +195,12 @@ class FirebaseMissionRepository : MissionRepository {
                     onError(
                         MissionRepository.MissionCompleteException(
                             MissionRepository.MissionCompleteException.Stage.VERIFY,
-                            reason = decision.reason
+                            reason = decision.reason,
+                            topLabel = decision.topLabel,
+                            matchScore = decision.matchScore,
+                            invalidScore = decision.invalidScore,
+                            similarity = decision.similarity,
+                            rejectReasonCode = decision.reasonCode
                         )
                     )
                 }
@@ -267,7 +285,11 @@ class FirebaseMissionRepository : MissionRepository {
                         rewardGranted = result.first,
                         alreadyCompleted = result.second,
                         photoUrl = result.third,
-                        needsReview = needsReview
+                        needsReview = needsReview,
+                        matchScore = proceed.matchScore,
+                        topLabel = proceed.topLabel,
+                        modelVersion = proceed.modelVersion,
+                        similarity = proceed.similarity
                     )
                 )
             }.addOnFailureListener { e ->

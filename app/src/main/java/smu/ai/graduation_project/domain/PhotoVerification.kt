@@ -31,6 +31,12 @@ object PhotoVerification {
 
     enum class Verdict { PASS, NEEDS_REVIEW, REJECT }
 
+    /**
+     * [Verdict.REJECT] 일 때 사용자에게 보여줄 안내 문구를 고르기 위한 원인 분류.
+     * 화면 표시 문구(다국어)는 UI 레이어(`strings.xml`)에서 맡고, 여기서는 원인만 분류한다.
+     */
+    enum class RejectReasonCode { INVALID_SUBJECT, CATEGORY_MISMATCH, LOW_CONFIDENCE }
+
     /** 모델이 낸 라벨별 점수. 합이 1일 필요는 없다. */
     data class Classification(
         val scores: Map<String, Double>,
@@ -63,7 +69,9 @@ object PhotoVerification {
         /** 참조 이미지와의 코사인 유사도. 계산하지 못했으면 null. */
         val similarity: Double?,
         /** 사용자/관리자에게 보여줄 사유. */
-        val reason: String
+        val reason: String,
+        /** [Verdict.REJECT] 일 때만 값이 있다. */
+        val rejectReasonCode: RejectReasonCode? = null
     )
 
     /**
@@ -94,7 +102,8 @@ object PhotoVerification {
         //     스푸핑은 유사도가 최대에 가깝게 나오므로, 유사도로는 막을 수 없다(6.7.5-가).
         if (invalid >= config.invalidRejectThreshold) {
             return Result(Verdict.REJECT, match, invalid, null,
-                "사진이 미션과 무관해 보여요. 미션 장소·대상을 촬영해 주세요.")
+                "사진이 미션과 무관해 보여요. 미션 장소·대상을 촬영해 주세요.",
+                RejectReasonCode.INVALID_SUBJECT)
         }
 
         // (2) 카테고리 점수만으로 1차 판정.
@@ -103,10 +112,13 @@ object PhotoVerification {
             match >= config.autoPassThreshold -> Verdict.PASS
             else -> Verdict.NEEDS_REVIEW
         }
+        val baseReasonCode = if (base == Verdict.REJECT) {
+            rejectReasonCode(classification, missionCategory, match)
+        } else null
 
         val similarity = PhotoEmbedding.maxCosineOrNull(classification.embedding, referenceEmbeddings)
         if (similarity == null) {
-            return Result(base, match, invalid, null, reasonFor(base, missionCategory))
+            return Result(base, match, invalid, null, reasonFor(base, missionCategory), baseReasonCode)
         }
 
         // (3) 유사도를 보조 신호로 결합한다. 한 단계씩만 조정한다(6.7.5).
@@ -122,9 +134,30 @@ object PhotoVerification {
                 Verdict.NEEDS_REVIEW
             else -> base
         }
+        // combined 가 REJECT 로 남는 경우는 base 가 이미 REJECT 였고 유사도 구제도 안 된 경우뿐이다.
+        val combinedReasonCode = if (combined == Verdict.REJECT) baseReasonCode else null
 
         return Result(combined, match, invalid, similarity,
-            reasonForCombined(base, combined, missionCategory))
+            reasonForCombined(base, combined, missionCategory), combinedReasonCode)
+    }
+
+    /**
+     * REJECT 원인을 분류한다. 무효 판정([INVALID_LABEL])은 [verify] 에서 먼저 걸러지므로 여기선
+     * "다른 카테고리로 더 강하게 분류됐는가"(유형 불일치) vs "전반적으로 애매함"(저신뢰) 만 가른다.
+     */
+    private fun rejectReasonCode(
+        classification: Classification,
+        missionCategory: String,
+        matchScore: Double
+    ): RejectReasonCode {
+        val topLabel = classification.topLabel
+        return if (topLabel != null && topLabel != missionCategory && topLabel != INVALID_LABEL &&
+            classification.scoreOf(topLabel) > matchScore
+        ) {
+            RejectReasonCode.CATEGORY_MISMATCH
+        } else {
+            RejectReasonCode.LOW_CONFIDENCE
+        }
     }
 
     private fun reasonFor(verdict: Verdict, category: String): String = when (verdict) {
