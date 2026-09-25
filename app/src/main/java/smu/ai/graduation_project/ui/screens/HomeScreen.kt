@@ -68,6 +68,7 @@ import smu.ai.graduation_project.domain.MissionRecommender
 import smu.ai.graduation_project.domain.MissionScorer
 import smu.ai.graduation_project.domain.RecommendationContext
 import smu.ai.graduation_project.model.Mission
+import smu.ai.graduation_project.ui.components.recommendationReasonLabel
 import smu.ai.graduation_project.ui.theme.CardGray
 import smu.ai.graduation_project.ui.theme.GradientEnd
 import smu.ai.graduation_project.ui.theme.GradientStart
@@ -441,7 +442,7 @@ private fun RecommendedMissionCard(
                         scored.reasons.take(2).forEach { reason ->
                             Surface(color = LightPurple, shape = RoundedCornerShape(4.dp)) {
                                 Text(
-                                    reason,
+                                    recommendationReasonLabel(reason),
                                     color = MainPurple,
                                     fontSize = 10.sp,
                                     modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)

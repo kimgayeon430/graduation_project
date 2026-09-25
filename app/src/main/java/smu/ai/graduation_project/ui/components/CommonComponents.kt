@@ -52,6 +52,25 @@ fun missionStatusLabel(status: String): String = when (status) {
     else -> status
 }
 
+private const val CATEGORY_PREFERENCE_SUFFIX = " 취향"
+
+/**
+ * [smu.ai.graduation_project.domain.MissionScorer] 가 만드는 추천 근거 코드(항상 한국어)를
+ * 표시용 라벨로 바꾼다. 유닛 테스트가 이 코드값을 직접 검사하므로 도메인 쪽은 그대로 두고
+ * 화면에 보여줄 때만 이걸 쓴다.
+ */
+@Composable
+fun recommendationReasonLabel(reason: String): String = when {
+    reason.endsWith(CATEGORY_PREFERENCE_SUFFIX) ->
+        stringResource(R.string.reco_reason_category_pref, categoryLabel(reason.removeSuffix(CATEGORY_PREFERENCE_SUFFIX)))
+    reason == "자주 하는 유형" -> stringResource(R.string.reco_reason_frequent)
+    reason == "지금 레벨에 적당" -> stringResource(R.string.reco_reason_level_fit)
+    reason == "가까운 미션" -> stringResource(R.string.reco_reason_nearby)
+    reason == "인기 미션" -> stringResource(R.string.reco_reason_popular)
+    reason == "지금 하기 좋은 시간" -> stringResource(R.string.reco_reason_good_time)
+    else -> reason
+}
+
 @Composable
 fun InfoCardSmall(title: String, icon: ImageVector, modifier: Modifier = Modifier) {
     Card(

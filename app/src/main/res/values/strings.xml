@@ -308,4 +308,12 @@
     <string name="home_empty_title">지금은 추천할 미션이 없어요</string>
     <string name="home_empty_desc">새로운 미션이 등록되면 여기에 표시됩니다. 미션 탭에서 전체 미션을 둘러보세요.</string>
     <string name="home_mission_image_desc">%1$s 대표 사진</string>
+
+    <!-- 추천 근거 칩 -->
+    <string name="reco_reason_category_pref">%1$s 취향</string>
+    <string name="reco_reason_frequent">자주 하는 유형</string>
+    <string name="reco_reason_level_fit">지금 레벨에 적당</string>
+    <string name="reco_reason_nearby">가까운 미션</string>
+    <string name="reco_reason_popular">인기 미션</string>
+    <string name="reco_reason_good_time">지금 하기 좋은 시간</string>
 </resources>

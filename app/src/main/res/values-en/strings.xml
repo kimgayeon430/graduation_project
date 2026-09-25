@@ -306,4 +306,12 @@
     <string name="home_empty_title">No missions to recommend right now</string>
     <string name="home_empty_desc">New missions will show up here. Check the Mission tab to browse them all.</string>
     <string name="home_mission_image_desc">%1$s cover photo</string>
+
+    <!-- 추천 근거 칩 -->
+    <string name="reco_reason_category_pref">%1$s Preference</string>
+    <string name="reco_reason_frequent">Frequent Pick</string>
+    <string name="reco_reason_level_fit">Fits Your Level</string>
+    <string name="reco_reason_nearby">Nearby</string>
+    <string name="reco_reason_popular">Popular</string>
+    <string name="reco_reason_good_time">Good Time Now</string>
 </resources>

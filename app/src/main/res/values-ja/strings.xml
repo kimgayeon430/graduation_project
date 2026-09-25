@@ -306,4 +306,12 @@
     <string name="home_empty_title">今はおすすめできるミッションがありません</string>
     <string name="home_empty_desc">新しいミッションが登録されるとここに表示されます。ミッションタブで全ミッションを確認してください。</string>
     <string name="home_mission_image_desc">%1$s の代表写真</string>
+
+    <!-- 추천 근거 칩 -->
+    <string name="reco_reason_category_pref">%1$sの好み</string>
+    <string name="reco_reason_frequent">よく選ぶタイプ</string>
+    <string name="reco_reason_level_fit">今のレベルにぴったり</string>
+    <string name="reco_reason_nearby">近くのミッション</string>
+    <string name="reco_reason_popular">人気ミッション</string>
+    <string name="reco_reason_good_time">今がおすすめの時間</string>
 </resources>
