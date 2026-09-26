@@ -45,6 +45,8 @@
     <string name="toast_save_failed">Couldn\'t save mission info to the server.</string>
     <string name="detail_btn_completed">Mission Completed</string>
     <string name="detail_btn_start">Start Mission</string>
+    <string name="detail_btn_navigate">Directions</string>
+    <string name="toast_no_map_app">No map app found.</string>
 
     <!-- 미션 수행 (GPS·사진 인증) -->
     <string name="perform_title">Mission</string>

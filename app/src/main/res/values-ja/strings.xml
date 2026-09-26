@@ -45,6 +45,8 @@
     <string name="toast_save_failed">ミッション情報をサーバーに保存できませんでした。</string>
     <string name="detail_btn_completed">完了したミッション</string>
     <string name="detail_btn_start">ミッションを開始する</string>
+    <string name="detail_btn_navigate">道案内</string>
+    <string name="toast_no_map_app">地図アプリが見つかりません。</string>
 
     <!-- 미션 수행 (GPS·사진 인증) -->
     <string name="perform_title">ミッション実行</string>

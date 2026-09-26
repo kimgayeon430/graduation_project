@@ -1,5 +1,10 @@
 ﻿package smu.ai.graduation_project.ui.screens
 
+import android.Manifest
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.location.LocationManager
+import android.net.Uri
 import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -19,6 +24,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.DirectionsWalk
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.Flag
@@ -30,6 +36,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -50,6 +57,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import coil.compose.AsyncImage
 import com.google.firebase.Firebase
 import com.google.firebase.auth.auth
@@ -57,6 +65,7 @@ import com.google.firebase.firestore.firestore
 import smu.ai.graduation_project.R
 import smu.ai.graduation_project.data.LanguagePreference
 import smu.ai.graduation_project.data.localizedString
+import smu.ai.graduation_project.domain.GeoDistance
 import smu.ai.graduation_project.model.Mission
 import smu.ai.graduation_project.ui.components.categoryLabel
 import smu.ai.graduation_project.ui.components.missionStatusLabel
@@ -79,21 +88,44 @@ fun MissionDetailScreen(
     var imageUrl by remember { mutableStateOf("") }
     var userMissionStatus by remember { mutableStateOf("미 진행") }
     var isStarting by remember { mutableStateOf(false) }
+    var userLatLng by remember { mutableStateOf<Pair<Double, Double>?>(null) }
     val missionTitlePlaceholder = stringResource(R.string.mission_no_title)
     val toastLoginRequired = stringResource(R.string.toast_login_required)
     val toastAlreadyCompleted = stringResource(R.string.toast_already_completed)
     val toastSaveFailed = stringResource(R.string.toast_save_failed)
+    val toastNoMapApp = stringResource(R.string.toast_no_map_app)
+
+    // 위치 권한이 이미 허용돼 있으면 마지막 known location 을 읽어 목표 지점까지의 거리를 보여준다.
+    // (HomeScreen 의 추천 카드 거리 계산과 같은 방식 — 여기서 새로 권한을 요청하지는 않는다.)
+    LaunchedEffect(Unit) {
+        val granted = ContextCompat.checkSelfPermission(
+            context, Manifest.permission.ACCESS_FINE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED || ContextCompat.checkSelfPermission(
+            context, Manifest.permission.ACCESS_COARSE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED
+        if (!granted) return@LaunchedEffect
+        val lm = context.getSystemService(LocationManager::class.java) ?: return@LaunchedEffect
+        val best = try {
+            lm.getProviders(true).mapNotNull { lm.getLastKnownLocation(it) }.maxByOrNull { it.time }
+        } catch (e: SecurityException) {
+            null
+        }
+        if (best != null) userLatLng = best.latitude to best.longitude
+    }
 
     LaunchedEffect(missionId, user?.uid) {
         db.collection("missions").document(missionId).get().addOnSuccessListener { doc ->
             if (doc.exists()) {
                 imageUrl = doc.getString("imageUrl").orEmpty()
+                val location = doc.getGeoPoint("location")
                 mission = Mission(
                     id = doc.id,
                     title = doc.localizedString("title", LanguagePreference.current, missionTitlePlaceholder),
                     desc = doc.localizedString("desc", LanguagePreference.current),
                     points = doc.getLong("points")?.toInt() ?: 0,
-                    category = doc.getString("category") ?: "투어"
+                    category = doc.getString("category") ?: "투어",
+                    latitude = location?.latitude,
+                    longitude = location?.longitude
                 )
             }
         }
@@ -191,9 +223,46 @@ fun MissionDetailScreen(
                     )
                 }
 
+                val distanceMeters = remember(currentMission.latitude, currentMission.longitude, userLatLng) {
+                    val lat = currentMission.latitude
+                    val lng = currentMission.longitude
+                    val user = userLatLng
+                    if (lat != null && lng != null && user != null) {
+                        GeoDistance.meters(user.first, user.second, lat, lng)
+                    } else null
+                }
+
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     DetailChip(Icons.Default.Place, categoryLabel(currentMission.category), LightPurple, MainPurple)
                     DetailChip(Icons.Default.EmojiEvents, "${currentMission.points}P", Color(0xFFFFF4E4), Orange)
+                    distanceMeters?.let { meters ->
+                        DetailChip(Icons.AutoMirrored.Filled.DirectionsWalk, GeoDistance.format(meters), Color(0xFFE9F6E7), Color(0xFF4E9A4B))
+                    }
+                }
+
+                if (currentMission.latitude != null && currentMission.longitude != null) {
+                    OutlinedButton(
+                        onClick = {
+                            val lat = currentMission.latitude
+                            val lng = currentMission.longitude
+                            val label = Uri.encode(currentMission.title)
+                            val intent = Intent(
+                                Intent.ACTION_VIEW,
+                                Uri.parse("geo:$lat,$lng?q=$lat,$lng($label)")
+                            )
+                            try {
+                                context.startActivity(intent)
+                            } catch (e: android.content.ActivityNotFoundException) {
+                                Toast.makeText(context, toastNoMapApp, Toast.LENGTH_SHORT).show()
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(14.dp)
+                    ) {
+                        Icon(Icons.Default.Place, null, tint = MainPurple, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(stringResource(R.string.detail_btn_navigate), color = MainPurple, fontWeight = FontWeight.Bold)
+                    }
                 }
 
                 Surface(

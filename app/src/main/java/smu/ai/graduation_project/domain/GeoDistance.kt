@@ -2,6 +2,7 @@ package smu.ai.graduation_project.domain
 
 import kotlin.math.atan2
 import kotlin.math.cos
+import kotlin.math.roundToInt
 import kotlin.math.sin
 import kotlin.math.sqrt
 
@@ -26,5 +27,11 @@ object GeoDistance {
             cos(Math.toRadians(lat1)) * cos(Math.toRadians(lat2)) *
             sin(dLon / 2) * sin(dLon / 2)
         return EARTH_RADIUS_METERS * 2 * atan2(sqrt(a), sqrt(1 - a))
+    }
+
+    /** 사람이 읽기 쉬운 거리 표기. 1km 미만은 반올림한 미터("320m"), 그 이상은 소수점 1자리 킬로미터("1.2km"). */
+    fun format(meters: Double): String {
+        if (meters < 1000.0) return "${meters.roundToInt()}m"
+        return "%.1fkm".format(meters / 1000.0)
     }
 }

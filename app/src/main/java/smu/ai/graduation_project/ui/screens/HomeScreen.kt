@@ -19,6 +19,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CardGiftcard
 import androidx.compose.material.icons.filled.Landscape
+import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.Stars
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -387,6 +388,7 @@ fun HomeScreen(onNavigateToDetail: (String) -> Unit) {
                 recommendations.forEach { scored ->
                     RecommendedMissionCard(
                         scored = scored,
+                        distanceMeters = distances[scored.mission.id],
                         onClick = { onNavigateToDetail(scored.mission.id) }
                     )
                 }
@@ -415,10 +417,11 @@ fun HomeScreen(onNavigateToDetail: (String) -> Unit) {
     }
 }
 
-/** 점수 기반 추천 미션 1건. 추천 이유(칩)를 함께 보여 준다. */
+/** 점수 기반 추천 미션 1건. 추천 이유(칩)와, 위치를 알면 현재 위치로부터의 거리를 함께 보여 준다. */
 @Composable
 private fun RecommendedMissionCard(
     scored: MissionScorer.Scored,
+    distanceMeters: Double?,
     onClick: () -> Unit
 ) {
     val mission = scored.mission
@@ -464,6 +467,11 @@ private fun RecommendedMissionCard(
                     Text(stringResource(R.string.shared_reward_label), fontSize = 12.sp)
                     Icon(Icons.Default.Stars, contentDescription = null, tint = Orange, modifier = Modifier.size(14.dp))
                     Text(" ${mission.points}P", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    distanceMeters?.let { meters ->
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Icon(Icons.Default.Place, contentDescription = null, tint = MainPurple, modifier = Modifier.size(14.dp))
+                        Text(" ${GeoDistance.format(meters)}", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    }
                 }
                 Spacer(modifier = Modifier.height(8.dp))
                 Button(
