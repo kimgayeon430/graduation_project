@@ -161,7 +161,8 @@ fun MissionPerformScreen(
                     points = doc.getLong("points")?.toInt() ?: 0,
                     category = doc.getString("category") ?: "투어",
                     imageUrl = doc.getString("imageUrl").orEmpty(),
-                    estimatedMinutes = doc.getLong("estimatedMinutes")?.toInt()
+                    estimatedMinutes = doc.getLong("estimatedMinutes")?.toInt(),
+                    likeCount = doc.getLong("likeCount")?.toInt() ?: 0
                 )
             }
             val completionCounts = missionSnapshot.documents.associate { doc ->

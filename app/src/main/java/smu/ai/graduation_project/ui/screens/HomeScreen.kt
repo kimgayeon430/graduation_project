@@ -130,7 +130,8 @@ fun HomeScreen(onNavigateToDetail: (String) -> Unit) {
                         desc = doc.localizedString("desc", LanguagePreference.current),
                         points = doc.getLong("points")?.toInt() ?: 0,
                         category = doc.getString("category") ?: "투어",
-                        imageUrl = doc.getString("imageUrl").orEmpty()
+                        imageUrl = doc.getString("imageUrl").orEmpty(),
+                        likeCount = doc.getLong("likeCount")?.toInt() ?: 0
                     )
                 }
                 missionGeo = snapshot.documents.mapNotNull { doc ->

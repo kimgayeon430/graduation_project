@@ -36,8 +36,10 @@ object MissionScorer {
         mission: Mission,
         context: RecommendationContext,
         weights: RecommendationWeights = RecommendationWeights.DEFAULT,
-        /** 후보 중 최대 완료 횟수. 0 이면 인기도 신호를 쓰지 않는다. */
-        maxCompletionCount: Int = 0
+        /** 후보 중 최대 완료 횟수. 0 이면 완료 기반 인기도 신호를 쓰지 않는다. */
+        maxCompletionCount: Int = 0,
+        /** 후보 중 최대 좋아요 수. 0 이면 좋아요 기반 인기도 신호를 쓰지 않는다. */
+        maxLikeCount: Int = 0
     ): Scored {
         val f = MissionFeatures.of(mission, context, maxCompletionCount)
         val reasons = mutableListOf<String>()
@@ -57,9 +59,16 @@ object MissionScorer {
             score += weights.proximity * f.proximity
             if (f.proximity >= SIGNAL_REASON_THRESHOLD) reasons += "가까운 미션"
         }
-        if (f.popularity > 0.0) {
-            score += weights.popularity * f.popularity
-            if (f.popularity >= SIGNAL_REASON_THRESHOLD) reasons += "인기 미션"
+        // 인기도 = 완료 횟수 기반 신호와 좋아요 기반 신호 중 더 강한 쪽.
+        // [MissionFeatures.of] 의 popularity(완료 횟수 기반)는 학습된 재랭커([LearnedReranker])가
+        // 학습 당시 그대로 쓰는 신호라 여기서 값을 바꾸면 안 된다 — 그래서 좋아요 신호는
+        // 이 규칙 점수 계산에서만 별도로 섞고, [MissionFeatures.Signals] 자체는 건드리지 않는다.
+        val likeSignal = if (maxLikeCount <= 0) 0.0
+        else (mission.likeCount.toDouble() / maxLikeCount).coerceIn(0.0, 1.0)
+        val popularitySignal = maxOf(f.popularity, likeSignal)
+        if (popularitySignal > 0.0) {
+            score += weights.popularity * popularitySignal
+            if (popularitySignal >= SIGNAL_REASON_THRESHOLD) reasons += "인기 미션"
         }
         if (f.timeOfDayFit > 0.0) {
             score += weights.timeOfDayFit * f.timeOfDayFit

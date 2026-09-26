@@ -107,6 +107,37 @@ class MissionScorerTest {
         assertFalse(scored.reasons.contains("인기 미션"))
     }
 
+    // 인기도: 완료 이력이 없어도 좋아요가 많으면 가산 (최대값 대비 상대값)
+    @Test
+    fun popularityRewardsHighlyLikedMissions() {
+        val liked = Mission(id = "l", title = "미션", category = "투어", points = 100, likeCount = 9)
+        val unliked = Mission(id = "u", title = "미션", category = "투어", points = 100, likeCount = 1)
+        val context = RecommendationContext()
+        val likedScored = MissionScorer.score(liked, context, maxLikeCount = 10)
+        val unlikedScored = MissionScorer.score(unliked, context, maxLikeCount = 10)
+
+        assertTrue(likedScored.score > unlikedScored.score)
+        assertTrue(likedScored.reasons.contains("인기 미션"))
+        assertFalse(unlikedScored.reasons.contains("인기 미션"))
+    }
+
+    // 좋아요 기록이 없으면(maxLikeCount == 0) 좋아요 기반 인기도 신호는 무시된다
+    @Test
+    fun likePopularityIgnoredWhenNoLikes() {
+        val m = Mission(id = "x", title = "미션", category = "투어", points = 100)
+        val scored = MissionScorer.score(m, RecommendationContext(), maxLikeCount = 0)
+        assertFalse(scored.reasons.contains("인기 미션"))
+    }
+
+    // 완료 인기도는 약해도 좋아요가 많으면 그래도 인기 미션으로 뜬다 (둘 중 더 강한 신호 사용)
+    @Test
+    fun popularityUsesStrongerOfCompletionOrLikeSignal() {
+        val m = Mission(id = "m", title = "미션", category = "투어", points = 100, likeCount = 9)
+        val context = RecommendationContext(completionCountByMissionId = mapOf("m" to 0))
+        val scored = MissionScorer.score(m, context, maxCompletionCount = 10, maxLikeCount = 10)
+        assertTrue(scored.reasons.contains("인기 미션"))
+    }
+
     // 같은 입력이면 항상 같은 결과 (설명 가능 · 재현 가능)
     @Test
     fun scoringIsDeterministic() {

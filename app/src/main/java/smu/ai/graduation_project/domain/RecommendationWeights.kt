@@ -15,7 +15,7 @@ data class RecommendationWeights(
     val difficultyFit: Double = 1.0,
     /** 미션이 사용자 현재 위치에 가까울수록 주는 가산치. */
     val proximity: Double = 1.5,
-    /** 다른 사용자가 많이 완료한 미션에 주는 가산치. */
+    /** 다른 사용자가 많이 완료했거나 좋아요를 많이 받은 미션에 주는 가산치(둘 중 더 강한 신호를 쓴다). */
     val popularity: Double = 1.0,
     /** 지금 시각이 미션 카테고리의 활동 시간대에 맞을수록 주는 가산치. */
     val timeOfDayFit: Double = 1.0,

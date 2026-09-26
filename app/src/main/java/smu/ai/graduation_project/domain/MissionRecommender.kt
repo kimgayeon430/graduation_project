@@ -61,7 +61,8 @@ object MissionRecommender {
         if (candidates.isEmpty()) return emptyList()
 
         val maxCompletionCount = candidates.maxOfOrNull { context.completionCount(it.id) } ?: 0
-        val scored = candidates.map { MissionScorer.score(it, context, weights, maxCompletionCount) }
+        val maxLikeCount = candidates.maxOfOrNull { it.likeCount } ?: 0
+        val scored = candidates.map { MissionScorer.score(it, context, weights, maxCompletionCount, maxLikeCount) }
         return greedyDiversify(scored, limit, weights.diversityPenalty)
     }
 
@@ -90,7 +91,8 @@ object MissionRecommender {
         if (candidates.isEmpty()) return emptyList()
 
         val maxCompletionCount = candidates.maxOfOrNull { context.completionCount(it.id) } ?: 0
-        val ruleScored = candidates.map { MissionScorer.score(it, context, weights, maxCompletionCount) }
+        val maxLikeCount = candidates.maxOfOrNull { it.likeCount } ?: 0
+        val ruleScored = candidates.map { MissionScorer.score(it, context, weights, maxCompletionCount, maxLikeCount) }
         val maxRule = ruleScored.maxOf { it.score }.takeIf { it > 0.0 } ?: 1.0
 
         val blended = candidates.mapIndexed { i, mission ->
