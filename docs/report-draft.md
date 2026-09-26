@@ -67,6 +67,9 @@ Android 애플리케이션을 개발한다. 사용자는 취향에 맞는 미션
 - 마이페이지에서 **보유 포인트를 누르면 적립 내역**(미션별 위치·사진 인증 보상)을 확인
 - 마이페이지에서 **한국어 / English / 日本語 3개 언어 UI 전환** — 하단 메뉴바·관리자 화면을 포함한 앱 전체 화면과 미션 콘텐츠(제목·설명)가 즉시 선택한 언어로 전환 (4.7절)
 - 사진 인증 후 **AI 판정 결과를 전체 화면으로 확인** — 제출한 사진, 판정 상태(통과·검토중·반려), 요구/예측 카테고리, AI 신뢰도, 포인트 지급 여부를 한 화면에서 보고 판정별로 다른 다음 행동(완료 확인 / 다시 촬영 / 미션 내용 보기)을 선택 (6.8절)
+- **사용자 미션 제안** — 제목·설명·카테고리·예상 소요시간·대표 이미지(갤러리 선택, 선택 사항)·장소(지도 탭 선택, 선택 사항)를 입력해 새 여행 미션을 제안. 포인트는 사용자가 정하지 못하고 관리자 승인 시 확정되며, 관리자 검수(검수중 → 승인/수정요청/반려)를 통과해야 다른 사용자에게 노출된다 (4.8절)
+- **내가 만든 미션** 전용 화면(마이페이지 진입) — 제안한 미션의 검수 상태를 확인하고, 수정 요청된 제안은 고친 뒤 재제출. 승인된 제안은 좋아요·찜·수행 횟수 같은 Creator 통계를 보여주고 실제 미션 상세로 연결. "+ 미션 제안하기"로 바로 새 제안 작성 (4.8절)
+- **좋아요 · 찜** — 모든 미션(관리자 생성/사용자 제안 모두)에 ❤️ 좋아요(공개 반응)와 🔖 찜(개인 저장)을 남기고 취소할 수 있다. 마이페이지에서 **찜한 미션** 전용 목록 확인 (4.8절)
 
 ### 2.2 관리자 기능
 
@@ -74,6 +77,7 @@ Android 애플리케이션을 개발한다. 사용자는 취향에 맞는 미션
 - 미션 등록·수정·삭제(제목·설명·카테고리·포인트·이미지·위치 좌표)
 - 전체 사용자·미션 진행 현황 조회, 사용자별 포인트·레벨·완료/진행 미션 확인
 - **사진 검수 큐**: 자동 판정이 애매한 완료 건을 승인하거나 반려(보상 회수 후 재인증 요청)
+- **미션 제안 검수 큐**: 사용자가 제안한 미션을 검토해 승인(최종 포인트 결정)·수정 요청(사유 입력)·반려(사유 입력) — 사유는 제안자에게 "내가 만든 미션" 화면에서 그대로 노출 (4.8절)
 - 관리자 권한 부여·해제
 
 ---
@@ -128,6 +132,7 @@ firebase.json         # Firebase CLI 설정 (규칙 배포)
 | `TravelLevelPolicy` | 누적 포인트 → 여행 레벨(Lv.1~5) + 현재 구간 진행률 계산(4.4.1) |
 | `BadgeUnlockEvaluator` | 완료 전/후 카운터 쌍 → 이번에 처음 조건을 충족한 배지 판정(4.4.2) |
 | `WeekBoundary` | "이번 주"(월요일 0시~) 경계 계산 — 배지·주간 진행률·성취 연출이 공유 |
+| `MissionReviewStatus` | 사용자 제안 미션의 검수 상태(`pending`/`approved`/`changes_requested`/`rejected`) 판정. 필드가 없는 기존 관리자 미션도 공개 대상으로 취급(하위 호환), 재제출 가능 여부(`changes_requested`만) 판정 (4.8절) |
 
 ### 3.3 앱 내비게이션
 
@@ -140,18 +145,22 @@ firebase.json         # Firebase CLI 설정 (규칙 배포)
 
 - `gate` 는 로그인된 기존 사용자의 `users/{uid}.preferences` 유무를 확인해 `main` 또는 `preference` 로 분기한다. (조회 실패 시 앱을 막지 않고 `main` 진행)
 - `admins/{uid}` 문서가 있는 사용자에게만 하단 탭에 **Admin** 이 보이고, 관리자 경로는 진입 시 권한을 재확인한다.
+- 미션 제안/검수/마이페이지 하위 경로: `mission_propose`(신규 제안) · `mission_propose/{missionId}`(수정요청 재제출) · `profile/my-missions`(내가 만든 미션) · `profile/bookmarks`(찜한 미션) · `admin/missions/review`(관리자 제안 검수, 관리자 전용). 기존 `admin/missions`(미션 관리) 목록은 승인된 미션만 보여주도록 분리해, 검수 대기 중인 제안과 뒤섞이지 않게 했다.
 
 ### 3.4 데이터 모델 (Firestore · Supabase Storage)
 
 | 경로 | 주요 필드 |
 | --- | --- |
 | `users/{uid}` | `nickname`, `mail`, `points`, `level`(가입 시 1회 기록, 미사용 레거시 — 4.4.1), `preferences[]`, `completedMissionsTotal`(Long, optional), `completedByCategory`(Map, optional), `completedByWeek`(Map, optional), `badges[]`(optional, 각 원소 `badgeId`/`unlockedAt`/`relatedCategory`/`relatedWeek`/`isNew` — 4.4.2) |
-| `missions/{id}` | `title`, `desc`, `category`, `points`, `imageUrl`, `location`(GeoPoint), `completionCount`, `estimatedMinutes`(Int, optional — 4.5.1), `photoEmbedding`/`photoEmbeddings`(6.7절) |
+| `missions/{id}` | `title`, `desc`, `category`, `points`, `imageUrl`, `location`(GeoPoint), `completionCount`, `estimatedMinutes`(Int, optional — 4.5.1), `photoEmbedding`/`photoEmbeddings`(6.7절), `creatorId`/`creatorName`(String, optional — 사용자 제안 미션만, 4.8절), `reviewStatus`(String, optional: `pending`/`approved`/`changes_requested`/`rejected` — 없으면 `approved` 취급), `reviewNote`(String, optional), `likeCount`/`bookmarkCount`(Int, optional, 4.8절) |
 | `user_missions/{id}` | `userId`, `missionId`, `status`, `progress`, `stage1RewardGranted`, `stage1RewardPoints`, `stage1VerifiedAt`, `stage2RewardGranted`, `stage2RewardPoints`, `photoUrl`, `photoStoragePath`, `photoVerified`, `photoUploadedAt`, `completedAt`, `photoNeedsReview`, `photoVerifyScore`, `photoVerifyLabel`, `photoVerifyModelVersion` |
 | `admins/{uid}` | `email`, `name` |
+| `mission_likes/{uid}_{missionId}` | `userId`, `missionId`, `createdAt`. 문서 ID를 `uid_missionId` 로 고정해 중복 좋아요를 구조적으로 막는다(4.8절) |
+| `mission_bookmarks/{uid}_{missionId}` | 위와 동일한 구조(개인 전용 찜) |
 | Supabase `mission-photos/<missionKey>/{uid}_{timestamp}.jpg` | 사진 인증 이미지 (공개 URL). `missionKey` 는 `missionId` 를 Supabase 스토리지 키 규칙에 맞춰 ASCII 로 정규화한 값(4.3절) |
+| Supabase `mission-photos/proposals/{uid}_{timestamp}.jpg` | 사용자가 미션을 제안할 때 고른 대표 이미지(같은 버킷, 경로만 구분) |
 
-`users/{uid}` 의 레벨·배지 관련 필드는 전부 optional 로 추가했다 — 필드가 없는 기존 사용자 문서도 0/빈 값으로 취급되어 그대로 동작한다(4.4.2절). `completedByWeek` 의 키는 ISO 주차가 아니라 "이번 주 월요일 0시" 기기 로컬 epoch millis 문자열이다(`domain/WeekBoundary`).
+`users/{uid}` 의 레벨·배지 관련 필드는 전부 optional 로 추가했다 — 필드가 없는 기존 사용자 문서도 0/빈 값으로 취급되어 그대로 동작한다(4.4.2절). `completedByWeek` 의 키는 ISO 주차가 아니라 "이번 주 월요일 0시" 기기 로컬 epoch millis 문자열이다(`domain/WeekBoundary`). `missions/{id}` 의 `creatorId`/`reviewStatus`/`likeCount`/`bookmarkCount` 도 전부 optional 이라, 기존 관리자 생성 미션 문서는 필드 추가 없이 그대로 "승인됨·제안자 없음·좋아요 0"으로 취급된다(하위 호환).
 
 ### 3.5 필요 권한
 
@@ -167,12 +176,15 @@ firebase.json         # Firebase CLI 설정 (규칙 배포)
 
 - **읽기**: 로그인 사용자에게 허용(미션은 게스트도 읽음). 목록·랭킹은 앱이 클라이언트에서 구성한다.
 - **쓰기**: 소유권과 문서 형태를 강제한다.
-  - `admins/{uid}`·`missions` 생성/삭제: 관리자(`admins/{uid}` 문서 존재)만
-  - `missions` 의 `completionCount` 필드만은 로그인 사용자가 갱신 가능(완료 시 인기도 신호)
+  - `admins/{uid}`·`missions` 삭제·일반 수정: 관리자(`admins/{uid}` 문서 존재)만
+  - `missions` 의 `completionCount`/`likeCount`/`bookmarkCount` 필드만은 로그인 사용자가 갱신 가능(완료·좋아요·찜 시 인기도 신호)
+  - `missions` 생성: 관리자는 제한 없음. 일반 사용자는 본인이 `creatorId`이고 `reviewStatus=pending`·`points=0` 인 문서만 생성 가능 — 포인트/승인 상태를 스스로 정하거나 위조할 수 없다(4.8절)
+  - `missions` 수정(제안자 재제출): 본인이 제안한 미션이 `changes_requested` 상태일 때만, `reviewStatus` 를 `pending` 으로 되돌리며 내용을 고칠 수 있다. 이때도 `points`/`creatorId`/카운터 필드는 바꿀 수 없다 — `rejected` 상태는 재제출 대상이 아니다
+  - `mission_likes`/`mission_bookmarks`: 문서 ID를 `{uid}_{missionId}` 형식으로 강제해 중복 반응을 구조적으로 막는다. 생성/삭제는 본인 문서만, 좋아요는 공개 읽기·찜은 본인만 읽기
   - `users/{uid}`: 본인 또는 관리자만 수정, 삭제 불가
   - `user_missions/{id}`: 생성은 본인 문서만, 수정은 본인 또는 관리자. (예전엔 "사용자는 자기 `photoNeedsReview` 를 true→false 로 되돌릴 수 없음" 조건도 있었으나, 검수 대기 중 재인증해 정상적으로 `PASS` 가 나온 흐름까지 함께 막는 버그가 실기기에서 드러나 제거했다 — 6.8.3)
-- **테스트**: `firestore-tests/` 에서 에뮬레이터 + `@firebase/rules-unit-testing` 으로 20건 검증(8.1절).
-- **한계**: 서버(Cloud Functions)가 없어 포인트 지급/회수의 값 자체는 검증하지 못한다. 서버측 포인트 검증은 향후 과제다. (10장)
+- **테스트**: `firestore-tests/` 에서 에뮬레이터 + `@firebase/rules-unit-testing` 으로 37건 검증(8.1절) — 사용자 미션 제안·좋아요·찜 관련 17건 포함.
+- **한계**: 서버(Cloud Functions)가 없어 포인트 지급/회수, `likeCount`/`bookmarkCount` 값 자체는 완전히 검증하지 못한다(문서 존재로 "반응 여부"는 강제하지만, 카운터 필드 자체를 임의로 증가시키는 것까지는 못 막음 — 기존 `completionCount` 와 같은 한계). 서버측 검증은 향후 과제다. (10장)
 
 ---
 
@@ -297,7 +309,7 @@ PASS 판정 결과 화면 하단에 "다음에는 이런 미션 어때요?" 카�
 ### 4.6 관리자 기능
 
 - `admins/{uid}` 문서 유무로 관리자 화면을 노출한다.
-- 미션 CRUD(위치 좌표 입력 포함), 사용자·미션 진행 현황 조회, 사진 검수 큐(6.5절).
+- 미션 CRUD(위치 좌표 입력 포함), 사용자·미션 진행 현황 조회, 사진 검수 큐(6.5절), 미션 제안 검수 큐(4.8절).
 
 ### 4.7 다국어 지원 (i18n)
 
@@ -316,6 +328,28 @@ PASS 판정 결과 화면 하단에 "다음에는 이런 미션 어때요?" 카�
 **적용 범위**: 랜딩·로그인·회원가입·취향 선택, 홈·미션 목록·미션 상세·미션 지도·미션 수행, 마이페이지·포인트 내역·진행 중 미션·완료한 미션·랭킹, 하단 메뉴바, 관리자 5개 화면(홈·미션 목록·미션 편집·사용자 관리·사진 검수) 전체.
 
 **남은 한계**: 네이버 지도 `InfoWindow.DefaultTextAdapter` 의 말풍선 텍스트는 Compose 컴포저블이 아니라 콜백이라 `context.getLocalizedString()` 으로 별도 처리한다. 사진 인증 거절 사유(`PhotoVerification.reason`)는 도메인 계층이 Android `Context` 에 의존하지 않는 순수 Kotlin 이라 처음에는 직접 번역할 수 없었는데, 6.8절에서 결과 화면을 새로 만들며 원인을 `RejectReasonCode` enum 으로만 도메인에서 분류하고 실제 다국어 문구는 UI 레이어 `strings.xml` 에서 고르도록 정리해 해소했다.
+
+### 4.8 사용자 미션 제안 · 관리자 검수 · 좋아요/찜
+
+관리자만 만들 수 있던 미션을 일반 사용자도 제안할 수 있게 열되, 아무 검증 없이 바로 노출되면 스팸·부적절한 콘텐츠·임의 포인트 설정 위험이 생긴다. 그래서 **제안(사용자) → 검수(관리자) → 노출** 3단계로 나누고, 승인 전까지는 기존 미션 목록·지도·추천 어디에도 보이지 않게 했다.
+
+**제안 화면(`MissionProposalScreen`)** — 제목·설명·카테고리·예상 소요시간은 기존 관리자 미션 편집 폼(`AdminMissionEditScreen`)과 같은 필드 구성을 재사용한다. 두 가지는 사용자 경험을 고려해 다르게 만들었다.
+
+- **대표 이미지**: 관리자 폼은 URL을 직접 입력받지만, 일반 사용자에게 이미지 호스팅 URL을 받는 건 비현실적이다. 대신 갤러리에서 고르면(`ActivityResultContracts.PickVisualMedia`, 별도 런타임 권한 불필요) 기존 `SupabaseStorage`(사진 인증에 쓰던 것과 같은 버킷, `proposals/` 경로만 구분)에 업로드해 URL을 채운다. 선택 사항으로 두어, 이미지가 없어도 제안 자체는 낼 수 있게 했다.
+- **미션 장소**: 관리자 폼은 위도/경도를 텍스트로 직접 입력받지만, 일반 사용자는 좌표를 모른다. 대신 `MissionMapScreen` 의 지도 생명주기 처리를 단순화한 경량 지도를 새로 만들어, 지도를 한 번 탭하면 그 위치에 마커가 놓이고 좌표가 채워지도록 했다. 이 지도는 기존 미션 지도 화면과 완전히 분리된 새 컴포저블이라 기존 화면 동작에는 영향이 없다.
+- **포인트는 입력받지 않는다.** 사용자가 제안 시 정할 수 있는 값이 아니라, 관리자가 검수·승인할 때 처음 정해진다 — 이 정책은 UI 뿐 아니라 `firestore.rules` 로도 강제된다(아래).
+
+**검수(`AdminMissionReviewScreen`)** — 기존 `AdminPhotoReviewScreen`(사진 검수 큐)과 같은 구조(대기열 + 카드 + 승인/반려 다이얼로그)를 그대로 따라 관리자 학습 비용을 줄였다. 승인 시에는 포인트를 입력받아 `reviewStatus=approved`·`points=<입력값>`으로 갱신하고, 수정 요청/반려는 사유를 필수 입력받아 `reviewNote` 에 남긴다. 이 사유는 제안자의 "내가 만든 미션" 화면에 그대로 노출된다.
+
+**재제출** — "수정 요청" 상태에서만 제안자가 `MissionProposalScreen`을 다시 열어 내용을 고치고 제출할 수 있다("반려"는 재제출 대상이 아니다). 재제출은 `reviewStatus`를 `pending`으로 되돌릴 뿐 `points`/`creatorId`는 절대 건드리지 않는다.
+
+**보안 규칙 설계** — 클라이언트가 Firestore를 직접 쓰는 구조라(3.6절), 위 정책은 규칙으로도 강제해야 실제로 우회 불가능하다. 생성 규칙은 `creatorId == 본인 uid`·`reviewStatus == 'pending'`·`points == 0` 세 조건을 모두 요구해 사용자가 자기 미션을 바로 승인하거나 포인트를 스스로 매길 수 없게 한다. 재제출 규칙은 현재 상태가 `changes_requested`일 때만 허용하고, 쓰는 값 중 `points`/`creatorId`가 기존과 같아야 한다는 조건을 별도로 걸어 우회를 막는다. `firestore-tests/rules.test.js`에 17건을 추가해(총 37건) 에뮬레이터로 실제 검증했다(3.6·8.1절).
+
+**좋아요 / 찜(`MissionEngagement`)** — 두 반응 모두 `mission_likes`/`mission_bookmarks` 컬렉션에 문서 ID를 `{uid}_{missionId}`로 고정해 저장한다. 이 설계만으로 "사용자당 미션당 최대 1건"이 구조적으로 보장되어 중복 방지 로직을 따로 클라이언트에 둘 필요가 없고, 취소는 그 문서를 지우기만 하면 된다. 문서 생성/삭제와 `missions.{likeCount|bookmarkCount}` 증감을 하나의 `WriteBatch`로 묶어 카운터가 반응 문서 존재 여부와 항상 같이 움직이게 했다. 좋아요는 "공개적인 추천"이라 목록에서 지금 몇 명이 좋아하는지 누구나 보게 했고, 찜은 "개인 저장"이라 본인만 읽을 수 있게 규칙을 다르게 뒀다. 좋아요/찜 버튼은 미션 목록 카드와 미션 상세 화면에 추가했고, 지도 화면의 정보창은 네이버 지도가 살아있는 뷰가 아니라 비트맵만 받는 구조라(4.2절 한계) 버튼을 얹지 않았다.
+
+**추천 시스템과의 연결** — `likeCount`/`bookmarkCount`를 `missions` 문서에 얹어 두어 향후 인기도·개인화 신호로 바로 쓸 수 있게 준비했지만, 이번 구현에서는 `MissionScorer`의 가중치·점수식 자체는 건드리지 않았다(기존에 계산된 값으로 튜닝된 로직을 검증 없이 바꾸는 위험을 피하기 위함). 대신 추천 후보를 불러오는 두 지점(`HomeScreen`, `MissionPerformScreen`)과 `MissionListScreen`·지도에서 공통으로 `MissionReviewStatus.isPubliclyVisible()`을 적용해, 검수 전/반려된 제안이 추천·목록·지도 어디에도 노출되지 않도록 했다. 좋아요/찜을 실제 점수식에 반영하는 것은 10장 향후 계획으로 남긴다.
+
+**하위 호환** — 새 필드(`creatorId`, `reviewStatus`, `reviewNote`, `likeCount`, `bookmarkCount`)는 전부 optional 이고, 기존 관리자 생성 미션 문서는 필드 자체가 없다. 어디서 읽든 `reviewStatus`가 없으면 `approved`로, 카운터가 없으면 0으로 취급하도록 `MissionReviewStatus`/읽기 코드를 통일해, 기존 데이터에 마이그레이션 없이도 그대로 동작한다. 관리자 미션 목록 화면은 승인된 미션만 보여주도록 필터를 추가해 검수 대기 중인 제안과 뒤섞이지 않게 했을 뿐, 미션 생성·수정·삭제 자체의 동작은 바꾸지 않았다.
 
 ---
 
@@ -714,6 +748,10 @@ PASS 판정 직후 결과 화면(6.8.2)이 뜨기 전에 짧게(2.2~3.2초) 보�
 - [ ] 위 레벨·배지·다음 미션 추천 기능은 컴파일·단위 테스트만 확인했고 실기기/에뮬레이터 화면은 아직 보지 못함 — 다음 세션에서 레벨업 연출, 배지 3종 각각의 획득 순간, 프로필 화면 표시를 실제로 확인할 것
 - [x] 미션 지도 핀 상태별 색상 구분 + 완료 미션 인증 사진 정보창(4.2절)
 - [x] 홈 추천 카드·미션 상세 화면에 실제 거리 표시(`GeoDistance.format`), 미션 상세 화면 "길찾기" 버튼(`geo:` Intent) — 실기기 미검증
+- [x] 사용자 미션 제안(제목·설명·카테고리·예상 소요시간·대표 이미지·지도 탭 위치 선택) → 관리자 검수(승인 시 포인트 확정/수정요청/반려, 사유는 제안자에게 노출) → 승인된 미션만 목록·지도·추천에 노출(4.8절). `MissionReviewStatus` 순수 로직 + 단위 테스트, `MissionEngagement`(좋아요·찜 토글) 신규
+- [x] 좋아요/찜 — 모든 미션에 추가, 문서 ID 고정(`{uid}_{missionId}`)으로 중복 방지, 미션 목록/상세 화면에 버튼과 카운트 표시, 마이페이지 "내가 만든 미션"·"찜한 미션" 전용 화면(4.8절)
+- [x] `firestore.rules` 에 사용자 제안 생성/재제출·좋아요·찜 권한 추가, 에뮬레이터 테스트 17건 추가(총 37건) — 자기 승인·포인트 자가 설정·타인 명의 반응 생성이 모두 거부됨을 확인(3.6·4.8·8.1절)
+- [ ] 위 미션 제안·검수·좋아요/찜 기능은 컴파일·단위 테스트·Firestore 규칙 에뮬레이터 테스트만 확인했고 실기기 화면은 아직 보지 못함 — 지도 탭 위치 선택, 갤러리 이미지 업로드, 검수 승인/반려 플로우를 실제로 확인할 것
 
 ### 7.2 남은 작업
 
@@ -754,8 +792,8 @@ PASS 판정 직후 결과 화면(6.8.2)이 뜨기 전에 짧게(2.2~3.2초) 보�
 
 ### 8.1 도메인 규칙 · 보안 규칙
 
-- **JUnit4 단위 테스트**로 거리·보상·완료·취향·추천·사진 판정 규칙을 검증한다(경계값 포함). 사진 인증: `PhotoVerificationTest`, `PhotoGateTest`. 추천: `MissionFeaturesTest`, `LearnedRerankerTest`, `MissionRecommenderRerankedTest`.
-- **Firestore 보안 규칙 테스트** (`firestore-tests/`, `@firebase/rules-unit-testing` + 에뮬레이터, 20건): 게스트/일반/관리자 컨텍스트로 `admins`·`missions`·`users`·`user_missions` 의 읽기·쓰기 허용/거부를 검증한다. 핵심: 일반 사용자가 `missions.completionCount` 외 필드를 못 바꾸고, 남의 진행 문서는 못 건드린다. (`photoNeedsReview` true→false 차단 테스트는 실사용 버그로 6.8.3 에서 반대로 뒤집었다 — 이제 본인 진행 문서 재인증으로 통과할 수 있다)
+- **JUnit4 단위 테스트**로 거리·보상·완료·취향·추천·사진 판정·미션 검수 상태 규칙을 검증한다(경계값 포함). 사진 인증: `PhotoVerificationTest`, `PhotoGateTest`. 추천: `MissionFeaturesTest`, `LearnedRerankerTest`, `MissionRecommenderRerankedTest`. 미션 제안 검수: `MissionReviewStatusTest`(4.8절).
+- **Firestore 보안 규칙 테스트** (`firestore-tests/`, `@firebase/rules-unit-testing` + 에뮬레이터, 37건): 게스트/일반/관리자 컨텍스트로 `admins`·`missions`·`users`·`user_missions`·`mission_likes`·`mission_bookmarks` 의 읽기·쓰기 허용/거부를 검증한다. 핵심: 일반 사용자가 `missions.completionCount`/`likeCount`/`bookmarkCount` 외 필드를 못 바꾸고, 남의 진행 문서는 못 건드리며, 미션 제안 시 `points`/`reviewStatus` 를 스스로 정하거나 재제출 중 바꿀 수 없고, 좋아요/찜은 문서 ID 형식(`{uid}_{missionId}`) 위반이나 타인 명의 생성이 모두 거부된다(4.8절). (`photoNeedsReview` true→false 차단 테스트는 실사용 버그로 6.8.3 에서 반대로 뒤집었다 — 이제 본인 진행 문서 재인증으로 통과할 수 있다)
 - ViewModel 레벨 테스트는 `android.net.Uri`·`android.location.Location` 의존으로 순수 JUnit 에서 불가하며, Robolectric 도입은 향후 과제로 둔다.
 
 ### 8.2 사진 인증 모델
@@ -847,6 +885,11 @@ NDCG@5 +0.033 으로 이득의 대부분을 가져온다.
   - `4406c4d` 홈 화면 "이번 주 진행률"이 위치 인증만 해도 올라가던 버그 수정, `domain/WeekBoundary` 로 "이번 주" 계산 통합
   - `e7731a1` 미션 지도 핀에 진행 상태별 색상 + 사진 인증 완료 미션은 인증 사진을 정보창에 표시(4.2절)
   - `5b30e1a` 홈 추천 카드·미션 상세 화면에 실제 거리 표시, 미션 상세 화면 "길찾기" 버튼 추가(4.2·4.5절)
+  - `f005275` 사용자 미션 제안을 위한 데이터 모델 기반(`MissionReviewStatus`/`MissionEngagement`) 추가(4.8절)
+  - `b08d60e` 미션 제안·검수 화면(`MissionProposalScreen`/`AdminMissionReviewScreen`)과 찜한 미션 화면 추가, 보안 규칙 반영
+  - `ddf8e27` 미션 제안·검수·좋아요·찜 화면을 내비게이션에 연결, 목록/추천에서 미승인 미션 제외, 좋아요·찜 버튼 추가
+  - `cf05d08` 위 화면들 한국어/영어/일본어 문구 추가
+  - `05c8469` 미션 제안·좋아요·찜 Firestore 보안 규칙 테스트 17건 추가(총 37건, 4.8절)
 
 ---
 
@@ -861,6 +904,9 @@ NDCG@5 +0.033 으로 이득의 대부분을 가져온다.
 - 서버 사이드 포인트 검증, Firestore 보안 규칙 정비, Compose UI 테스트·Repository 계약 테스트 — 여행 레벨·배지 카운터(4.4.1·4.4.2)도 포인트와 같은 신뢰 경계(클라이언트가 직접 쓰는 구조)에 있어 같은 서버 검증 작업 범위에 포함
 - 다음 미션 추천 카드(4.5.1)에 사용자 실시간 위치 기반 거리 표시 추가 — 이번 구현은 위치 재획득 없이 "계산 불가 시 생략" 으로 스코프를 좁혔음
 - 위 레벨/배지/추천 카드 기능의 실기기 검증(레벨업 연출, 배지 3종 각각의 최초 획득, 프로필 표시, 화면 회전 시 상태 유지)
+- 사용자 미션 제안·검수·좋아요/찜(4.8절)의 실기기 검증 — 지도 탭 위치 선택, 갤러리 이미지 업로드, 검수 승인/수정요청/반려 전체 흐름, 재제출까지 실제 기기로 아직 못 봄
+- 좋아요/찜 데이터(`likeCount`/`bookmarkCount`)를 실제 추천 점수식(`MissionScorer`)에 반영 — 이번에는 필드만 준비해 두고 가중치는 건드리지 않았다(4.8절)
+- 미션 제안 검수 대기열에 알림(푸시/뱃지)을 붙여 관리자가 신규 제안을 놓치지 않게 하는 것, 대량 제안 시 스팸 방지(예: 사용자당 동시 pending 제안 수 제한)
 
 ---
 

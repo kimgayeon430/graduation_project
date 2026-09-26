@@ -27,6 +27,9 @@
 - 누적 포인트 기반 여행 레벨(Lv.1~5) 진행률과 여행 배지 3종을 프로필에서 확인
 - 프로필에서 포인트, 레벨 및 미션 현황 확인
 - 마이페이지에서 한국어 / English / 日本語 3개 언어 UI 전환 (앱 전체 화면·하단 메뉴바에 즉시 반영)
+- **미션 제안**: 제목·설명·카테고리·예상 소요시간·대표 이미지(갤러리, 선택)·장소(지도 탭 선택, 선택)를 입력해 새 여행 미션을 제안. 포인트는 관리자가 승인 시 확정하며, 검수(검수중 → 승인/수정요청/반려)를 통과해야 다른 사용자에게 노출
+- **내가 만든 미션**(마이페이지 진입): 제안한 미션의 검수 상태 확인, 수정 요청 시 고쳐서 재제출, 승인된 제안은 좋아요·찜·수행 횟수 통계와 함께 실제 미션 상세로 연결, "+ 미션 제안하기"로 바로 새 제안
+- **좋아요 · 찜**: 모든 미션에 ❤️ 좋아요(공개 반응)·🔖 찜(개인 저장) 추가/취소, 마이페이지에서 찜한 미션 전용 목록 확인
 
 ### 관리자
 
@@ -35,6 +38,7 @@
 - 전체 사용자와 미션 진행 현황 조회
 - 사용자별 포인트, 레벨, 완료·진행 미션 확인
 - 사진 검수 큐: 자동 판정이 애매한(`photoNeedsReview`) 완료 건을 승인하거나 반려(2단계 보상 회수 후 재인증 요청)
+- **미션 제안 검수 큐**: 사용자가 제안한 미션을 승인(포인트 확정)·수정 요청(사유)·반려(사유)
 - 관리자 권한 부여 및 해제
 
 ## 기술 스택
@@ -262,6 +266,7 @@ AI 판정이 끝나면 Toast 대신 **전체 화면**(`Dialog(usePlatformDefault
 
 - `gate` 는 로그인된 기존 사용자의 `users/{uid}.preferences` 유무를 확인해 `main` 또는 `preference` 로 분기합니다. (조회 실패 시 앱을 막지 않고 `main` 으로 진행)
 - `admins/{uid}` 문서가 있는 사용자에게만 하단 탭에 **Admin** 항목이 보이고, 관리자 경로는 진입 시 권한을 재확인합니다.
+- 미션 제안/검수/마이페이지 하위 경로: `mission_propose`(신규 제안) · `mission_propose/{missionId}`(수정요청 재제출) · `profile/my-missions`(내가 만든 미션) · `profile/bookmarks`(찜한 미션) · `admin/missions/review`(관리자 제안 검수).
 
 ## 프로젝트 구조
 
@@ -273,9 +278,10 @@ app/src/main/java/smu/ai/graduation_project
 ├── model/          # Mission, UserRank 등 데이터 모델
 ├── navigation/     # 화면 경로 및 내비게이션 정의
 └── ui/
-    ├── admin/      # 미션·사용자 관리, 사진 검수(AdminPhotoReviewScreen) 화면
+    ├── admin/      # 미션·사용자 관리, 사진 검수(AdminPhotoReviewScreen), 미션 제안 검수(AdminMissionReviewScreen) 화면
     ├── components/ # 공통 Compose 컴포넌트
-    ├── screens/    # 랜딩·로그인·홈·미션 목록/상세/지도·수행·취향 선택·랭킹·프로필 및 ViewModel
+    ├── screens/    # 랜딩·로그인·홈·미션 목록/상세/지도·수행·취향 선택·랭킹·프로필 및 ViewModel,
+    │               # 미션 제안(MissionProposalScreen)·내가 만든 미션(MyMissionsScreen)·찜한 미션(BookmarkedMissionsScreen)
     └── theme/      # 색상, 타이포그래피, 앱 테마
 
 app/src/test/java/smu/ai/graduation_project
@@ -307,16 +313,19 @@ ml/                 # 모델 학습·평가 (Colab/로컬, 앱 빌드와 분리)
 | `MissionScorer` | 신호를 `RecommendationWeights` 로 가중합 + 근거 문구 (규칙 점수) |
 | `LearnedReranker` | 완료 로그로 학습한 로지스틱 회귀로 완료 확률 추정 (`assets/reranker.json`) |
 | `MissionRecommender` | 후보 필터 → 규칙/학습 점수 블렌드 → 다양성 감점으로 상위 N건 |
+| `MissionReviewStatus` | 사용자 제안 미션의 검수 상태(`pending`/`approved`/`changes_requested`/`rejected`) 판정, 하위 호환·재제출 가능 여부 |
 
 ## Firestore · Supabase Storage 데이터
 
 | 경로 | 주요 필드 |
 | --- | --- |
 | `users/{uid}` | `nickname`, `mail`, `points`, `level`, `preferences[]` |
-| `missions/{id}` | `title`, `desc`, `category`, `points`, `imageUrl`, `imageUrls`(배열, 선택 — 참조 이미지 추가), `location`(GeoPoint), `completionCount`, `photoEmbeddings`(배열, 원소는 `{v:[...]}` 맵), `photoEmbedding`(단일, 레거시), `photoEmbeddingModelVersion` |
+| `missions/{id}` | `title`, `desc`, `category`, `points`, `imageUrl`, `imageUrls`(배열, 선택 — 참조 이미지 추가), `location`(GeoPoint), `completionCount`, `photoEmbeddings`(배열, 원소는 `{v:[...]}` 맵), `photoEmbedding`(단일, 레거시), `photoEmbeddingModelVersion`, `creatorId`/`creatorName`(선택, 사용자 제안 미션만), `reviewStatus`/`reviewNote`(선택, 없으면 승인됨으로 취급), `likeCount`/`bookmarkCount`(선택) |
 | `user_missions/{id}` | `userId`, `missionId`, `status`, `progress`, `stage1RewardGranted`, `stage2RewardGranted`, `photoUrl`, `photoStoragePath`, `photoVerified`, `photoUploadedAt`, `completedAt`, `photoNeedsReview`, `photoVerifyScore`, `photoVerifyLabel`, `photoVerifyModelVersion`, `photoVerifySimilarity` |
 | `admins/{uid}` | `email`, `name` |
+| `mission_likes/{uid}_{missionId}`, `mission_bookmarks/{uid}_{missionId}` | `userId`, `missionId`, `createdAt` — 문서 ID 고정으로 중복 반응 방지 |
 | Supabase Storage `mission-photos/{missionId}/{uid}_{timestamp}.jpg` | 사진 인증 이미지 (공개 URL 로 접근) |
+| Supabase Storage `mission-photos/proposals/{uid}_{timestamp}.jpg` | 미션 제안 대표 이미지 (같은 버킷, 경로만 구분) |
 
 ## 실행 방법
 
@@ -413,9 +422,14 @@ python export_onnx.py --model outputs/final --out ../app/src/main/assets/photo_v
 - 포인트 랭킹 및 프로필(여행 레벨 진행률, 여행 배지 3종)
 - 관리자 미션 관리 (위치 좌표 입력 포함)
 - 관리자 사용자 관리
+- 미션 제안(대표 이미지 갤러리 선택, 지도 탭 위치 선택) 및 "내가 만든 미션" · "찜한 미션" 화면
+- 관리자 미션 제안 검수 큐 (승인 시 포인트 확정 / 수정요청 / 반려)
+- 미션 목록·상세의 좋아요 · 찜 버튼
 
 ## 향후 개선 계획
 
+- 사용자 미션 제안·검수·좋아요/찜 기능 실기기 검증 — 현재는 컴파일·단위 테스트·Firestore 규칙 에뮬레이터 테스트까지만 확인
+- 좋아요/찜(`likeCount`/`bookmarkCount`)을 실제 추천 점수식(`MissionScorer`)에 반영 — 이번에는 필드만 준비
 - 유사도 임계값(`rescue`/`suspect`) 실사용 로그 기반 확정 — 현재는 실사용 1건 + 웹 프록시 표본뿐이라 통계적으로 부족 (`ml/calibrate_similarity.py`)
 - 크라우드소싱 사진으로 체험(및 무관 실내) 클래스 보강 후 재학습 — 무효 클래스는 화면 재촬영 합성으로 이미 보강·재학습 완료(위), 체험은 실사진 수집이 남음. 수집 시 `ml/data/import_collected.py --category 체험 --from-dir <폴더>` 로 기존 파이프라인에 합류
 - 촬영 시각·EXIF·위치 메타데이터 교차 검증, GPS 스푸핑/순간이동 탐지
