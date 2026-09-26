@@ -210,6 +210,8 @@
     <string name="profile_next_goal">다음 목표: 미션 1개 더 완료하고 포인트를 쌓아보세요.</string>
     <string name="profile_menu_nickname">닉네임 변경</string>
     <string name="profile_menu_language">언어 / Language / 言語</string>
+    <string name="profile_menu_my_missions">내가 만든 미션</string>
+    <string name="profile_menu_bookmarks">찜한 미션</string>
     <string name="profile_menu_ranking">랭킹 보기</string>
     <string name="profile_menu_logout">로그아웃</string>
     <string name="profile_dialog_nickname_title">닉네임 변경</string>
@@ -231,6 +233,8 @@
     <string name="admin_home_users_desc">사용자 활동을 확인합니다.</string>
     <string name="admin_home_photo_review_title">사진 검수</string>
     <string name="admin_home_photo_review_desc">신고된 미션 인증 사진을 승인하거나 반려합니다.</string>
+    <string name="admin_home_mission_review_title">미션 제안 검수</string>
+    <string name="admin_home_mission_review_desc">사용자가 제안한 미션을 승인/반려합니다.</string>
 
     <!-- 관리자 미션 목록 -->
     <string name="admin_mission_list_title">미션 관리</string>
@@ -240,6 +244,23 @@
     <string name="admin_mission_delete_title">미션 삭제</string>
     <string name="admin_mission_delete_confirm">\'%1$s\' 미션을 삭제할까요?</string>
     <string name="admin_cancel">취소</string>
+    <string name="admin_mission_proposed_by">제안: %1$s</string>
+
+    <!-- 관리자 미션 제안 검수 -->
+    <string name="admin_mission_review_title">미션 제안 검수</string>
+    <string name="admin_mission_review_empty">검수할 제안이 없습니다.</string>
+    <string name="admin_mission_review_minutes_suffix">분</string>
+    <string name="admin_mission_review_reject">반려</string>
+    <string name="admin_mission_review_request_changes">수정 요청</string>
+    <string name="admin_mission_review_approve_title">미션 승인</string>
+    <string name="admin_mission_review_approve_body">\'%1$s\' 제안을 승인합니다. 최종 포인트를 정해주세요.</string>
+    <string name="admin_mission_review_request_changes_title">수정 요청</string>
+    <string name="admin_mission_review_reject_title">미션 반려</string>
+    <string name="admin_mission_review_reason_body">\'%1$s\' 제안자에게 보여줄 사유를 입력하세요.</string>
+    <string name="admin_mission_review_reason_label">사유</string>
+    <string name="admin_mission_review_toast_saved">검수 결과를 저장했습니다.</string>
+    <string name="admin_mission_review_toast_invalid_points">포인트를 올바르게 입력하세요.</string>
+    <string name="admin_mission_review_toast_reason_required">사유를 입력하세요.</string>
 
     <!-- 관리자 사용자 관리 -->
     <string name="admin_user_mgmt_title">사용자 관리</string>
@@ -293,6 +314,39 @@
     <string name="admin_mission_saving">저장 중...</string>
     <string name="admin_mission_save_edit">수정 완료</string>
     <string name="admin_mission_save_add">미션 추가</string>
+
+    <!-- 검수 상태 배지 -->
+    <string name="review_status_pending">검수중</string>
+    <string name="review_status_approved">승인됨</string>
+    <string name="review_status_changes_requested">수정 요청</string>
+    <string name="review_status_rejected">반려됨</string>
+
+    <!-- 미션 제안 -->
+    <string name="proposal_new_title">미션 제안하기</string>
+    <string name="proposal_edit_title">제안 수정</string>
+    <string name="proposal_intro">여행 미션을 제안해보세요. 관리자 검수 후 승인되면 다른 사용자에게도 공개됩니다.</string>
+    <string name="proposal_image_label">대표 이미지 (선택)</string>
+    <string name="proposal_image_pick">이미지 선택</string>
+    <string name="proposal_location_label">미션 장소 (선택)</string>
+    <string name="proposal_location_hint">지도를 탭해 미션 장소를 선택하세요.</string>
+    <string name="proposal_location_selected">선택한 위치: %1$.5f, %2$.5f</string>
+    <string name="proposal_submit_new">제안 제출하기</string>
+    <string name="proposal_submit_resubmit">수정해서 다시 제출하기</string>
+    <string name="proposal_toast_upload_failed">이미지 업로드에 실패했습니다.</string>
+    <string name="proposal_toast_submitted">제안이 접수되었습니다. 검수 후 공개됩니다.</string>
+
+    <!-- 내가 만든 미션 -->
+    <string name="my_missions_title">내가 만든 미션</string>
+    <string name="my_missions_propose_new">미션 제안하기</string>
+    <string name="my_missions_empty">아직 제안한 미션이 없어요.</string>
+    <string name="my_missions_pending_hint">관리자 검수를 기다리고 있어요.</string>
+    <string name="my_missions_review_note">관리자 의견: %1$s</string>
+    <string name="my_missions_edit_resubmit">수정 후 재제출</string>
+    <string name="my_missions_view_detail">미션 상세 보기</string>
+
+    <!-- 찜한 미션 -->
+    <string name="bookmarked_missions_title">찜한 미션</string>
+    <string name="bookmarked_missions_empty">찜한 미션이 없어요.</string>
 
     <!-- 포인트 내역 -->
     <string name="point_history_title">포인트 내역</string>

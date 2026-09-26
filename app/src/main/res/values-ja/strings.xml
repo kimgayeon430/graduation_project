@@ -206,6 +206,8 @@
     <string name="profile_next_goal">次の目標：ミッションをもう1つ完了してポイントを貯めましょう。</string>
     <string name="profile_menu_nickname">ニックネーム変更</string>
     <string name="profile_menu_language">언어 / Language / 言語</string>
+    <string name="profile_menu_my_missions">自分が作ったミッション</string>
+    <string name="profile_menu_bookmarks">お気に入りミッション</string>
     <string name="profile_menu_ranking">ランキングを見る</string>
     <string name="profile_menu_logout">ログアウト</string>
     <string name="profile_dialog_nickname_title">ニックネーム変更</string>
@@ -227,6 +229,8 @@
     <string name="admin_home_users_desc">ユーザーの活動を確認します。</string>
     <string name="admin_home_photo_review_title">写真検収</string>
     <string name="admin_home_photo_review_desc">報告されたミッション認証写真を承認または却下します。</string>
+    <string name="admin_home_mission_review_title">ミッション提案の審査</string>
+    <string name="admin_home_mission_review_desc">ユーザーが提案したミッションを承認・却下します。</string>
 
     <!-- 관리자 미션 목록 -->
     <string name="admin_mission_list_title">ミッション管理</string>
@@ -236,6 +240,23 @@
     <string name="admin_mission_delete_title">ミッション削除</string>
     <string name="admin_mission_delete_confirm">\'%1$s\' ミッションを削除しますか？</string>
     <string name="admin_cancel">キャンセル</string>
+    <string name="admin_mission_proposed_by">提案者: %1$s</string>
+
+    <!-- 관리자 미션 제안 검수 -->
+    <string name="admin_mission_review_title">ミッション提案の審査</string>
+    <string name="admin_mission_review_empty">審査する提案がありません。</string>
+    <string name="admin_mission_review_minutes_suffix">分</string>
+    <string name="admin_mission_review_reject">却下</string>
+    <string name="admin_mission_review_request_changes">修正依頼</string>
+    <string name="admin_mission_review_approve_title">ミッションを承認</string>
+    <string name="admin_mission_review_approve_body">\'%1$s\' の提案を承認します。最終ポイントを設定してください。</string>
+    <string name="admin_mission_review_request_changes_title">修正依頼</string>
+    <string name="admin_mission_review_reject_title">ミッションを却下</string>
+    <string name="admin_mission_review_reason_body">\'%1$s\' の提案者に表示する理由を入力してください。</string>
+    <string name="admin_mission_review_reason_label">理由</string>
+    <string name="admin_mission_review_toast_saved">審査結果を保存しました。</string>
+    <string name="admin_mission_review_toast_invalid_points">ポイントを正しく入力してください。</string>
+    <string name="admin_mission_review_toast_reason_required">理由を入力してください。</string>
 
     <!-- 관리자 사용자 관리 -->
     <string name="admin_user_mgmt_title">ユーザー管理</string>
@@ -289,6 +310,39 @@
     <string name="admin_mission_saving">保存中...</string>
     <string name="admin_mission_save_edit">修正完了</string>
     <string name="admin_mission_save_add">ミッション追加</string>
+
+    <!-- 검수 상태 배지 -->
+    <string name="review_status_pending">審査中</string>
+    <string name="review_status_approved">承認済み</string>
+    <string name="review_status_changes_requested">修正依頼</string>
+    <string name="review_status_rejected">却下</string>
+
+    <!-- 미션 제안 -->
+    <string name="proposal_new_title">ミッションを提案</string>
+    <string name="proposal_edit_title">提案を編集</string>
+    <string name="proposal_intro">旅行ミッションを提案してください。管理者の審査後に承認されると、他のユーザーにも公開されます。</string>
+    <string name="proposal_image_label">代表画像(任意)</string>
+    <string name="proposal_image_pick">画像を選択</string>
+    <string name="proposal_location_label">ミッション場所(任意)</string>
+    <string name="proposal_location_hint">地図をタップしてミッションの場所を選択してください。</string>
+    <string name="proposal_location_selected">選択した位置: %1$.5f, %2$.5f</string>
+    <string name="proposal_submit_new">提案を送信</string>
+    <string name="proposal_submit_resubmit">修正して再提出</string>
+    <string name="proposal_toast_upload_failed">画像のアップロードに失敗しました。</string>
+    <string name="proposal_toast_submitted">提案を受け付けました。審査後に公開されます。</string>
+
+    <!-- 내가 만든 미션 -->
+    <string name="my_missions_title">自分が作ったミッション</string>
+    <string name="my_missions_propose_new">ミッションを提案する</string>
+    <string name="my_missions_empty">まだ提案したミッションがありません。</string>
+    <string name="my_missions_pending_hint">管理者の審査待ちです。</string>
+    <string name="my_missions_review_note">管理者コメント: %1$s</string>
+    <string name="my_missions_edit_resubmit">修正して再提出</string>
+    <string name="my_missions_view_detail">ミッション詳細を見る</string>
+
+    <!-- 찜한 미션 -->
+    <string name="bookmarked_missions_title">お気に入りミッション</string>
+    <string name="bookmarked_missions_empty">お気に入りのミッションがありません。</string>
 
     <!-- 포인트 내역 -->
     <string name="point_history_title">ポイント履歴</string>

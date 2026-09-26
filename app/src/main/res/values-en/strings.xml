@@ -206,6 +206,8 @@
     <string name="profile_next_goal">Next goal: complete one more mission and earn more points.</string>
     <string name="profile_menu_nickname">Change Nickname</string>
     <string name="profile_menu_language">언어 / Language / 言語</string>
+    <string name="profile_menu_my_missions">My Proposed Missions</string>
+    <string name="profile_menu_bookmarks">Bookmarked Missions</string>
     <string name="profile_menu_ranking">View Ranking</string>
     <string name="profile_menu_logout">Log Out</string>
     <string name="profile_dialog_nickname_title">Change Nickname</string>
@@ -227,6 +229,8 @@
     <string name="admin_home_users_desc">Review user activity.</string>
     <string name="admin_home_photo_review_title">Photo review</string>
     <string name="admin_home_photo_review_desc">Approve or reject flagged mission photos.</string>
+    <string name="admin_home_mission_review_title">Mission Proposal Review</string>
+    <string name="admin_home_mission_review_desc">Approve or reject missions proposed by users.</string>
 
     <!-- 관리자 미션 목록 -->
     <string name="admin_mission_list_title">Mission Management</string>
@@ -236,6 +240,23 @@
     <string name="admin_mission_delete_title">Delete Mission</string>
     <string name="admin_mission_delete_confirm">Delete mission \'%1$s\'?</string>
     <string name="admin_cancel">Cancel</string>
+    <string name="admin_mission_proposed_by">Proposed by %1$s</string>
+
+    <!-- 관리자 미션 제안 검수 -->
+    <string name="admin_mission_review_title">Mission Proposal Review</string>
+    <string name="admin_mission_review_empty">No proposals to review.</string>
+    <string name="admin_mission_review_minutes_suffix">min</string>
+    <string name="admin_mission_review_reject">Reject</string>
+    <string name="admin_mission_review_request_changes">Request Changes</string>
+    <string name="admin_mission_review_approve_title">Approve Mission</string>
+    <string name="admin_mission_review_approve_body">Approve the proposal \'%1$s\'. Set the final points.</string>
+    <string name="admin_mission_review_request_changes_title">Request Changes</string>
+    <string name="admin_mission_review_reject_title">Reject Mission</string>
+    <string name="admin_mission_review_reason_body">Enter a reason to show the proposer of \'%1$s\'.</string>
+    <string name="admin_mission_review_reason_label">Reason</string>
+    <string name="admin_mission_review_toast_saved">Review result saved.</string>
+    <string name="admin_mission_review_toast_invalid_points">Enter valid points.</string>
+    <string name="admin_mission_review_toast_reason_required">Please enter a reason.</string>
 
     <!-- 관리자 사용자 관리 -->
     <string name="admin_user_mgmt_title">User Management</string>
@@ -289,6 +310,39 @@
     <string name="admin_mission_saving">Saving...</string>
     <string name="admin_mission_save_edit">Save Changes</string>
     <string name="admin_mission_save_add">Add Mission</string>
+
+    <!-- 검수 상태 배지 -->
+    <string name="review_status_pending">In Review</string>
+    <string name="review_status_approved">Approved</string>
+    <string name="review_status_changes_requested">Changes Requested</string>
+    <string name="review_status_rejected">Rejected</string>
+
+    <!-- 미션 제안 -->
+    <string name="proposal_new_title">Propose a Mission</string>
+    <string name="proposal_edit_title">Edit Proposal</string>
+    <string name="proposal_intro">Propose a travel mission. Once approved by an admin, it will be visible to other users.</string>
+    <string name="proposal_image_label">Cover Image (optional)</string>
+    <string name="proposal_image_pick">Choose Image</string>
+    <string name="proposal_location_label">Mission Location (optional)</string>
+    <string name="proposal_location_hint">Tap the map to pick the mission location.</string>
+    <string name="proposal_location_selected">Selected location: %1$.5f, %2$.5f</string>
+    <string name="proposal_submit_new">Submit Proposal</string>
+    <string name="proposal_submit_resubmit">Resubmit</string>
+    <string name="proposal_toast_upload_failed">Failed to upload image.</string>
+    <string name="proposal_toast_submitted">Your proposal has been submitted for review.</string>
+
+    <!-- 내가 만든 미션 -->
+    <string name="my_missions_title">My Proposed Missions</string>
+    <string name="my_missions_propose_new">Propose New Mission</string>
+    <string name="my_missions_empty">You haven\'t proposed any missions yet.</string>
+    <string name="my_missions_pending_hint">Waiting for admin review.</string>
+    <string name="my_missions_review_note">Admin note: %1$s</string>
+    <string name="my_missions_edit_resubmit">Edit &amp; Resubmit</string>
+    <string name="my_missions_view_detail">View Mission</string>
+
+    <!-- 찜한 미션 -->
+    <string name="bookmarked_missions_title">Bookmarked Missions</string>
+    <string name="bookmarked_missions_empty">No bookmarked missions yet.</string>
 
     <!-- 포인트 내역 -->
     <string name="point_history_title">Point History</string>
