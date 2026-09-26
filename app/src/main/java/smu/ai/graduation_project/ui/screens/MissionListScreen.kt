@@ -20,11 +20,16 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Bookmark
+import androidx.compose.material.icons.filled.BookmarkBorder
 import androidx.compose.material.icons.filled.Circle
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.LinearProgressIndicator
@@ -54,7 +59,9 @@ import com.google.firebase.auth.auth
 import com.google.firebase.firestore.firestore
 import smu.ai.graduation_project.R
 import smu.ai.graduation_project.data.LanguagePreference
+import smu.ai.graduation_project.data.MissionEngagement
 import smu.ai.graduation_project.data.localizedString
+import smu.ai.graduation_project.domain.MissionReviewStatus
 import smu.ai.graduation_project.model.Mission
 import smu.ai.graduation_project.ui.components.categoryLabel
 import smu.ai.graduation_project.ui.components.missionStatusLabel
@@ -80,11 +87,41 @@ fun MissionListScreen(onMissionClick: (String) -> Unit) {
     var loading by remember { mutableStateOf(true) }
     var loadError by remember { mutableStateOf<String?>(null) }
     var reload by remember { mutableStateOf(0) }
+    var likedIds by remember { mutableStateOf<Set<String>>(emptySet()) }
+    var bookmarkedIds by remember { mutableStateOf<Set<String>>(emptySet()) }
     val db = Firebase.firestore
     val user = Firebase.auth.currentUser
     val errorLoadMissions = stringResource(R.string.error_load_missions)
     val errorLoadProgress = stringResource(R.string.error_load_progress)
     val missionTitlePlaceholder = stringResource(R.string.mission_no_title)
+
+    LaunchedEffect(user?.uid) {
+        val uid = user?.uid ?: return@LaunchedEffect
+        db.collection("mission_likes").whereEqualTo("userId", uid).get()
+            .addOnSuccessListener { snapshot ->
+                likedIds = snapshot.documents.mapNotNull { it.getString("missionId") }.toSet()
+            }
+        db.collection("mission_bookmarks").whereEqualTo("userId", uid).get()
+            .addOnSuccessListener { snapshot ->
+                bookmarkedIds = snapshot.documents.mapNotNull { it.getString("missionId") }.toSet()
+            }
+    }
+
+    fun toggleLike(mission: Mission) {
+        val uid = user?.uid ?: return
+        val nowLiked = mission.id !in likedIds
+        likedIds = if (nowLiked) likedIds + mission.id else likedIds - mission.id
+        missions = missions.map { if (it.id == mission.id) it.copy(likeCount = (it.likeCount + if (nowLiked) 1 else -1).coerceAtLeast(0)) else it }
+        MissionEngagement.setLiked(db, uid, mission.id, nowLiked, onComplete = {}, onError = {})
+    }
+
+    fun toggleBookmark(mission: Mission) {
+        val uid = user?.uid ?: return
+        val nowBookmarked = mission.id !in bookmarkedIds
+        bookmarkedIds = if (nowBookmarked) bookmarkedIds + mission.id else bookmarkedIds - mission.id
+        missions = missions.map { if (it.id == mission.id) it.copy(bookmarkCount = (it.bookmarkCount + if (nowBookmarked) 1 else -1).coerceAtLeast(0)) else it }
+        MissionEngagement.setBookmarked(db, uid, mission.id, nowBookmarked, onComplete = {}, onError = {})
+    }
 
     DisposableEffect(selectedCategory, user?.uid, reload) {
         var active = true
@@ -97,7 +134,9 @@ fun MissionListScreen(onMissionClick: (String) -> Unit) {
 
         query.get().addOnSuccessListener { missionSnapshot ->
             if (!active) return@addOnSuccessListener
-            val loadedMissions = missionSnapshot.documents.map { doc ->
+            val loadedMissions = missionSnapshot.documents.mapNotNull { doc ->
+                val reviewStatus = doc.getString("reviewStatus")
+                if (!MissionReviewStatus.isPubliclyVisible(reviewStatus)) return@mapNotNull null
                 val location = doc.getGeoPoint("location")
 
                 Mission(
@@ -111,7 +150,9 @@ fun MissionListScreen(onMissionClick: (String) -> Unit) {
                     progress = 0f,
                     progressText = "0/1",
                     latitude = location?.latitude,
-                    longitude = location?.longitude
+                    longitude = location?.longitude,
+                    likeCount = doc.getLong("likeCount")?.toInt() ?: 0,
+                    bookmarkCount = doc.getLong("bookmarkCount")?.toInt() ?: 0
                 )
             }
 
@@ -238,7 +279,12 @@ fun MissionListScreen(onMissionClick: (String) -> Unit) {
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     items(missions) { mission ->
-                        MissionListCard(mission = mission, onClick = { onMissionClick(mission.id) })
+                        MissionListCard(
+                            mission = mission.copy(isLikedByMe = mission.id in likedIds, isBookmarkedByMe = mission.id in bookmarkedIds),
+                            onClick = { onMissionClick(mission.id) },
+                            onToggleLike = { toggleLike(mission) },
+                            onToggleBookmark = { toggleBookmark(mission) }
+                        )
                     }
                 }
             }
@@ -249,7 +295,9 @@ fun MissionListScreen(onMissionClick: (String) -> Unit) {
 @Composable
 private fun MissionListCard(
     mission: Mission,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    onToggleLike: () -> Unit,
+    onToggleBookmark: () -> Unit
 ) {
     Surface(
         onClick = onClick,
@@ -346,15 +394,40 @@ private fun MissionListCard(
                     trackColor = Color(0xFFE8E8E8)
                 )
 
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.Circle, null, tint = Orange, modifier = Modifier.size(9.dp))
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(
-                        text = "${mission.points}P",
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 14.sp,
-                        color = Color(0xFF404040)
-                    )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Circle, null, tint = Orange, modifier = Modifier.size(9.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "${mission.points}P",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 14.sp,
+                            color = Color(0xFF404040)
+                        )
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        IconButton(onClick = onToggleLike, modifier = Modifier.size(28.dp)) {
+                            Icon(
+                                if (mission.isLikedByMe) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                                contentDescription = null,
+                                tint = if (mission.isLikedByMe) Color(0xFFE0537A) else Color.LightGray,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                        Text("${mission.likeCount}", fontSize = 11.sp, color = Color.Gray)
+                        IconButton(onClick = onToggleBookmark, modifier = Modifier.size(28.dp)) {
+                            Icon(
+                                if (mission.isBookmarkedByMe) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
+                                contentDescription = null,
+                                tint = if (mission.isBookmarkedByMe) MainPurple else Color.LightGray,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    }
                 }
             }
         }

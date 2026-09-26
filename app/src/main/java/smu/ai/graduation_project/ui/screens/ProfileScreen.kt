@@ -19,7 +19,9 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Assignment
 import androidx.compose.material.icons.automirrored.filled.ExitToApp
+import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.Flag
@@ -90,7 +92,9 @@ fun ProfileScreen(
     onNavigateToInProgressMissions: () -> Unit,
     onNavigateToCompletedMissions: () -> Unit,
     onNavigateToPointHistory: () -> Unit,
-    onNavigateToRanking: () -> Unit
+    onNavigateToRanking: () -> Unit,
+    onNavigateToMyMissions: () -> Unit,
+    onNavigateToBookmarkedMissions: () -> Unit
 ) {
     val currentUser = Firebase.auth.currentUser
     val db = Firebase.firestore
@@ -381,6 +385,8 @@ fun ProfileScreen(
                     ProfileMenuItem(stringResource(R.string.profile_menu_language), Icons.Default.Language) {
                         showLanguageDialog = true
                     }
+                    ProfileMenuItem(stringResource(R.string.profile_menu_my_missions), Icons.AutoMirrored.Filled.Assignment, onClick = onNavigateToMyMissions)
+                    ProfileMenuItem(stringResource(R.string.profile_menu_bookmarks), Icons.Default.Bookmark, onClick = onNavigateToBookmarkedMissions)
                     ProfileMenuItem(stringResource(R.string.profile_menu_ranking), Icons.Default.EmojiEvents, onClick = onNavigateToRanking)
                     ProfileMenuItem(stringResource(R.string.profile_menu_logout), Icons.AutoMirrored.Filled.ExitToApp, onClick = onLogout)
                 }

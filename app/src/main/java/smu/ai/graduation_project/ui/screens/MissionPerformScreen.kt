@@ -76,6 +76,7 @@ import smu.ai.graduation_project.data.LanguagePreference
 import smu.ai.graduation_project.data.localizedString
 import smu.ai.graduation_project.domain.MissionCompletion
 import smu.ai.graduation_project.domain.MissionRecommender
+import smu.ai.graduation_project.domain.MissionReviewStatus
 import smu.ai.graduation_project.domain.RecommendationContext
 import smu.ai.graduation_project.domain.TravelLevelPolicy
 import smu.ai.graduation_project.model.Mission
@@ -153,6 +154,7 @@ fun MissionPerformScreen(
         db.collection("missions").get().addOnSuccessListener { missionSnapshot ->
             val allMissions = missionSnapshot.documents.mapNotNull { doc ->
                 if (doc.getString("title").isNullOrBlank()) return@mapNotNull null
+                if (!MissionReviewStatus.isPubliclyVisible(doc.getString("reviewStatus"))) return@mapNotNull null
                 Mission(
                     id = doc.id,
                     title = doc.localizedString("title", LanguagePreference.current),

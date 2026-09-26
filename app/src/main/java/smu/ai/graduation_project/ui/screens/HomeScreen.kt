@@ -67,6 +67,7 @@ import smu.ai.graduation_project.data.localizedString
 import smu.ai.graduation_project.domain.GeoDistance
 import smu.ai.graduation_project.domain.MissionCompletion
 import smu.ai.graduation_project.domain.MissionRecommender
+import smu.ai.graduation_project.domain.MissionReviewStatus
 import smu.ai.graduation_project.domain.MissionScorer
 import smu.ai.graduation_project.domain.RecommendationContext
 import smu.ai.graduation_project.domain.WeekBoundary
@@ -122,6 +123,7 @@ fun HomeScreen(onNavigateToDetail: (String) -> Unit) {
             .addOnSuccessListener { snapshot ->
                 allMissions = snapshot.documents.mapNotNull { doc ->
                     if (doc.getString("title").isNullOrBlank()) return@mapNotNull null
+                    if (!MissionReviewStatus.isPubliclyVisible(doc.getString("reviewStatus"))) return@mapNotNull null
                     Mission(
                         id = doc.id,
                         title = doc.localizedString("title", LanguagePreference.current),

@@ -25,8 +25,12 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.DirectionsWalk
+import androidx.compose.material.icons.filled.Bookmark
+import androidx.compose.material.icons.filled.BookmarkBorder
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.EmojiEvents
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Flag
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Place
@@ -64,6 +68,7 @@ import com.google.firebase.auth.auth
 import com.google.firebase.firestore.firestore
 import smu.ai.graduation_project.R
 import smu.ai.graduation_project.data.LanguagePreference
+import smu.ai.graduation_project.data.MissionEngagement
 import smu.ai.graduation_project.data.localizedString
 import smu.ai.graduation_project.domain.GeoDistance
 import smu.ai.graduation_project.model.Mission
@@ -89,6 +94,8 @@ fun MissionDetailScreen(
     var userMissionStatus by remember { mutableStateOf("미 진행") }
     var isStarting by remember { mutableStateOf(false) }
     var userLatLng by remember { mutableStateOf<Pair<Double, Double>?>(null) }
+    var isLiked by remember { mutableStateOf(false) }
+    var isBookmarked by remember { mutableStateOf(false) }
     val missionTitlePlaceholder = stringResource(R.string.mission_no_title)
     val toastLoginRequired = stringResource(R.string.toast_login_required)
     val toastAlreadyCompleted = stringResource(R.string.toast_already_completed)
@@ -125,7 +132,9 @@ fun MissionDetailScreen(
                     points = doc.getLong("points")?.toInt() ?: 0,
                     category = doc.getString("category") ?: "투어",
                     latitude = location?.latitude,
-                    longitude = location?.longitude
+                    longitude = location?.longitude,
+                    likeCount = doc.getLong("likeCount")?.toInt() ?: 0,
+                    bookmarkCount = doc.getLong("bookmarkCount")?.toInt() ?: 0
                 )
             }
         }
@@ -143,7 +152,33 @@ fun MissionDetailScreen(
                         else -> "미 진행"
                     }
                 }
+            db.collection("mission_likes").document("${uid}_$missionId").get()
+                .addOnSuccessListener { isLiked = it.exists() }
+            db.collection("mission_bookmarks").document("${uid}_$missionId").get()
+                .addOnSuccessListener { isBookmarked = it.exists() }
         }
+    }
+
+    fun toggleLike() {
+        val uid = user?.uid ?: run {
+            Toast.makeText(context, toastLoginRequired, Toast.LENGTH_SHORT).show()
+            return
+        }
+        val nowLiked = !isLiked
+        isLiked = nowLiked
+        mission = mission?.let { it.copy(likeCount = (it.likeCount + if (nowLiked) 1 else -1).coerceAtLeast(0)) }
+        MissionEngagement.setLiked(db, uid, missionId, nowLiked, onComplete = {}, onError = {})
+    }
+
+    fun toggleBookmark() {
+        val uid = user?.uid ?: run {
+            Toast.makeText(context, toastLoginRequired, Toast.LENGTH_SHORT).show()
+            return
+        }
+        val nowBookmarked = !isBookmarked
+        isBookmarked = nowBookmarked
+        mission = mission?.let { it.copy(bookmarkCount = (it.bookmarkCount + if (nowBookmarked) 1 else -1).coerceAtLeast(0)) }
+        MissionEngagement.setBookmarked(db, uid, missionId, nowBookmarked, onComplete = {}, onError = {})
     }
 
     Scaffold(
@@ -237,6 +272,29 @@ fun MissionDetailScreen(
                     DetailChip(Icons.Default.EmojiEvents, "${currentMission.points}P", Color(0xFFFFF4E4), Orange)
                     distanceMeters?.let { meters ->
                         DetailChip(Icons.AutoMirrored.Filled.DirectionsWalk, GeoDistance.format(meters), Color(0xFFE9F6E7), Color(0xFF4E9A4B))
+                    }
+                }
+
+                Row(horizontalArrangement = Arrangement.spacedBy(18.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        IconButton(onClick = { toggleLike() }) {
+                            Icon(
+                                if (isLiked) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                                contentDescription = null,
+                                tint = if (isLiked) Color(0xFFE0537A) else Color.Gray
+                            )
+                        }
+                        Text("${currentMission.likeCount}", color = Color.Gray, fontSize = 13.sp)
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        IconButton(onClick = { toggleBookmark() }) {
+                            Icon(
+                                if (isBookmarked) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
+                                contentDescription = null,
+                                tint = if (isBookmarked) MainPurple else Color.Gray
+                            )
+                        }
+                        Text("${currentMission.bookmarkCount}", color = Color.Gray, fontSize = 13.sp)
                     }
                 }
 

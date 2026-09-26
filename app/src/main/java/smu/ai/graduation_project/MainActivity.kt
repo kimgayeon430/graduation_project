@@ -48,8 +48,10 @@ import smu.ai.graduation_project.navigation.Screen
 import smu.ai.graduation_project.ui.admin.AdminMissionEditScreen
 import smu.ai.graduation_project.ui.admin.AdminHomeScreen
 import smu.ai.graduation_project.ui.admin.AdminMissionListScreen
+import smu.ai.graduation_project.ui.admin.AdminMissionReviewScreen
 import smu.ai.graduation_project.ui.admin.AdminPhotoReviewScreen
 import smu.ai.graduation_project.ui.admin.AdminUserManagementScreen
+import smu.ai.graduation_project.ui.screens.BookmarkedMissionsScreen
 import smu.ai.graduation_project.ui.screens.CompletedMissionScreen
 import smu.ai.graduation_project.ui.screens.HomeScreen
 import smu.ai.graduation_project.ui.screens.InProgressMissionScreen
@@ -58,6 +60,8 @@ import smu.ai.graduation_project.ui.screens.LoginScreen
 import smu.ai.graduation_project.ui.screens.MissionDetailScreen
 import smu.ai.graduation_project.ui.screens.MissionListScreen
 import smu.ai.graduation_project.ui.screens.MissionPerformScreen
+import smu.ai.graduation_project.ui.screens.MissionProposalScreen
+import smu.ai.graduation_project.ui.screens.MyMissionsScreen
 import smu.ai.graduation_project.ui.screens.PointHistoryScreen
 import smu.ai.graduation_project.ui.screens.PreferenceScreen
 import smu.ai.graduation_project.ui.screens.ProfileScreen
@@ -289,7 +293,8 @@ private fun MainApp(onLogout: () -> Unit) {
                     AdminHomeScreen(
                         onNavigateToMissionManagement = { navController.navigate("admin/missions") },
                         onNavigateToUserManagement = { navController.navigate("admin/users") },
-                        onNavigateToPhotoReview = { navController.navigate("admin/photo_review") }
+                        onNavigateToPhotoReview = { navController.navigate("admin/photo_review") },
+                        onNavigateToMissionReview = { navController.navigate("admin/missions/review") }
                     )
                 } else {
                     LaunchedEffect(Unit) {
@@ -368,6 +373,30 @@ private fun MainApp(onLogout: () -> Unit) {
                     }
                 }
             }
+            composable("admin/missions/review") {
+                if (isAdmin) {
+                    AdminMissionReviewScreen(onNavigateBack = { navController.popBackStack() })
+                } else {
+                    LaunchedEffect(Unit) {
+                        android.widget.Toast.makeText(context, context.getString(R.string.toast_admin_only), android.widget.Toast.LENGTH_SHORT).show()
+                        navController.popBackStack()
+                    }
+                }
+            }
+            composable("mission_propose") {
+                MissionProposalScreen(
+                    missionId = null,
+                    onNavigateBack = { navController.popBackStack() },
+                    onSubmitSuccess = { navController.popBackStack() }
+                )
+            }
+            composable("mission_propose/{missionId}") { backStack ->
+                MissionProposalScreen(
+                    missionId = backStack.arguments?.getString("missionId"),
+                    onNavigateBack = { navController.popBackStack() },
+                    onSubmitSuccess = { navController.popBackStack() }
+                )
+            }
             composable(Screen.Ranking.route) { RankingScreen() }
             composable(Screen.Profile.route) {
                 ProfileScreen(
@@ -375,7 +404,9 @@ private fun MainApp(onLogout: () -> Unit) {
                     onNavigateToInProgressMissions = { navController.navigate("profile/in-progress") },
                     onNavigateToCompletedMissions = { navController.navigate("profile/completed") },
                     onNavigateToPointHistory = { navController.navigate("profile/points") },
-                    onNavigateToRanking = { navController.navigate(Screen.Ranking.route) }
+                    onNavigateToRanking = { navController.navigate(Screen.Ranking.route) },
+                    onNavigateToMyMissions = { navController.navigate("profile/my-missions") },
+                    onNavigateToBookmarkedMissions = { navController.navigate("profile/bookmarks") }
                 )
             }
             composable("profile/completed") {
@@ -386,6 +417,20 @@ private fun MainApp(onLogout: () -> Unit) {
             }
             composable("profile/points") {
                 PointHistoryScreen(onNavigateBack = { navController.popBackStack() })
+            }
+            composable("profile/my-missions") {
+                MyMissionsScreen(
+                    onNavigateBack = { navController.popBackStack() },
+                    onProposeNew = { navController.navigate("mission_propose") },
+                    onEditProposal = { navController.navigate("mission_propose/$it") },
+                    onViewApprovedMission = { navController.navigate("mission_detail/$it") }
+                )
+            }
+            composable("profile/bookmarks") {
+                BookmarkedMissionsScreen(
+                    onNavigateBack = { navController.popBackStack() },
+                    onMissionClick = { navController.navigate("mission_detail/$it") }
+                )
             }
         }
     }
