@@ -23,7 +23,20 @@ data class Mission(
     /** 예상 소요 시간(분). 관리자가 아직 입력하지 않은 기존 미션은 null — UI 는 null 이면 이 값을 숨긴다. */
     val estimatedMinutes: Int? = null,
     /** 이 사용자가 사진 인증에 실제로 제출한 사진(`user_missions.photoUrl`). [imageUrl](대표 이미지)과 다르다. */
-    val verifiedPhotoUrl: String? = null
+    val verifiedPhotoUrl: String? = null,
+    /** 이 미션을 제안한 사용자 uid. 관리자가 만든 미션(기존 문서 전부 포함)은 null. */
+    val creatorId: String? = null,
+    /** 제안 시점의 제안자 닉네임 스냅샷. */
+    val creatorName: String = "",
+    /** 검수 상태: pending(검수중) | approved(승인) | changes_requested(수정요청) | rejected(반려). 기존 문서는 필드가 없으므로 읽을 때 "approved"로 채운다. */
+    val reviewStatus: String = "approved",
+    /** 수정요청/반려 사유. 관리자가 검수 시 남긴다. */
+    val reviewNote: String? = null,
+    val likeCount: Int = 0,
+    val bookmarkCount: Int = 0,
+    /** 클라이언트에서 `mission_likes`/`mission_bookmarks` 조회로 병합만 하는 값. Firestore에는 저장하지 않는다. */
+    val isLikedByMe: Boolean = false,
+    val isBookmarkedByMe: Boolean = false
 )
 
 data class UserRank(
