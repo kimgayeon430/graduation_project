@@ -344,6 +344,9 @@
     <string name="bookmarked_missions_title">お気に入りミッション</string>
     <string name="bookmarked_missions_empty">お気に入りのミッションがありません。</string>
 
+    <!-- 좋아요/찜 -->
+    <string name="engagement_toast_failed">いいね・お気に入りの処理に失敗しました。通信状態をご確認ください。</string>
+
     <!-- 포인트 내역 -->
     <string name="point_history_title">ポイント履歴</string>
     <string name="point_history_mission_fallback">ミッション</string>

@@ -98,6 +98,7 @@ fun MissionDetailScreen(
     var isBookmarked by remember { mutableStateOf(false) }
     val missionTitlePlaceholder = stringResource(R.string.mission_no_title)
     val toastLoginRequired = stringResource(R.string.toast_login_required)
+    val engagementFailedMessage = stringResource(R.string.engagement_toast_failed)
     val toastAlreadyCompleted = stringResource(R.string.toast_already_completed)
     val toastSaveFailed = stringResource(R.string.toast_save_failed)
     val toastNoMapApp = stringResource(R.string.toast_no_map_app)
@@ -167,7 +168,14 @@ fun MissionDetailScreen(
         val nowLiked = !isLiked
         isLiked = nowLiked
         mission = mission?.let { it.copy(likeCount = (it.likeCount + if (nowLiked) 1 else -1).coerceAtLeast(0)) }
-        MissionEngagement.setLiked(db, uid, missionId, nowLiked, onComplete = {}, onError = {})
+        MissionEngagement.setLiked(db, uid, missionId, nowLiked,
+            onComplete = {},
+            onError = {
+                isLiked = !nowLiked
+                mission = mission?.let { it.copy(likeCount = (it.likeCount + if (nowLiked) -1 else 1).coerceAtLeast(0)) }
+                Toast.makeText(context, engagementFailedMessage, Toast.LENGTH_SHORT).show()
+            }
+        )
     }
 
     fun toggleBookmark() {
@@ -178,7 +186,14 @@ fun MissionDetailScreen(
         val nowBookmarked = !isBookmarked
         isBookmarked = nowBookmarked
         mission = mission?.let { it.copy(bookmarkCount = (it.bookmarkCount + if (nowBookmarked) 1 else -1).coerceAtLeast(0)) }
-        MissionEngagement.setBookmarked(db, uid, missionId, nowBookmarked, onComplete = {}, onError = {})
+        MissionEngagement.setBookmarked(db, uid, missionId, nowBookmarked,
+            onComplete = {},
+            onError = {
+                isBookmarked = !nowBookmarked
+                mission = mission?.let { it.copy(bookmarkCount = (it.bookmarkCount + if (nowBookmarked) -1 else 1).coerceAtLeast(0)) }
+                Toast.makeText(context, engagementFailedMessage, Toast.LENGTH_SHORT).show()
+            }
+        )
     }
 
     Scaffold(

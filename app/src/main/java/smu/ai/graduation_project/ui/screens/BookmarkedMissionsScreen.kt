@@ -1,5 +1,6 @@
 package smu.ai.graduation_project.ui.screens
 
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -39,6 +40,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -67,9 +69,11 @@ fun BookmarkedMissionsScreen(
 ) {
     val db = Firebase.firestore
     val uid = Firebase.auth.currentUser?.uid
+    val context = LocalContext.current
     var missions by remember { mutableStateOf<List<Mission>>(emptyList()) }
     var loading by remember { mutableStateOf(true) }
     val missionTitlePlaceholder = stringResource(R.string.mission_no_title)
+    val engagementFailedMessage = stringResource(R.string.engagement_toast_failed)
 
     LaunchedEffect(uid) {
         val currentUid = uid
@@ -164,9 +168,14 @@ fun BookmarkedMissionsScreen(
                         onClick = { onMissionClick(mission.id) },
                         onUnbookmark = {
                             val currentUid = uid ?: return@BookmarkedMissionCard
-                            MissionEngagement.setBookmarked(db, currentUid, mission.id, bookmarked = false, onComplete = {
-                                missions = missions.filterNot { it.id == mission.id }
-                            }, onError = {})
+                            MissionEngagement.setBookmarked(db, currentUid, mission.id, bookmarked = false,
+                                onComplete = {
+                                    missions = missions.filterNot { it.id == mission.id }
+                                },
+                                onError = {
+                                    Toast.makeText(context, engagementFailedMessage, Toast.LENGTH_SHORT).show()
+                                }
+                            )
                         }
                     )
                 }

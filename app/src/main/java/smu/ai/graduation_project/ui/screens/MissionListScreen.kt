@@ -1,5 +1,6 @@
 package smu.ai.graduation_project.ui.screens
 
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -50,6 +51,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -92,9 +94,11 @@ fun MissionListScreen(onMissionClick: (String) -> Unit) {
     var bookmarkedIds by remember { mutableStateOf<Set<String>>(emptySet()) }
     val db = Firebase.firestore
     val user = Firebase.auth.currentUser
+    val context = LocalContext.current
     val errorLoadMissions = stringResource(R.string.error_load_missions)
     val errorLoadProgress = stringResource(R.string.error_load_progress)
     val missionTitlePlaceholder = stringResource(R.string.mission_no_title)
+    val engagementFailedMessage = stringResource(R.string.engagement_toast_failed)
 
     LaunchedEffect(user?.uid) {
         val uid = user?.uid ?: return@LaunchedEffect
@@ -113,7 +117,16 @@ fun MissionListScreen(onMissionClick: (String) -> Unit) {
         val nowLiked = mission.id !in likedIds
         likedIds = if (nowLiked) likedIds + mission.id else likedIds - mission.id
         missions = missions.map { if (it.id == mission.id) it.copy(likeCount = (it.likeCount + if (nowLiked) 1 else -1).coerceAtLeast(0)) else it }
-        MissionEngagement.setLiked(db, uid, mission.id, nowLiked, onComplete = {}, onError = {})
+        MissionEngagement.setLiked(db, uid, mission.id, nowLiked,
+            onComplete = {},
+            onError = {
+                // 서버 반영 실패 — 낙관적으로 바꿔둔 상태를 되돌리고 알린다(안 그러면 화면을 나갔다
+                // 들어왔을 때 저장 안 된 상태로 조용히 돌아가 사용자에게는 "기록이 사라진" 것처럼 보인다).
+                likedIds = if (nowLiked) likedIds - mission.id else likedIds + mission.id
+                missions = missions.map { if (it.id == mission.id) it.copy(likeCount = (it.likeCount + if (nowLiked) -1 else 1).coerceAtLeast(0)) else it }
+                Toast.makeText(context, engagementFailedMessage, Toast.LENGTH_SHORT).show()
+            }
+        )
     }
 
     fun toggleBookmark(mission: Mission) {
@@ -121,7 +134,14 @@ fun MissionListScreen(onMissionClick: (String) -> Unit) {
         val nowBookmarked = mission.id !in bookmarkedIds
         bookmarkedIds = if (nowBookmarked) bookmarkedIds + mission.id else bookmarkedIds - mission.id
         missions = missions.map { if (it.id == mission.id) it.copy(bookmarkCount = (it.bookmarkCount + if (nowBookmarked) 1 else -1).coerceAtLeast(0)) else it }
-        MissionEngagement.setBookmarked(db, uid, mission.id, nowBookmarked, onComplete = {}, onError = {})
+        MissionEngagement.setBookmarked(db, uid, mission.id, nowBookmarked,
+            onComplete = {},
+            onError = {
+                bookmarkedIds = if (nowBookmarked) bookmarkedIds - mission.id else bookmarkedIds + mission.id
+                missions = missions.map { if (it.id == mission.id) it.copy(bookmarkCount = (it.bookmarkCount + if (nowBookmarked) -1 else 1).coerceAtLeast(0)) else it }
+                Toast.makeText(context, engagementFailedMessage, Toast.LENGTH_SHORT).show()
+            }
+        )
     }
 
     DisposableEffect(selectedCategory, user?.uid, reload) {

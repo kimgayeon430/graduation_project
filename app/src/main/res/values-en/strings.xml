@@ -344,6 +344,9 @@
     <string name="bookmarked_missions_title">Bookmarked Missions</string>
     <string name="bookmarked_missions_empty">No bookmarked missions yet.</string>
 
+    <!-- 좋아요/찜 -->
+    <string name="engagement_toast_failed">Couldn\'t save your like/bookmark. Please check your connection.</string>
+
     <!-- 포인트 내역 -->
     <string name="point_history_title">Point History</string>
     <string name="point_history_mission_fallback">Mission</string>
