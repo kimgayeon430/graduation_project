@@ -183,7 +183,7 @@ firebase.json         # Firebase CLI 설정 (규칙 배포)
   - `mission_likes`/`mission_bookmarks`: 문서 ID를 `{uid}_{missionId}` 형식으로 강제해 중복 반응을 구조적으로 막는다. 생성/삭제는 본인 문서만, 좋아요는 공개 읽기·찜은 본인만 읽기
   - `users/{uid}`: 본인 또는 관리자만 수정, 삭제 불가
   - `user_missions/{id}`: 생성은 본인 문서만, 수정은 본인 또는 관리자. (예전엔 "사용자는 자기 `photoNeedsReview` 를 true→false 로 되돌릴 수 없음" 조건도 있었으나, 검수 대기 중 재인증해 정상적으로 `PASS` 가 나온 흐름까지 함께 막는 버그가 실기기에서 드러나 제거했다 — 6.8.3)
-- **테스트**: `firestore-tests/` 에서 에뮬레이터 + `@firebase/rules-unit-testing` 으로 37건 검증(8.1절) — 사용자 미션 제안·좋아요·찜 관련 17건 포함.
+- **테스트**: `firestore-tests/` 에서 에뮬레이터 + `@firebase/rules-unit-testing` 으로 38건 검증(8.1절) — 사용자 미션 제안·좋아요·찜 관련 18건 포함.
 - **한계**: 서버(Cloud Functions)가 없어 포인트 지급/회수, `likeCount`/`bookmarkCount` 값 자체는 완전히 검증하지 못한다(문서 존재로 "반응 여부"는 강제하지만, 카운터 필드 자체를 임의로 증가시키는 것까지는 못 막음 — 기존 `completionCount` 와 같은 한계). 서버측 검증은 향후 과제다. (10장)
 
 ---
@@ -343,7 +343,7 @@ PASS 판정 결과 화면 하단에 "다음에는 이런 미션 어때요?" 카�
 
 **재제출** — "수정 요청" 상태에서만 제안자가 `MissionProposalScreen`을 다시 열어 내용을 고치고 제출할 수 있다("반려"는 재제출 대상이 아니다). 재제출은 `reviewStatus`를 `pending`으로 되돌릴 뿐 `points`/`creatorId`는 절대 건드리지 않는다.
 
-**보안 규칙 설계** — 클라이언트가 Firestore를 직접 쓰는 구조라(3.6절), 위 정책은 규칙으로도 강제해야 실제로 우회 불가능하다. 생성 규칙은 `creatorId == 본인 uid`·`reviewStatus == 'pending'`·`points == 0` 세 조건을 모두 요구해 사용자가 자기 미션을 바로 승인하거나 포인트를 스스로 매길 수 없게 한다. 재제출 규칙은 현재 상태가 `changes_requested`일 때만 허용하고, 쓰는 값 중 `points`/`creatorId`가 기존과 같아야 한다는 조건을 별도로 걸어 우회를 막는다. `firestore-tests/rules.test.js`에 17건을 추가해(총 37건) 에뮬레이터로 실제 검증했다(3.6·8.1절).
+**보안 규칙 설계** — 클라이언트가 Firestore를 직접 쓰는 구조라(3.6절), 위 정책은 규칙으로도 강제해야 실제로 우회 불가능하다. 생성 규칙은 `creatorId == 본인 uid`·`reviewStatus == 'pending'`·`points == 0` 세 조건을 모두 요구해 사용자가 자기 미션을 바로 승인하거나 포인트를 스스로 매길 수 없게 한다. 여기에 `request.resource.data.keys().hasOnly([...])`로 생성 시 쓸 수 있는 필드 자체를 화이트리스트로 제한했다 — 그렇지 않으면 세 조건만 만족시키고도 생성 시점에 `completionCount`/`likeCount` 같은 인기도 카운터를 원하는 값으로 미리 끼워 넣을 수 있었다(승인 전에는 목록에 안 보이지만, 검수 화면이 그 필드를 보여주지 않으므로 관리자가 못 보고 승인해버릴 위험이 있었다). 재제출 규칙은 현재 상태가 `changes_requested`일 때만 허용하고, 쓰는 값 중 `points`/`creatorId`가 기존과 같아야 한다는 조건을 별도로 걸어 우회를 막는다. `firestore-tests/rules.test.js`에 18건을 추가해(총 38건, 필드 화이트리스트 위반 시도 포함) 에뮬레이터로 실제 검증했다(3.6·8.1절).
 
 **좋아요 / 찜(`MissionEngagement`)** — 두 반응 모두 `mission_likes`/`mission_bookmarks` 컬렉션에 문서 ID를 `{uid}_{missionId}`로 고정해 저장한다. 이 설계만으로 "사용자당 미션당 최대 1건"이 구조적으로 보장되어 중복 방지 로직을 따로 클라이언트에 둘 필요가 없고, 취소는 그 문서를 지우기만 하면 된다. 문서 생성/삭제와 `missions.{likeCount|bookmarkCount}` 증감을 하나의 `WriteBatch`로 묶어 카운터가 반응 문서 존재 여부와 항상 같이 움직이게 했다. 좋아요는 "공개적인 추천"이라 목록에서 지금 몇 명이 좋아하는지 누구나 보게 했고, 찜은 "개인 저장"이라 본인만 읽을 수 있게 규칙을 다르게 뒀다. 좋아요/찜 버튼은 미션 목록 카드와 미션 상세 화면에 추가했고, 지도 화면의 정보창은 네이버 지도가 살아있는 뷰가 아니라 비트맵만 받는 구조라(4.2절 한계) 버튼을 얹지 않았다.
 
@@ -750,7 +750,7 @@ PASS 판정 직후 결과 화면(6.8.2)이 뜨기 전에 짧게(2.2~3.2초) 보�
 - [x] 홈 추천 카드·미션 상세 화면에 실제 거리 표시(`GeoDistance.format`), 미션 상세 화면 "길찾기" 버튼(`geo:` Intent) — 실기기 미검증
 - [x] 사용자 미션 제안(제목·설명·카테고리·예상 소요시간·대표 이미지·지도 탭 위치 선택) → 관리자 검수(승인 시 포인트 확정/수정요청/반려, 사유는 제안자에게 노출) → 승인된 미션만 목록·지도·추천에 노출(4.8절). `MissionReviewStatus` 순수 로직 + 단위 테스트, `MissionEngagement`(좋아요·찜 토글) 신규
 - [x] 좋아요/찜 — 모든 미션에 추가, 문서 ID 고정(`{uid}_{missionId}`)으로 중복 방지, 미션 목록/상세 화면에 버튼과 카운트 표시, 마이페이지 "내가 만든 미션"·"찜한 미션" 전용 화면(4.8절)
-- [x] `firestore.rules` 에 사용자 제안 생성/재제출·좋아요·찜 권한 추가, 에뮬레이터 테스트 17건 추가(총 37건) — 자기 승인·포인트 자가 설정·타인 명의 반응 생성이 모두 거부됨을 확인(3.6·4.8·8.1절)
+- [x] `firestore.rules` 에 사용자 제안 생성/재제출·좋아요·찜 권한 추가, 에뮬레이터 테스트 18건 추가(총 38건) — 자기 승인·포인트 자가 설정·타인 명의 반응 생성이 모두 거부됨을 확인(3.6·4.8·8.1절)
 - [ ] 위 미션 제안·검수·좋아요/찜 기능은 컴파일·단위 테스트·Firestore 규칙 에뮬레이터 테스트만 확인했고 실기기 화면은 아직 보지 못함 — 지도 탭 위치 선택, 갤러리 이미지 업로드, 검수 승인/반려 플로우를 실제로 확인할 것
 
 ### 7.2 남은 작업
@@ -793,7 +793,7 @@ PASS 판정 직후 결과 화면(6.8.2)이 뜨기 전에 짧게(2.2~3.2초) 보�
 ### 8.1 도메인 규칙 · 보안 규칙
 
 - **JUnit4 단위 테스트**로 거리·보상·완료·취향·추천·사진 판정·미션 검수 상태 규칙을 검증한다(경계값 포함). 사진 인증: `PhotoVerificationTest`, `PhotoGateTest`. 추천: `MissionFeaturesTest`, `LearnedRerankerTest`, `MissionRecommenderRerankedTest`. 미션 제안 검수: `MissionReviewStatusTest`(4.8절).
-- **Firestore 보안 규칙 테스트** (`firestore-tests/`, `@firebase/rules-unit-testing` + 에뮬레이터, 37건): 게스트/일반/관리자 컨텍스트로 `admins`·`missions`·`users`·`user_missions`·`mission_likes`·`mission_bookmarks` 의 읽기·쓰기 허용/거부를 검증한다. 핵심: 일반 사용자가 `missions.completionCount`/`likeCount`/`bookmarkCount` 외 필드를 못 바꾸고, 남의 진행 문서는 못 건드리며, 미션 제안 시 `points`/`reviewStatus` 를 스스로 정하거나 재제출 중 바꿀 수 없고, 좋아요/찜은 문서 ID 형식(`{uid}_{missionId}`) 위반이나 타인 명의 생성이 모두 거부된다(4.8절). (`photoNeedsReview` true→false 차단 테스트는 실사용 버그로 6.8.3 에서 반대로 뒤집었다 — 이제 본인 진행 문서 재인증으로 통과할 수 있다)
+- **Firestore 보안 규칙 테스트** (`firestore-tests/`, `@firebase/rules-unit-testing` + 에뮬레이터, 38건): 게스트/일반/관리자 컨텍스트로 `admins`·`missions`·`users`·`user_missions`·`mission_likes`·`mission_bookmarks` 의 읽기·쓰기 허용/거부를 검증한다. 핵심: 일반 사용자가 `missions.completionCount`/`likeCount`/`bookmarkCount` 외 필드를 못 바꾸고, 남의 진행 문서는 못 건드리며, 미션 제안 시 `points`/`reviewStatus` 를 스스로 정하거나 재제출 중 바꿀 수 없고, 좋아요/찜은 문서 ID 형식(`{uid}_{missionId}`) 위반이나 타인 명의 생성이 모두 거부된다(4.8절). (`photoNeedsReview` true→false 차단 테스트는 실사용 버그로 6.8.3 에서 반대로 뒤집었다 — 이제 본인 진행 문서 재인증으로 통과할 수 있다)
 - ViewModel 레벨 테스트는 `android.net.Uri`·`android.location.Location` 의존으로 순수 JUnit 에서 불가하며, Robolectric 도입은 향후 과제로 둔다.
 
 ### 8.2 사진 인증 모델
@@ -889,7 +889,7 @@ NDCG@5 +0.033 으로 이득의 대부분을 가져온다.
   - `b08d60e` 미션 제안·검수 화면(`MissionProposalScreen`/`AdminMissionReviewScreen`)과 찜한 미션 화면 추가, 보안 규칙 반영
   - `ddf8e27` 미션 제안·검수·좋아요·찜 화면을 내비게이션에 연결, 목록/추천에서 미승인 미션 제외, 좋아요·찜 버튼 추가
   - `cf05d08` 위 화면들 한국어/영어/일본어 문구 추가
-  - `05c8469` 미션 제안·좋아요·찜 Firestore 보안 규칙 테스트 17건 추가(총 37건, 4.8절)
+  - `05c8469` 미션 제안·좋아요·찜 Firestore 보안 규칙 테스트 18건 추가(총 38건, 4.8절)
 
 ---
 

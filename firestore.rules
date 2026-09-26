@@ -35,8 +35,9 @@ service cloud.firestore {
     // 예외 1: 로그인 사용자는 completionCount/likeCount/bookmarkCount 필드만 바꿀 수 있다
     //   (미션 완료·좋아요·찜 시 인기도 신호 갱신). completionCount 와 마찬가지로 서버 검증이 없어
     //   값 자체의 위조까지는 막지 못한다(10장 한계, 기존과 동일한 신뢰 모델).
-    // 예외 2: 로그인 사용자는 본인이 제안자(creatorId)인 미션을 pending 상태·points=0 으로 생성할 수
-    //   있다 — 포인트는 관리자가 검수 승인 시에만 정할 수 있다.
+    // 예외 2: 로그인 사용자는 본인이 제안자(creatorId)인 미션을 pending 상태·points=0 으로, 정해진
+    //   필드만 넣어 생성할 수 있다 — 포인트는 관리자가 검수 승인 시에만 정하고, completionCount 같은
+    //   인기도 카운터를 생성 시점에 미리 조작해 넣는 것도 필드 화이트리스트로 막는다.
     // 예외 3: 제안자는 관리자가 "수정 요청"(changes_requested)한 자신의 미션을 pending 으로
     //   되돌리며(=재제출) 수정할 수 있다. 이때도 points/creatorId 는 못 바꾸고, 카운터 필드도 못 건든다.
     match /missions/{missionId} {
@@ -45,7 +46,11 @@ service cloud.firestore {
         || (signedIn()
             && request.resource.data.creatorId == request.auth.uid
             && request.resource.data.reviewStatus == 'pending'
-            && request.resource.data.points == 0);
+            && request.resource.data.points == 0
+            && request.resource.data.keys().hasOnly([
+                 'title', 'desc', 'category', 'imageUrl', 'estimatedMinutes',
+                 'location', 'creatorId', 'creatorName', 'reviewStatus', 'points'
+               ]));
       allow delete: if isAdmin();
       allow update: if isAdmin()
         || (signedIn() && onlyChanged(['completionCount', 'likeCount', 'bookmarkCount']))

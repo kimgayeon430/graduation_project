@@ -190,6 +190,16 @@ describe("missions/{id} — 사용자 제안", () => {
       title: "제안", category: "투어", points: 0, creatorId: "alice", reviewStatus: "approved",
     }));
   });
+  test("생성 시 정해진 필드 외에 completionCount 등을 미리 끼워 넣을 수 없다", async () => {
+    await assertFails(setDoc(doc(asUser("alice"), "missions", "p1"), {
+      title: "제안", category: "투어", points: 0, creatorId: "alice", reviewStatus: "pending",
+      completionCount: 9999,
+    }));
+    await assertFails(setDoc(doc(asUser("alice"), "missions", "p2"), {
+      title: "제안", category: "투어", points: 0, creatorId: "alice", reviewStatus: "pending",
+      likeCount: 9999,
+    }));
+  });
   test("남의 이름으로 creatorId를 지정할 수 없다", async () => {
     await assertFails(setDoc(doc(asUser("alice"), "missions", "p1"), {
       title: "제안", category: "투어", points: 0, creatorId: "mallory", reviewStatus: "pending",

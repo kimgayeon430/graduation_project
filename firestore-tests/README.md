@@ -1,7 +1,7 @@
 # Firestore 보안 규칙 테스트
 
 `../firestore.rules` 를 Firestore 에뮬레이터에 올려 `@firebase/rules-unit-testing` 으로 검증한다.
-`assertSucceeds` / `assertFails` 37건 (`rules.test.js`).
+`assertSucceeds` / `assertFails` 38건 (`rules.test.js`).
 
 ## 실행
 
