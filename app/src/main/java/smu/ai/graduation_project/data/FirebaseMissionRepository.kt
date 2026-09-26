@@ -13,6 +13,15 @@ import smu.ai.graduation_project.domain.PhotoVerificationConfig
 import java.util.Calendar
 import java.util.concurrent.Executors
 
+/** [FirebaseMissionRepository.uploadPhotoAndComplete] 트랜잭션의 반환값. */
+private data class CompletionTxResult(
+    val pointsToGrant: Int,
+    val alreadyCompleted: Boolean,
+    val photoUrl: String,
+    /** 처음 완료할 때만 값이 있다(재제출/검수 대기는 null). */
+    val delta: MissionRewardCounters.Delta?
+)
+
 /**
  * [MissionRepository] 의 구현. 미션/진행 상태 데이터는 Firestore, 사진 파일은 Supabase Storage 를 쓴다.
  * 읽고 쓰는 Firestore 컬렉션·필드 구조는 이전과 동일하다.
@@ -266,33 +275,33 @@ class FirebaseMissionRepository : MissionRepository {
                             emptyMap()
                         }
                     )
-                    if (outcome.pointsToGrant > 0) {
-                        transaction.set(
-                            userRef,
-                            mapOf("points" to FieldValue.increment(outcome.pointsToGrant.toLong())),
-                            SetOptions.merge()
-                        )
-                    }
-                    // 이 사용자가 처음 완료할 때만 미션 인기도(completionCount) 를 올린다.
-                    if (outcome.countTowardPopularity) {
+                    // 이 사용자가 처음 완료할 때만: 포인트 지급 + 인기도(completionCount) + 배지/레벨용
+                    // 누적 카운터를 같은 트랜잭션 안에서 원자적으로 올린다. 재제출/검수 대기는 여기 안 온다.
+                    val delta = if (outcome.countTowardPopularity) {
                         transaction.set(
                             missionRef,
                             mapOf("completionCount" to FieldValue.increment(1L)),
                             SetOptions.merge()
                         )
-                    }
-                    Triple(outcome.pointsToGrant, alreadyCompleted, photoUrl)
+                        MissionRewardCounters.applyCompletion(
+                            transaction, userRef, missionCategory, outcome.pointsToGrant
+                        )
+                    } else null
+                    CompletionTxResult(outcome.pointsToGrant, alreadyCompleted, photoUrl, delta)
             }.addOnSuccessListener { result ->
                 onResult(
                     MissionRepository.CompleteResult(
-                        rewardGranted = result.first,
-                        alreadyCompleted = result.second,
-                        photoUrl = result.third,
+                        rewardGranted = result.pointsToGrant,
+                        alreadyCompleted = result.alreadyCompleted,
+                        photoUrl = result.photoUrl,
                         needsReview = needsReview,
                         matchScore = proceed.matchScore,
                         topLabel = proceed.topLabel,
                         modelVersion = proceed.modelVersion,
-                        similarity = proceed.similarity
+                        similarity = proceed.similarity,
+                        totalPointsAfter = result.delta?.totalPointsAfter ?: 0,
+                        weeklyCompletedAfter = result.delta?.weeklyCompletedAfter ?: 0,
+                        newlyUnlockedBadges = result.delta?.newlyUnlockedBadges ?: emptyList()
                     )
                 )
             }.addOnFailureListener { e ->

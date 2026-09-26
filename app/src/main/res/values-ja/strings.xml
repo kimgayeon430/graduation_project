@@ -124,6 +124,47 @@
     <string name="perform_celebration_subtitle">「%1$s」で今日の旅の一片を完成させました</string>
     <string name="perform_celebration_points_format">+%1$dP</string>
     <string name="perform_celebration_weekly_progress">今週のミッション %1$d/%2$d</string>
+    <string name="perform_celebration_level_up_badge">LEVEL UP!</string>
+    <string name="perform_celebration_level_up_desc">%1$s Lv.%2$dになりました。</string>
+    <string name="perform_celebration_badge_earned_one">新しいバッジを獲得しました!</string>
+    <string name="perform_celebration_badge_earned_many">新しいバッジを%1$d個獲得しました!</string>
+
+    <!-- 旅レベル(累積ポイント基準、TravelLevelPolicy) -->
+    <string name="level_name_1">旅の新芽</string>
+    <string name="level_name_2">街の探検家</string>
+    <string name="level_name_3">都市の旅人</string>
+    <string name="level_name_4">隠れた名所コレクター</string>
+    <string name="level_name_5">マスタートラベラー</string>
+    <string name="level_display_format">%1$s Lv.%2$d</string>
+    <string name="level_points_to_next">次のレベルまで%1$dP</string>
+    <string name="level_max_reached">最高レベルに到達しました!</string>
+
+    <!-- 旅バッジ3種 -->
+    <string name="badge_first_step_title">初めの一歩</string>
+    <string name="badge_first_step_unlocked">最初の旅の記録を残しました。</string>
+    <string name="badge_first_step_hint">ミッションを初めて完了すると獲得</string>
+    <string name="badge_weekly_explorer_title">週間探検家</string>
+    <string name="badge_weekly_explorer_unlocked">今週の目標を達成しました。</string>
+    <string name="badge_weekly_explorer_hint">1週間にミッションを5個完了すると獲得</string>
+    <string name="badge_taste_discovery_title">好みの発見</string>
+    <string name="badge_taste_discovery_unlocked">自分だけの旅の好みを見つけました。</string>
+    <string name="badge_taste_discovery_hint">同じカテゴリのミッションを3個完了すると獲得</string>
+
+    <!-- プロフィール画面: レベル/バッジ欄 -->
+    <string name="profile_level_section_title">旅レベル</string>
+    <string name="profile_badges_title">わたしの旅バッジ</string>
+    <string name="profile_badge_unlocked_on">%1$s獲得</string>
+
+    <!-- ミッション成功画面: 次のミッション推薦カード -->
+    <string name="perform_next_mission_title">次はこんなミッションはどうですか?</string>
+    <string name="perform_next_mission_duration_format">約%1$d分</string>
+    <string name="perform_next_mission_btn_start">このミッションを始める</string>
+    <string name="perform_next_mission_btn_skip">また今度</string>
+    <string name="perform_next_mission_empty_title">今日のミッションはすべて見終わりました。</string>
+    <string name="perform_next_mission_empty_desc">新しいミッションが追加されたらお知らせします。</string>
+
+    <!-- 管理者: ミッション編集画面 -->
+    <string name="admin_mission_field_duration_minutes">予想所要時間(分、任意)</string>
 
     <string name="perform_result_pass_title">ミッション認証完了</string>
     <string name="perform_result_pass_desc">AIがミッション条件に合う写真と確認しました。</string>

@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.DirectionsWalk
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.foundation.BorderStroke
@@ -22,6 +23,8 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.clickable
 import androidx.compose.ui.res.stringResource
 import smu.ai.graduation_project.R
+import smu.ai.graduation_project.domain.BadgeId
+import smu.ai.graduation_project.domain.TravelLevel
 import smu.ai.graduation_project.model.UserRank
 import smu.ai.graduation_project.ui.theme.*
 import java.util.Locale
@@ -70,6 +73,46 @@ fun recommendationReasonLabel(reason: String): String = when {
     reason == "인기 미션" -> stringResource(R.string.reco_reason_popular)
     reason == "지금 하기 좋은 시간" -> stringResource(R.string.reco_reason_good_time)
     else -> reason
+}
+
+/** [TravelLevel] 을 현재 언어의 표시용 이름으로 바꾼다("여행 새싹", "동네 탐험가" 등). */
+@Composable
+fun travelLevelLabel(level: TravelLevel): String = when (level) {
+    TravelLevel.SEEDLING -> stringResource(R.string.level_name_1)
+    TravelLevel.NEIGHBORHOOD_EXPLORER -> stringResource(R.string.level_name_2)
+    TravelLevel.CITY_TRAVELER -> stringResource(R.string.level_name_3)
+    TravelLevel.HIDDEN_GEM_COLLECTOR -> stringResource(R.string.level_name_4)
+    TravelLevel.MASTER_TRAVELER -> stringResource(R.string.level_name_5)
+}
+
+/** 배지 아이콘. 획득/미획득 모두 같은 아이콘을 쓰고 색만 달리한다(획득=보라, 미획득=회색+자물쇠). */
+fun badgeIcon(badgeId: BadgeId): ImageVector = when (badgeId) {
+    BadgeId.FIRST_STEP -> Icons.AutoMirrored.Filled.DirectionsWalk
+    BadgeId.WEEKLY_EXPLORER -> Icons.Default.Explore
+    BadgeId.TASTE_DISCOVERY -> Icons.Default.Favorite
+}
+
+@Composable
+fun badgeTitle(badgeId: BadgeId): String = when (badgeId) {
+    BadgeId.FIRST_STEP -> stringResource(R.string.badge_first_step_title)
+    BadgeId.WEEKLY_EXPLORER -> stringResource(R.string.badge_weekly_explorer_title)
+    BadgeId.TASTE_DISCOVERY -> stringResource(R.string.badge_taste_discovery_title)
+}
+
+/** 배지를 이미 획득했을 때 보여줄 축하 문구. */
+@Composable
+fun badgeUnlockedMessage(badgeId: BadgeId): String = when (badgeId) {
+    BadgeId.FIRST_STEP -> stringResource(R.string.badge_first_step_unlocked)
+    BadgeId.WEEKLY_EXPLORER -> stringResource(R.string.badge_weekly_explorer_unlocked)
+    BadgeId.TASTE_DISCOVERY -> stringResource(R.string.badge_taste_discovery_unlocked)
+}
+
+/** 아직 못 얻었을 때 보여줄 획득 조건 안내. */
+@Composable
+fun badgeLockedHint(badgeId: BadgeId): String = when (badgeId) {
+    BadgeId.FIRST_STEP -> stringResource(R.string.badge_first_step_hint)
+    BadgeId.WEEKLY_EXPLORER -> stringResource(R.string.badge_weekly_explorer_hint)
+    BadgeId.TASTE_DISCOVERY -> stringResource(R.string.badge_taste_discovery_hint)
 }
 
 @Composable

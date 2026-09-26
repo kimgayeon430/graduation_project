@@ -274,7 +274,8 @@ private fun MainApp(onLogout: () -> Unit) {
                             launchSingleTop = true
                             restoreState = true
                         }
-                    }
+                    },
+                    onNavigateToDetail = { navController.navigate("mission_detail/$it") }
                 )
             }
             composable("profile/in-progress") {

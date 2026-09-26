@@ -52,6 +52,7 @@ import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.SetOptions
 import com.google.firebase.firestore.firestore
 import smu.ai.graduation_project.R
+import smu.ai.graduation_project.data.MissionRewardCounters
 import smu.ai.graduation_project.domain.MissionCompletion
 import smu.ai.graduation_project.ui.theme.CardGray
 import smu.ai.graduation_project.ui.theme.MainPurple
@@ -161,20 +162,24 @@ fun AdminPhotoReviewScreen(onNavigateBack: () -> Unit) {
                 )
             )
             val uid = snapshot.getString("userId")
-            if (uid != null && outcome.pointsToGrant > 0) {
-                transaction.set(
-                    db.collection("users").document(uid),
-                    mapOf("points" to FieldValue.increment(outcome.pointsToGrant.toLong())),
-                    SetOptions.merge()
-                )
-            }
             val missionId = snapshot.getString("missionId")
-            if (missionId != null && outcome.countTowardPopularity) {
-                transaction.set(
-                    db.collection("missions").document(missionId),
-                    mapOf("completionCount" to FieldValue.increment(1L)),
-                    SetOptions.merge()
-                )
+            if (outcome.countTowardPopularity) {
+                if (missionId != null) {
+                    transaction.set(
+                        db.collection("missions").document(missionId),
+                        mapOf("completionCount" to FieldValue.increment(1L)),
+                        SetOptions.merge()
+                    )
+                }
+                // 승인 시점에도 사진 제출 즉시-완료 경로와 같은 카운터(배지/레벨용)를 원자적으로 올린다.
+                if (uid != null) {
+                    MissionRewardCounters.applyCompletion(
+                        transaction,
+                        db.collection("users").document(uid),
+                        item.missionCategory,
+                        outcome.pointsToGrant
+                    )
+                }
             }
             true
         }.addOnSuccessListener { done ->

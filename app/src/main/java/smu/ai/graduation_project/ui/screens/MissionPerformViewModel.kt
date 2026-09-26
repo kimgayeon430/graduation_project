@@ -13,13 +13,16 @@ import smu.ai.graduation_project.data.MissionRepository
 import smu.ai.graduation_project.data.OnnxPhotoVerifier
 import smu.ai.graduation_project.data.PhotoVerifier
 import smu.ai.graduation_project.data.getLocalizedString
+import smu.ai.graduation_project.domain.BadgeUnlockEvaluator
 import smu.ai.graduation_project.domain.LocationVerification
 import smu.ai.graduation_project.domain.MissionCompletion
 import smu.ai.graduation_project.domain.PhotoVerification
 import smu.ai.graduation_project.domain.PhotoVerificationConfig
+import smu.ai.graduation_project.domain.TravelLevelPolicy
 
-/** 성취 연출의 "이번 주 미션 N/5" 목표값. 홈 화면의 주간 진행률 카드와 같은 값을 쓴다. */
-private const val WEEKLY_MISSION_GOAL = 5
+/** 성취 연출 애니메이션 길이(ms). 레벨업/배지 획득처럼 더 보여줄 게 있으면 더 길게 튼다. */
+private const val CELEBRATION_DURATION_PLAIN_MS = 2200L
+private const val CELEBRATION_DURATION_RICH_MS = 3200L
 
 /**
  * 미션 수행 화면의 상태 보유 + Firebase 조회·위치 인증·사진 업로드·포인트 지급 흐름 조정.
@@ -280,22 +283,29 @@ class MissionPerformViewModel(
                             rejectReasonCode = null,
                             modelVersion = result.modelVersion
                         )
-                        repository.countMissionsCompletedThisWeek(uid!!) { weeklyCompleted ->
-                            uiState = uiState.copy(
-                                isUploading = false,
-                                missionCompleted = true,
-                                stage2RewardGranted = result.rewardGranted > 0,
-                                photoUrl = result.photoUrl,
-                                verificationText = str(R.string.perform_state_mission_completed),
-                                photoResult = builtResult,
-                                celebration = CelebrationUi(
-                                    missionTitle = state.missionTitle,
-                                    pointsGranted = result.rewardGranted,
-                                    weeklyCompleted = weeklyCompleted,
-                                    weeklyGoal = WEEKLY_MISSION_GOAL
-                                )
+                        val pointsBeforeGrant = result.totalPointsAfter - result.rewardGranted
+                        val levelBefore = TravelLevelPolicy.progressFor(pointsBeforeGrant).level
+                        val levelProgress = TravelLevelPolicy.progressFor(result.totalPointsAfter)
+                        val leveledUp = levelProgress.level != levelBefore
+                        val richContent = leveledUp || result.newlyUnlockedBadges.isNotEmpty()
+                        uiState = uiState.copy(
+                            isUploading = false,
+                            missionCompleted = true,
+                            stage2RewardGranted = result.rewardGranted > 0,
+                            photoUrl = result.photoUrl,
+                            verificationText = str(R.string.perform_state_mission_completed),
+                            photoResult = builtResult,
+                            celebration = CelebrationUi(
+                                missionTitle = state.missionTitle,
+                                pointsGranted = result.rewardGranted,
+                                weeklyCompleted = result.weeklyCompletedAfter,
+                                weeklyGoal = BadgeUnlockEvaluator.WEEKLY_EXPLORER_THRESHOLD,
+                                levelProgress = levelProgress,
+                                leveledUp = leveledUp,
+                                newlyUnlockedBadges = result.newlyUnlockedBadges,
+                                durationMillis = if (richContent) CELEBRATION_DURATION_RICH_MS else CELEBRATION_DURATION_PLAIN_MS
                             )
-                        }
+                        )
                     }
                 }
             },
@@ -382,7 +392,7 @@ class MissionPerformViewModel(
         uiState = uiState.copy(photoResult = null)
     }
 
-    // ---- 성취 연출(PASS 전용, 약 2.2초) --------------------------------------
+    // ---- 성취 연출(PASS 전용, 2.2~3.2초) --------------------------------------
 
     /** 연출 애니메이션이 끝나면 화면이 호출한다 — 결과 화면(이미 준비돼 있음)으로 이어진다. */
     fun onCelebrationFinished() {

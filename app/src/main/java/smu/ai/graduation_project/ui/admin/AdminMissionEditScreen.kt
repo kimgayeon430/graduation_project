@@ -57,6 +57,7 @@ fun AdminMissionEditScreen(
     var category by remember { mutableStateOf("투어") }
     var points by remember { mutableIntStateOf(100) }
     var imageUrl by remember { mutableStateOf("") }
+    var estimatedMinutes by remember { mutableStateOf("") }
     var latitude by remember { mutableStateOf("") }
     var longitude by remember { mutableStateOf("") }
     var isSaving by remember { mutableStateOf(false) }
@@ -69,6 +70,7 @@ fun AdminMissionEditScreen(
                 category = doc.getString("category") ?: "투어"
                 points = doc.getLong("points")?.toInt() ?: 100
                 imageUrl = doc.getString("imageUrl").orEmpty()
+                estimatedMinutes = doc.getLong("estimatedMinutes")?.toString().orEmpty()
                 doc.getGeoPoint("location")?.let {
                     latitude = it.latitude.toString()
                     longitude = it.longitude.toString()
@@ -104,6 +106,12 @@ fun AdminMissionEditScreen(
             OutlinedTextField(category, { category = it }, modifier = Modifier.fillMaxWidth(), label = { Text(stringResource(R.string.admin_mission_field_category)) })
             OutlinedTextField(points.toString(), { points = it.toIntOrNull() ?: 0 }, modifier = Modifier.fillMaxWidth(), label = { Text(stringResource(R.string.admin_mission_field_points)) })
             OutlinedTextField(imageUrl, { imageUrl = it }, modifier = Modifier.fillMaxWidth(), label = { Text(stringResource(R.string.admin_mission_field_image_url)) })
+            OutlinedTextField(
+                estimatedMinutes,
+                { estimatedMinutes = it.filter { ch -> ch.isDigit() } },
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text(stringResource(R.string.admin_mission_field_duration_minutes)) }
+            )
 
             Text(stringResource(R.string.admin_mission_field_location_section), fontWeight = FontWeight.Bold)
             OutlinedTextField(latitude, { latitude = it }, modifier = Modifier.fillMaxWidth(), label = { Text(stringResource(R.string.admin_mission_field_latitude)) })
@@ -138,6 +146,10 @@ fun AdminMissionEditScreen(
                         put("category", category.trim())
                         put("points", points)
                         put("imageUrl", imageUrl.trim())
+                        when (val minutes = estimatedMinutes.toIntOrNull()) {
+                            null -> if (isEdit) put("estimatedMinutes", FieldValue.delete())
+                            else -> put("estimatedMinutes", minutes)
+                        }
                         when {
                             lat != null && lng != null -> put("location", GeoPoint(lat, lng))
                             isEdit -> put("location", FieldValue.delete())

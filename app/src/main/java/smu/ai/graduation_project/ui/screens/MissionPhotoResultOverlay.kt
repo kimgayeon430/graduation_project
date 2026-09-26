@@ -35,6 +35,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -48,6 +49,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
@@ -67,8 +69,15 @@ import kotlin.math.roundToInt
 import kotlin.math.sin
 import kotlin.random.Random
 import smu.ai.graduation_project.R
+import smu.ai.graduation_project.domain.LevelProgress
 import smu.ai.graduation_project.domain.PhotoVerification
+import smu.ai.graduation_project.ui.components.NextMissionEmptyCard
+import smu.ai.graduation_project.ui.components.NextMissionRecommendationCard
+import smu.ai.graduation_project.ui.components.RecommendedMissionUi
+import smu.ai.graduation_project.ui.components.badgeIcon
+import smu.ai.graduation_project.ui.components.badgeTitle
 import smu.ai.graduation_project.ui.components.categoryLabel
+import smu.ai.graduation_project.ui.components.travelLevelLabel
 import smu.ai.graduation_project.ui.theme.CardGray
 import smu.ai.graduation_project.ui.theme.LightPurple
 import smu.ai.graduation_project.ui.theme.MainPurple
@@ -107,7 +116,7 @@ fun MissionPhotoAnalyzingOverlay() {
 }
 
 /**
- * PASS 판정 직후 약 2.2초 보여주는 성취 연출. [PhotoResultUi] 화면은 이미 준비돼 있고,
+ * PASS 판정 직후 2.2~3.2초 보여주는 성취 연출. [PhotoResultUi] 화면은 이미 준비돼 있고,
  * 애니메이션이 끝나면 화면(타이머)이 [MissionPerformViewModel.onCelebrationFinished] 를 불러
  * 이 연출을 닫으면 그 결과 화면이 자연스럽게 이어서 보인다.
  */
@@ -117,8 +126,14 @@ fun MissionSuccessCelebrationOverlay(celebration: CelebrationUi) {
     val progress = remember { Animatable(0f) }
     LaunchedEffect(Unit) {
         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-        progress.animateTo(1f, animationSpec = tween(durationMillis = 2200, easing = LinearEasing))
+        progress.animateTo(1f, animationSpec = tween(durationMillis = celebration.durationMillis.toInt(), easing = LinearEasing))
     }
+    val extrasVisible = progress.value > 0.35f
+    val extrasAlpha by animateFloatAsState(
+        targetValue = if (extrasVisible) 1f else 0f,
+        animationSpec = tween(durationMillis = 400),
+        label = "celebrationExtrasAlpha"
+    )
 
     val badgeScale by animateFloatAsState(
         targetValue = if (progress.value > 0.03f) 1f else 0f,
@@ -199,6 +214,111 @@ fun MissionSuccessCelebrationOverlay(celebration: CelebrationUi) {
                 color = Color.Gray,
                 fontSize = 13.sp
             )
+
+            Column(
+                modifier = Modifier.alpha(extrasAlpha),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                if (celebration.leveledUp) {
+                    Spacer(modifier = Modifier.height(20.dp))
+                    Surface(color = MainPurple, shape = RoundedCornerShape(100.dp)) {
+                        Text(
+                            stringResource(R.string.perform_celebration_level_up_badge),
+                            color = Color.White,
+                            fontWeight = FontWeight.ExtraBold,
+                            fontSize = 13.sp,
+                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        stringResource(
+                            R.string.perform_celebration_level_up_desc,
+                            travelLevelLabel(celebration.levelProgress.level),
+                            celebration.levelProgress.level.number
+                        ),
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 15.sp,
+                        color = Color(0xFF2C2C2C)
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+                LevelProgressCard(celebration.levelProgress)
+
+                if (celebration.newlyUnlockedBadges.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(14.dp))
+                    Text(
+                        if (celebration.newlyUnlockedBadges.size == 1) {
+                            stringResource(R.string.perform_celebration_badge_earned_one)
+                        } else {
+                            stringResource(R.string.perform_celebration_badge_earned_many, celebration.newlyUnlockedBadges.size)
+                        },
+                        color = Color.Gray,
+                        fontSize = 12.sp
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        celebration.newlyUnlockedBadges.forEach { badge ->
+                            Surface(color = Color.White, shape = RoundedCornerShape(14.dp)) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(badgeIcon(badge), null, tint = MainPurple, modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(badgeTitle(badge), color = MainPurple, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** 성취 연출·프로필 화면이 함께 쓰는 레벨 진행 카드(레벨명 · 포인트 · 진행률 바 · 다음 레벨까지). */
+@Composable
+fun LevelProgressCard(levelProgress: LevelProgress, modifier: Modifier = Modifier) {
+    Surface(
+        modifier = modifier.fillMaxWidth(0.85f),
+        color = Color.White,
+        shape = RoundedCornerShape(16.dp)
+    ) {
+        Column(modifier = Modifier.padding(14.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    stringResource(R.string.level_display_format, travelLevelLabel(levelProgress.level), levelProgress.level.number),
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 14.sp,
+                    color = Color(0xFF2C2C2C)
+                )
+                Text(
+                    if (levelProgress.isMaxLevel) {
+                        stringResource(R.string.level_max_reached)
+                    } else {
+                        stringResource(R.string.level_points_to_next, levelProgress.pointsToNextLevel ?: 0)
+                    },
+                    fontSize = 12.sp,
+                    color = MainPurple,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+            LinearProgressIndicator(
+                progress = { levelProgress.progressRatio },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(8.dp)
+                    .clip(RoundedCornerShape(100.dp)),
+                color = MainPurple,
+                trackColor = LightPurple
+            )
         }
     }
 }
@@ -242,7 +362,13 @@ private fun DrawScope.drawConfettiParticle(particle: ConfettiParticle, progress:
 fun MissionPhotoResultOverlay(
     result: PhotoResultUi,
     onPrimary: () -> Unit,
-    onSecondary: () -> Unit
+    onSecondary: () -> Unit,
+    /** PASS 일 때만 쓴다. 아직 추천을 못 불러왔으면 null(로딩 중엔 빈 카드/에러를 보여주지 않는다). */
+    recommendation: RecommendedMissionUi? = null,
+    /** true 가 되고 나서야 [recommendation] == null 을 "추천할 미션이 없음"으로 해석해 안내 문구를 보여준다. */
+    recommendationLoaded: Boolean = false,
+    onStartRecommendedMission: (String) -> Unit = {},
+    onSkipRecommendedMission: () -> Unit = {}
 ) {
     val accentColor = when (result.verdict) {
         PhotoVerdictUi.PASS -> MainPurple
@@ -426,6 +552,17 @@ fun MissionPhotoResultOverlay(
                     Text(stringResource(R.string.perform_result_btn_view_mission))
                 }
             }
+        }
+
+        if (result.verdict == PhotoVerdictUi.PASS && recommendationLoaded) {
+            Spacer(modifier = Modifier.height(24.dp))
+            recommendation?.let {
+                NextMissionRecommendationCard(
+                    recommendation = it,
+                    onStart = { onStartRecommendedMission(it.missionId) },
+                    onSkip = onSkipRecommendedMission
+                )
+            } ?: NextMissionEmptyCard()
         }
 
         Spacer(modifier = Modifier.height(24.dp))

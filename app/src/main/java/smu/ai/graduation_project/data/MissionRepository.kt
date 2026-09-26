@@ -1,6 +1,7 @@
 package smu.ai.graduation_project.data
 
 import com.google.firebase.firestore.GeoPoint
+import smu.ai.graduation_project.domain.BadgeId
 import smu.ai.graduation_project.domain.PhotoVerification
 import smu.ai.graduation_project.domain.PhotoVerificationConfig
 
@@ -51,7 +52,16 @@ interface MissionRepository {
         /** 모델이 낸 최상위 라벨. 모델을 못 불러왔으면 빈 문자열. */
         val topLabel: String = "",
         val modelVersion: String = "",
-        val similarity: Double? = null
+        val similarity: Double? = null,
+        /**
+         * 이 완료로 지급된 포인트까지 반영한 `users/{uid}.points` 총합. 이번이 "처음 완료"가 아니면
+         * (검수 대기, 중복 제출 등) 카운터를 건드리지 않으므로 지급 전 값과 같다.
+         */
+        val totalPointsAfter: Int = 0,
+        /** 이번 완료를 반영한, 이번 주(월요일 0시~) 완료 수. [smu.ai.graduation_project.data.MissionRewardCounters] 가 원자적으로 센다. */
+        val weeklyCompletedAfter: Int = 0,
+        /** 이번 완료로 새로 조건을 충족한 배지. 대부분 비어 있다. */
+        val newlyUnlockedBadges: List<BadgeId> = emptyList()
     )
 
     /** 사진 인증 완료 과정에서 어느 단계가 실패/거부됐는지 구분하기 위한 예외. */

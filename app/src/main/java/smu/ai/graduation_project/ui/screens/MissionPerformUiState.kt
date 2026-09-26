@@ -2,6 +2,8 @@ package smu.ai.graduation_project.ui.screens
 
 import android.net.Uri
 import com.google.firebase.firestore.GeoPoint
+import smu.ai.graduation_project.domain.BadgeId
+import smu.ai.graduation_project.domain.LevelProgress
 import smu.ai.graduation_project.domain.LocationVerification
 import smu.ai.graduation_project.domain.MissionRewardPolicy
 import smu.ai.graduation_project.domain.PhotoVerification
@@ -32,15 +34,23 @@ data class PhotoResultUi(
 )
 
 /**
- * PASS 판정 직후 짧게(약 2.2초) 보여주는 성취 연출에 필요한 값. 이 화면을 지나야
+ * PASS 판정 직후 짧게(2.2~3.2초) 보여주는 성취 연출에 필요한 값. 이 화면을 지나야
  * [PhotoResultUi] 결과 화면(이미 준비돼 있음)이 이어서 보인다.
  */
 data class CelebrationUi(
     val missionTitle: String,
     val pointsGranted: Int,
-    /** 이번 주(월요일 0시~) 완료한 미션 수. 조회 실패 시 0. */
+    /** 이번 완료를 반영한, 이번 주(월요일 0시~) 완료한 미션 수. */
     val weeklyCompleted: Int,
-    val weeklyGoal: Int
+    val weeklyGoal: Int,
+    /** 이번 완료 직후(포인트 반영 후) 레벨 진행 상태. */
+    val levelProgress: LevelProgress,
+    /** 이번 완료로 레벨이 올랐는지. true 면 "LEVEL UP!" 을 한 번만 보여준다. */
+    val leveledUp: Boolean,
+    /** 이번 완료로 새로 조건을 충족한 배지. 대부분 비어 있다. */
+    val newlyUnlockedBadges: List<BadgeId> = emptyList(),
+    /** 이 연출을 보여줄 시간(ms). 레벨업/배지 획득이 있으면 더 길게 튼다. */
+    val durationMillis: Long = 2200L
 )
 
 /**

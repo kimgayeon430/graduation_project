@@ -69,8 +69,17 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.google.firebase.Firebase
 import com.google.firebase.auth.auth
+import com.google.firebase.firestore.firestore
 import kotlinx.coroutines.delay
 import smu.ai.graduation_project.R
+import smu.ai.graduation_project.data.LanguagePreference
+import smu.ai.graduation_project.data.localizedString
+import smu.ai.graduation_project.domain.MissionCompletion
+import smu.ai.graduation_project.domain.MissionRecommender
+import smu.ai.graduation_project.domain.RecommendationContext
+import smu.ai.graduation_project.domain.TravelLevelPolicy
+import smu.ai.graduation_project.model.Mission
+import smu.ai.graduation_project.ui.components.RecommendedMissionUi
 import smu.ai.graduation_project.ui.theme.CardGray
 import smu.ai.graduation_project.ui.theme.LightPurple
 import smu.ai.graduation_project.ui.theme.MainPurple
@@ -94,6 +103,7 @@ fun MissionPerformScreen(
     onNavigateBack: () -> Unit,
     onNavigateToMissionList: () -> Unit = {},
     onNavigateToHome: () -> Unit = {},
+    onNavigateToDetail: (String) -> Unit = {},
     viewModel: MissionPerformViewModel = viewModel()
 ) {
     val context = LocalContext.current
@@ -123,12 +133,81 @@ fun MissionPerformScreen(
         }
     }
 
-    // 일회성 이벤트: 성취 연출은 버튼이 아니라 타이머로 끝난다(2.2초 애니메이션 + 여유).
+    // 일회성 이벤트: 성취 연출은 버튼이 아니라 타이머로 끝난다(연출 애니메이션 시간 + 여유 300ms).
     LaunchedEffect(state.celebration) {
-        if (state.celebration != null) {
-            delay(2500)
+        state.celebration?.let { celebration ->
+            delay(celebration.durationMillis + 300)
             viewModel.onCelebrationFinished()
         }
+    }
+
+    // PASS 결과 화면 하단의 "다음 추천 미션" 카드용 데이터. HomeScreen 과 같은 방식(화면에서 직접
+    // Firestore 조회)으로 후보를 모으고, 실제 순위는 MissionRecommender 를 그대로 재사용한다.
+    var recommendedMission by remember { mutableStateOf<RecommendedMissionUi?>(null) }
+    var recommendationLoaded by remember { mutableStateOf(false) }
+    LaunchedEffect(state.photoResult?.verdict, uid) {
+        if (state.photoResult?.verdict != PhotoVerdictUi.PASS || uid == null) return@LaunchedEffect
+        recommendationLoaded = false
+        recommendedMission = null
+        val db = Firebase.firestore
+        db.collection("missions").get().addOnSuccessListener { missionSnapshot ->
+            val allMissions = missionSnapshot.documents.mapNotNull { doc ->
+                if (doc.getString("title").isNullOrBlank()) return@mapNotNull null
+                Mission(
+                    id = doc.id,
+                    title = doc.localizedString("title", LanguagePreference.current),
+                    points = doc.getLong("points")?.toInt() ?: 0,
+                    category = doc.getString("category") ?: "투어",
+                    imageUrl = doc.getString("imageUrl").orEmpty(),
+                    estimatedMinutes = doc.getLong("estimatedMinutes")?.toInt()
+                )
+            }
+            val completionCounts = missionSnapshot.documents.associate { doc ->
+                doc.id to (doc.getLong("completionCount")?.toInt() ?: 0)
+            }
+            db.collection("users").document(uid).get().addOnSuccessListener { userDoc ->
+                @Suppress("UNCHECKED_CAST")
+                val preferences = (userDoc.get("preferences") as? List<String>).orEmpty()
+                val userLevel = TravelLevelPolicy.progressFor(userDoc.getLong("points")?.toInt() ?: 0).level.number
+                db.collection("user_missions").whereEqualTo("userId", uid).get()
+                    .addOnSuccessListener { userMissionsSnapshot ->
+                        // 방금 완료한 미션은 이 조회 시점에 이미 "완료" 로 반영돼 있지만, 혹시 모를 지연에
+                        // 대비해 missionId 를 한 번 더 명시적으로 제외한다.
+                        val completedIds = userMissionsSnapshot.documents
+                            .filter { MissionCompletion.isCompleted(it.getString("status").orEmpty()) }
+                            .mapNotNull { it.getString("missionId") }
+                            .toSet() + missionId
+                        val scored = MissionRecommender.recommendScored(
+                            missions = allMissions,
+                            context = RecommendationContext(
+                                preferredCategories = preferences.toSet(),
+                                completedCountByCategory = allMissions
+                                    .filter { it.id in completedIds }
+                                    .groupingBy { it.category }
+                                    .eachCount(),
+                                userLevel = userLevel,
+                                completionCountByMissionId = completionCounts,
+                                currentHour = java.time.LocalTime.now().hour
+                            ),
+                            completedMissionIds = completedIds,
+                            limit = 1
+                        )
+                        recommendedMission = scored.firstOrNull()?.let { s ->
+                            RecommendedMissionUi(
+                                missionId = s.mission.id,
+                                title = s.mission.title,
+                                imageUrl = s.mission.imageUrl,
+                                category = s.mission.category,
+                                points = s.mission.points,
+                                estimatedMinutes = s.mission.estimatedMinutes,
+                                reasons = s.reasons
+                            )
+                        }
+                        recommendationLoaded = true
+                    }
+                    .addOnFailureListener { recommendationLoaded = true }
+            }.addOnFailureListener { recommendationLoaded = true }
+        }.addOnFailureListener { recommendationLoaded = true }
     }
 
     // AI 분석 중 / 성취 연출(PASS 전용) / 분석 결과: 전체 화면으로 띄운다(단순 Toast 로 끝내지 않는다).
@@ -176,6 +255,16 @@ fun MissionPerformScreen(
                                 } else {
                                     viewModel.onPhotoResultAcknowledged()
                                 }
+                            },
+                            recommendation = recommendedMission,
+                            recommendationLoaded = recommendationLoaded,
+                            onStartRecommendedMission = { recommendedMissionId ->
+                                viewModel.onPhotoResultDismissed()
+                                onNavigateToDetail(recommendedMissionId)
+                            },
+                            onSkipRecommendedMission = {
+                                viewModel.onPhotoResultDismissed()
+                                onNavigateToHome()
                             }
                         )
                     }

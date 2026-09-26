@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -24,6 +25,7 @@ import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.Flag
 import androidx.compose.material.icons.filled.HourglassTop
 import androidx.compose.material.icons.filled.Language
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LocalFireDepartment
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Stars
@@ -32,6 +34,7 @@ import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
@@ -48,26 +51,37 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.google.firebase.Firebase
 import com.google.firebase.auth.auth
 import com.google.firebase.auth.userProfileChangeRequest
+import com.google.firebase.Timestamp
 import com.google.firebase.firestore.Query
 import com.google.firebase.firestore.firestore
 import smu.ai.graduation_project.R
 import smu.ai.graduation_project.data.AppLanguage
 import smu.ai.graduation_project.data.LanguagePreference
+import smu.ai.graduation_project.domain.BadgeId
+import smu.ai.graduation_project.domain.TravelLevelPolicy
 import smu.ai.graduation_project.ui.components.ProfileMenuItem
 import smu.ai.graduation_project.ui.components.StatCard
+import smu.ai.graduation_project.ui.components.badgeIcon
+import smu.ai.graduation_project.ui.components.badgeLockedHint
+import smu.ai.graduation_project.ui.components.badgeTitle
+import smu.ai.graduation_project.ui.components.travelLevelLabel
 import smu.ai.graduation_project.ui.theme.CardGray
 import smu.ai.graduation_project.ui.theme.LightPurple
 import smu.ai.graduation_project.ui.theme.MainPurple
 import smu.ai.graduation_project.ui.theme.Orange
+import java.text.SimpleDateFormat
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -91,6 +105,8 @@ fun ProfileScreen(
     var completedCount by remember { mutableIntStateOf(0) }
     var progressCount by remember { mutableIntStateOf(0) }
     var rank by remember { mutableIntStateOf(0) }
+    /** badgeId → 획득 시각(millis). 아직 못 얻은 배지는 맵에 없다. */
+    var unlockedBadges by remember { mutableStateOf<Map<BadgeId, Long?>>(emptyMap()) }
     var showNicknameDialog by remember { mutableStateOf(false) }
     var showLanguageDialog by remember { mutableStateOf(false) }
     var nicknameDraft by remember { mutableStateOf(nickname) }
@@ -103,6 +119,14 @@ fun ProfileScreen(
                     email = snapshot.getString("mail") ?: currentUser.email ?: guestEmail
                     level = snapshot.getString("level") ?: "Lv.1"
                     points = snapshot.getLong("points")?.toInt() ?: 0
+                    @Suppress("UNCHECKED_CAST")
+                    unlockedBadges = (snapshot.get("badges") as? List<Map<String, Any?>>)
+                        .orEmpty()
+                        .mapNotNull { entry ->
+                            val badge = (entry["badgeId"] as? String)?.let { BadgeId.fromId(it) } ?: return@mapNotNull null
+                            badge to (entry["unlockedAt"] as? Timestamp)?.toDate()?.time
+                        }
+                        .toMap()
                     if (!showNicknameDialog) {
                         nicknameDraft = nickname
                     }
@@ -204,6 +228,50 @@ fun ProfileScreen(
                 }
             }
 
+            val levelProgress = remember(points) { TravelLevelPolicy.progressFor(points) }
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                color = CardGray,
+                shape = RoundedCornerShape(20.dp)
+            ) {
+                Column(modifier = Modifier.padding(18.dp)) {
+                    Text(stringResource(R.string.profile_level_section_title), fontWeight = FontWeight.Bold, fontSize = 15.sp, color = Color.Gray)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            stringResource(R.string.level_display_format, travelLevelLabel(levelProgress.level), levelProgress.level.number),
+                            fontWeight = FontWeight.ExtraBold,
+                            fontSize = 18.sp,
+                            color = Color(0xFF2C2C2C)
+                        )
+                        Text(
+                            if (levelProgress.isMaxLevel) {
+                                stringResource(R.string.level_max_reached)
+                            } else {
+                                stringResource(R.string.level_points_to_next, levelProgress.pointsToNextLevel ?: 0)
+                            },
+                            fontSize = 13.sp,
+                            color = MainPurple,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(10.dp))
+                    LinearProgressIndicator(
+                        progress = { levelProgress.progressRatio },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(8.dp)
+                            .clip(CircleShape),
+                        color = MainPurple,
+                        trackColor = LightPurple
+                    )
+                }
+            }
+
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -271,6 +339,30 @@ fun ProfileScreen(
                             color = Color(0xFF444444),
                             fontSize = 13.sp
                         )
+                    }
+                }
+            }
+
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                color = Color.White,
+                shadowElevation = 1.dp,
+                shape = RoundedCornerShape(20.dp)
+            ) {
+                Column(modifier = Modifier.padding(18.dp)) {
+                    Text(stringResource(R.string.profile_badges_title), fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                    Spacer(modifier = Modifier.height(14.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceEvenly
+                    ) {
+                        BadgeId.entries.forEach { badgeId ->
+                            ProfileBadgeItem(
+                                badgeId = badgeId,
+                                unlockedAtMillis = unlockedBadges[badgeId],
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
                     }
                 }
             }
@@ -381,3 +473,50 @@ fun ProfileScreen(
         )
     }
 }
+
+/** 배지 1개. 획득했으면 보라색 아이콘 + 획득일, 아직이면 회색 실루엣 + 자물쇠 + 획득 조건. */
+@Composable
+private fun ProfileBadgeItem(badgeId: BadgeId, unlockedAtMillis: Long?, modifier: Modifier = Modifier) {
+    val unlocked = unlockedAtMillis != null
+    Column(
+        modifier = modifier,
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Box(
+            modifier = Modifier
+                .size(56.dp)
+                .background(if (unlocked) LightPurple else Color(0xFFEDEDED), CircleShape),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                if (unlocked) badgeIcon(badgeId) else Icons.Default.Lock,
+                null,
+                tint = if (unlocked) MainPurple else Color(0xFFAFAFAF),
+                modifier = Modifier.size(if (unlocked) 26.dp else 20.dp)
+            )
+        }
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(
+            badgeTitle(badgeId),
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Bold,
+            textAlign = TextAlign.Center,
+            color = if (unlocked) Color(0xFF2C2C2C) else Color.Gray
+        )
+        Spacer(modifier = Modifier.height(2.dp))
+        Text(
+            if (unlocked) {
+                stringResource(R.string.profile_badge_unlocked_on, formatBadgeDate(unlockedAtMillis))
+            } else {
+                badgeLockedHint(badgeId)
+            },
+            fontSize = 10.sp,
+            color = Color.Gray,
+            textAlign = TextAlign.Center,
+            lineHeight = 13.sp
+        )
+    }
+}
+
+private fun formatBadgeDate(millis: Long): String =
+    SimpleDateFormat("yyyy.MM.dd", Locale.KOREA).format(java.util.Date(millis))

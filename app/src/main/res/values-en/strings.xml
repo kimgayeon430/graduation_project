@@ -124,6 +124,47 @@
     <string name="perform_celebration_subtitle">You completed \"%1$s\" — one more piece of today\'s journey.</string>
     <string name="perform_celebration_points_format">+%1$dP</string>
     <string name="perform_celebration_weekly_progress">This week\'s missions %1$d/%2$d</string>
+    <string name="perform_celebration_level_up_badge">LEVEL UP!</string>
+    <string name="perform_celebration_level_up_desc">You\'re now %1$s Lv.%2$d.</string>
+    <string name="perform_celebration_badge_earned_one">You earned a new badge!</string>
+    <string name="perform_celebration_badge_earned_many">You earned %1$d new badges!</string>
+
+    <!-- Travel level (computed from cumulative points, TravelLevelPolicy) -->
+    <string name="level_name_1">Travel Sprout</string>
+    <string name="level_name_2">Neighborhood Explorer</string>
+    <string name="level_name_3">City Traveler</string>
+    <string name="level_name_4">Hidden Gem Collector</string>
+    <string name="level_name_5">Master Traveler</string>
+    <string name="level_display_format">%1$s Lv.%2$d</string>
+    <string name="level_points_to_next">%1$dP to next level</string>
+    <string name="level_max_reached">You\'ve reached the top level!</string>
+
+    <!-- Three travel badges -->
+    <string name="badge_first_step_title">First Steps</string>
+    <string name="badge_first_step_unlocked">You logged your first travel memory.</string>
+    <string name="badge_first_step_hint">Earn by completing your first mission</string>
+    <string name="badge_weekly_explorer_title">Weekly Explorer</string>
+    <string name="badge_weekly_explorer_unlocked">You hit this week\'s goal.</string>
+    <string name="badge_weekly_explorer_hint">Earn by completing 5 missions in one week</string>
+    <string name="badge_taste_discovery_title">Taste Discovery</string>
+    <string name="badge_taste_discovery_unlocked">You found your own travel style.</string>
+    <string name="badge_taste_discovery_hint">Earn by completing 3 missions in the same category</string>
+
+    <!-- Profile screen: level/badges section -->
+    <string name="profile_level_section_title">Travel Level</string>
+    <string name="profile_badges_title">My Travel Badges</string>
+    <string name="profile_badge_unlocked_on">Earned %1$s</string>
+
+    <!-- Mission success screen: next mission recommendation card -->
+    <string name="perform_next_mission_title">How about this mission next?</string>
+    <string name="perform_next_mission_duration_format">About %1$d min</string>
+    <string name="perform_next_mission_btn_start">Start this mission</string>
+    <string name="perform_next_mission_btn_skip">Maybe later</string>
+    <string name="perform_next_mission_empty_title">You\'ve seen all of today\'s missions.</string>
+    <string name="perform_next_mission_empty_desc">We\'ll let you know when new missions are added.</string>
+
+    <!-- Admin: mission edit screen -->
+    <string name="admin_mission_field_duration_minutes">Estimated duration (min, optional)</string>
 
     <string name="perform_result_pass_title">Mission Verified</string>
     <string name="perform_result_pass_desc">AI confirmed this photo matches the mission.</string>

@@ -207,11 +207,43 @@ firebase.json         # Firebase CLI 설정 (규칙 배포)
 - 스토리지 객체 키는 ASCII 일부 문자만 허용한다. 미션 문서 ID 가 한글 제목인 경우 `InvalidKey` 로 업로드가 거부되어, 경로의 미션 폴더명을 `해시_ASCII정규화` 형태(`missionKey`)로 변환했다.
 - 업로드 요청의 `x-upsert` 헤더를 켜면 Supabase 가 `UPDATE` 정책까지 요구해, anon `INSERT` 정책만 있는 버킷에서 RLS 로 거부된다. 객체 경로에 타임스탬프가 들어가 항상 유일하므로 `x-upsert` 를 끄고 새로 `INSERT` 한다.
 
-### 4.4 포인트 · 레벨 · 랭킹
+### 4.4 포인트 · 레벨 · 배지 · 랭킹
 
 - 보상 계산과 중복 지급 방지는 `MissionRewardPolicy` 에 모여 있으며, 포인트 지급은 Firestore 트랜잭션으로 원자적으로 처리된다.
 - 누적 포인트 기준 사용자 랭킹을 제공하고, 프로필에서 포인트·레벨·완료/진행 미션 수를 보여 준다.
 - **포인트 적립 내역**(`PointHistoryScreen`): 마이페이지의 보유 포인트를 누르면 미션별 위치·사진 인증 보상 내역을 최신순으로 보여 준다. 별도 원장 컬렉션 없이 `user_missions` 의 `stage1RewardGranted`/`stage1RewardPoints`/`stage1VerifiedAt`, `stage2RewardGranted`/`stage2RewardPoints`/`completedAt` 에서 재구성하며, 미션명은 `missions/{id}` 에서 조회한다. (`firestore.rules` 미배포 상태에서 새 컬렉션 추가 시 규칙 누락으로 리워드 트랜잭션이 깨질 위험을 피하기 위한 선택. 서버측 포인트 검증 도입 시 실제 원장으로 교체 — 10장)
+
+#### 4.4.1 여행 레벨 (`TravelLevel` / `TravelLevelPolicy`)
+
+가입 시 한 번 `"Lv.1"` 문자열로 써 두고 이후 갱신하지 않던 기존 `users.level` 필드는 실질적으로 죽은 데이터였다(레벨업 로직 자체가 없었음). 이를 대체해 **레벨을 Firestore 에 중복 저장하지 않고 누적 포인트에서 매번 계산**하는 순수 Kotlin 정책(`domain/TravelLevel.kt`)을 도입했다.
+
+| 레벨 | 이름 | 최소 포인트 |
+| ---: | --- | ---: |
+| Lv.1 | 여행 새싹 | 0P |
+| Lv.2 | 동네 탐험가 | 500P |
+| Lv.3 | 도시 여행자 | 1,500P |
+| Lv.4 | 숨은 명소 수집가 | 3,000P |
+| Lv.5 | 마스터 트래블러 | 5,000P |
+
+`LevelProgress` 는 레벨·현재 포인트·레벨 시작 포인트·다음 레벨 기준·**현재 레벨 구간 기준 진행률**·다음 레벨까지 필요 포인트를 담는다. 예를 들어 1,000P 는 Lv.2(500P) 구간 안이므로 진행률 `(1000-500)/(1500-500) = 50%`, 다음 레벨까지 500P — 전체 5,000P 기준이 아니라 구간 기준이라는 요구사항을 그대로 구현했다. 최고 레벨은 진행률 100%로 고정하고 "다음 레벨까지" 문구 대신 "최고 레벨을 달성했어요!" 를 보여준다. 프로필 화면과 미션 성공 성취 연출(6.8.4)이 같은 `LevelProgress`/`LevelProgressCard` 를 공유해 두 화면의 표시가 어긋나지 않는다. 단위 테스트 `TravelLevelPolicyTest`(경계값·구간 진행률·최고 레벨 6건)로 검증했다.
+
+#### 4.4.2 여행 배지 3종 (`BadgeId` / `BadgeUnlockEvaluator`)
+
+| 배지 | 조건 |
+| --- | --- |
+| 첫 발자국 | 누적 완료 미션 수가 처음 1개 이상 |
+| 주간 탐험가 | 동일한 주(월요일 0시~)에 완료한 미션 수가 처음 5개 이상 |
+| 취향 발견 | 같은 카테고리 완료 미션 수가 처음 3개 이상 |
+
+**스키마**: `users/{uid}` 에 `completedMissionsTotal`(Long) / `completedByCategory`(Map<String,Long>) / `completedByWeek`(Map<String,Long>, 키는 "이번 주 월요일 0시" 기기 로컬 epoch millis) / `badges`(배열, 원소는 `badgeId`/`unlockedAt`/`relatedCategory`/`relatedWeek`/`isNew`) 를 **optional 필드로만** 추가했다. 기존 필드는 이름도 구조도 바꾸지 않아, 이 필드가 없는 기존 사용자 문서도 0/빈 값으로 취급되어 그대로 동작한다.
+
+**원자성과 트랜잭션 제약**: Firestore 트랜잭션은 쿼리를 지원하지 않고 문서 단건 `get()` 만 가능하다. 그래서 "이번 주에 몇 개 완료했는가"를 매번 `user_missions` 를 쿼리해 셀 수 없다 — 대신 `users` 문서 위에 카운터를 얹고 완료 트랜잭션 안에서 `FieldValue.increment` 로 원자적으로 올리는 방식(`data/MissionRewardCounters.applyCompletion()`)을 택했다. before/after 카운터 쌍을 순수 함수 `BadgeUnlockEvaluator.evaluate()`(이번에 처음 문턱을 넘었는지만 판정)에 넘겨, 새로 조건을 충족한 배지가 있으면 같은 트랜잭션에서 함께 기록한다. 이 헬퍼는 사진 제출 즉시-완료 경로(`FirebaseMissionRepository.uploadPhotoAndComplete`)와 관리자 승인 경로(`AdminPhotoReviewScreen.approve()`) 양쪽에서 호출되어, 검수 대기를 거쳐 나중에 완료된 미션도 배지·카운터 계산에서 빠지지 않는다.
+
+**중복 지급 방지**: 카운터·배지 갱신은 `MissionCompletion.Outcome.countTowardPopularity`(이 사용자가 이 미션을 처음 완료할 때만 true — 기존에 인기도 신호 `completionCount` 증가를 게이팅하던 것과 같은 플래그를 재사용)가 참일 때만 실행된다. 재제출·이미 완료된 미션의 중복 요청은 이 플래그가 false 라 자동으로 걸러진다. 배지는 이미 획득한 `badgeId` 목록으로 한 번 더 걸러 중복 생성을 막는다. 한 번의 완료로 여러 배지(예: 취향 발견 + 주간 탐험가)를 동시에 얻을 수 있으며, 화면은 개별 카드 대신 "새로운 배지 N개를 획득했어요!" 로 묶어 보여준다(좌우 넘기기 UI는 만들지 않았다 — 로직의 정확성을 UI 화려함보다 우선한다는 원칙에 따름). 단위 테스트 `BadgeUnlockEvaluatorTest`(문턱 통과 시점, 카테고리 미상 시 스킵, 동시 다중 획득 등 7건)로 검증했다.
+
+**프로필 화면**: 레벨 카드와 "나의 여행 배지" 카드(획득: 보라 아이콘 + 획득일 / 미획득: 회색 실루엣 + 자물쇠 + 획득 조건 문구)를 기존 화면 레이아웃 안에 추가했다. 미획득 배지도 숨기지 않고 조건을 보여줘 사용자가 다음 목표를 알 수 있게 했다.
+
+**한계**: `users` 쓰기 권한이 기존과 동일하게 "본인 또는 관리자" 라(3.6절), 포인트와 마찬가지로 이 카운터·배지도 서버 검증 없이는 클라이언트가 직접 조작할 수 있는 여지가 있다 — 새 한계가 아니라 기존 포인트 시스템의 한계를 그대로 물려받은 것이며, 10장의 서버 사이드 검증 계획에 함께 포함된다.
 
 ### 4.5 개인화 추천 (규칙 + 학습 하이브리드)
 
@@ -238,6 +270,17 @@ firebase.json         # Firebase CLI 설정 (규칙 배포)
 6. 진행 중인 미션이 있으면 추천 대신 노출한다. 결과가 없으면 안내 카드.
 
 학습·평가는 8.3절, 파이프라인은 `ml/reco/`.
+
+#### 4.5.1 미션 성공 화면의 다음 미션 추천
+
+PASS 판정 결과 화면 하단에 "다음에는 이런 미션 어때요?" 카드 1개를 추가했다. 새 추천 로직을 만들지 않고 위 `MissionRecommender.recommendScored()` 를 그대로 재사용한다 — 카드 1개만 필요해 re-ranker 모델(`assets/reranker.json`) 로딩 없이 규칙 점수(`MissionScorer`)만으로 정렬한다. 완료한 미션 전체를 제외하는 것은 동일하고, 방금 완료한 미션은 Firestore 반영 지연에 대비해 id 로 한 번 더 명시적으로 제외한다. 추천이 없으면 빈 카드 대신 안내 문구("오늘의 미션을 모두 둘러봤어요.")를 보여준다.
+
+두 가지는 스코프를 의도적으로 좁혔다.
+
+- **거리**: 이 화면에서 사용자의 실시간 위치를 다시 구하지 않는다. 명세가 "계산 불가능하면 임의 값 대신 항목 자체를 생략" 을 허용하므로, 거리 행을 아예 표시하지 않는 쪽을 택했다 — 홈 화면처럼 위치를 상시 들고 있지 않은 화면에 위치 획득 로직을 새로 얹는 비용 대비 이득이 적다고 판단했다.
+- **예상 소요 시간**: `Mission` 모델에 없던 정보라 바로 하드코딩하지 않고 `estimatedMinutes: Int?` optional 필드로 모델과 Firestore 스키마를 확장했다. 관리자 화면에 입력 필드를 추가해 값을 넣을 수 있게 했지만, 기존 미션 데이터는 전부 null 이라 이 행은 값이 있는 미션에서만 나타난다.
+
+"이 미션 시작하기" 는 해당 미션 상세 화면으로 이동만 하고 자동으로 완료·참여 처리하지 않는다. "다음에 할게요" 는 기존 "홈으로" 버튼과 같은 목적지로 보낸다(새 목적지를 만들지 않고 이미 검증된 흐름을 재사용).
 
 ### 4.6 관리자 기능
 
@@ -615,6 +658,14 @@ com.google.firebase.firestore.FirebaseFirestoreException: PERMISSION_DENIED: Mis
 
 **교훈**: `Stage.UPLOAD`/`Stage.FINALIZE` 실패를 사용자에게는 "저장 오류"로 뭉뚱그려 보여주되(6.8.2), 실제 원인은 로그로 남겨두는 방어선이 없었다면 이 버그는 "가끔 저장이 안 된다"는 막연한 증상으로만 남았을 것이다. 보안 규칙이 정상적인 재시도 흐름을 막는 이런 종류의 false positive 는 유닛 테스트(규칙 20건)만으로는 못 잡는다 — 규칙 테스트는 "설계한 대로 동작하는가"만 검증하고, "설계 자체가 실제 사용 흐름과 맞는가"는 실기기 사용으로만 드러난다.
 
+#### 6.8.4 성취 연출 확장: 레벨업 · 배지 획득 반영
+
+PASS 판정 직후 결과 화면(6.8.2)이 뜨기 전에 짧게(2.2~3.2초) 보여주는 성취 연출(`MissionSuccessCelebrationOverlay`)에, 이번 완료로 레벨이 올랐거나(4.4.1) 새 배지를 얻었으면(4.4.2) 그 사실을 함께 보여주도록 확장했다.
+
+- **레벨업/배지 유무로 완료 트랜잭션 결과를 확장**: `MissionRepository.CompleteResult` 에 `totalPointsAfter`/`weeklyCompletedAfter`/`newlyUnlockedBadges` 를 추가해, `FirebaseMissionRepository` 의 완료 트랜잭션이 반환하는 값만으로 뷰모델이 레벨업 여부(`TravelLevelPolicy.progressFor(지급 전 포인트)` vs `progressFor(지급 후 포인트)` 비교)와 새 배지를 판단한다. 기존에 이번 주 진행도 표시를 위해 완료 트랜잭션 뒤 `countMissionsCompletedThisWeek()` 를 한 번 더 쿼리하던 것도, 완료 트랜잭션이 이미 원자적으로 올린 주간 카운터 값을 그대로 돌려주는 것으로 대체해 추가 왕복을 없앴다.
+- **연출 길이를 내용에 맞춰 가변으로**: 레벨업이나 배지 획득처럼 더 보여줄 게 있으면 2.2초 대신 3.2초로 더 길게 튼다(사용자가 "너무 짧다"고 피드백해 원래 1.1초 → 2.2초로 늘린 뒤, 내용이 늘어난 지금 다시 한번 늘렸다). 애니메이션 진행도(`Animatable`)의 35% 지점부터 레벨/배지 영역을 페이드인시켜, 정보가 한꺼번에 쏟아지지 않고 순차적으로 드러나게 했다.
+- **한 번만 실행**: 레벨업 배너·배지 알림은 별도의 "이미 봤음" 플래그 없이, 이 연출 자체가 `MissionPerformViewModel.uiState.celebration` 이 null 이 아닐 때만 뜨고 한 번 닫히면(`onCelebrationFinished()`) 다시 null 이 되는 일회성 상태이므로 구조적으로 한 번만 보인다.
+
 ---
 
 ## 7. 구현 현황
@@ -643,6 +694,12 @@ com.google.firebase.firestore.FirebaseFirestoreException: PERMISSION_DENIED: Mis
 - [x] 검수 대기(`NEEDS_REVIEW`) 미션이 관리자 승인 전에 완료·포인트 지급되던 버그 수정(6.8.1) — `MissionCompletion.resolve()`/`resolveApproval()` 분리, `AdminPhotoReviewScreen.approve()`/`reject()` 가 실제 완료·보상 처리를 수행하도록 연결, 회귀 테스트 4건 추가
 - [x] 사진 인증 결과를 전체 화면으로 표시(6.8.2) — Toast 대신 `Dialog` 전체 화면 오버레이로 PASS/REVIEW/REJECT 판정·근거·포인트를 보여주고, REJECT 사유를 `RejectReasonCode` 로 분류. AI 분석 실패(`Stage.ANALYZE`)와 저장 실패(`Stage.UPLOAD`/`FINALIZE`)를 구분한 안내로 분리
 - [x] 검수 대기 중 재인증이 `PERMISSION_DENIED` 로 저장 실패하던 `firestore.rules` 버그 발견·수정·재배포(6.8.3) — 실기기 검증 중 발견, `firestore-tests/rules.test.js` 갱신 후 에뮬레이터 20건 재확인
+- [x] 여행 레벨 시스템(4.4.1) — `TravelLevel`/`TravelLevelPolicy` 순수 Kotlin 구현(구간 기준 진행률), `TravelLevelPolicyTest` 6건
+- [x] 여행 배지 3종(4.4.2) — `BadgeId`/`BadgeUnlockEvaluator` + `MissionRewardCounters`(완료 트랜잭션 내 원자적 카운터·배지 기록, 사진 제출 즉시완료·관리자 승인 두 경로 모두 반영), `BadgeUnlockEvaluatorTest` 7건, 기존 `users` 스키마는 optional 필드만 추가해 하위 호환
+- [x] 프로필 화면에 레벨 진행률 카드·배지 3종 카드(획득/미획득 상태 구분) 추가
+- [x] 성취 연출에 레벨업 배너·배지 획득 알림 반영, 연출 길이 가변화(6.8.4)
+- [x] 미션 성공 화면 하단 다음 미션 추천 카드(4.5.1) — 기존 `MissionRecommender.recommendScored()` 재사용, `Mission.estimatedMinutes` optional 필드 신규
+- [ ] 위 레벨·배지·다음 미션 추천 기능은 컴파일·단위 테스트만 확인했고 실기기/에뮬레이터 화면은 아직 보지 못함 — 다음 세션에서 레벨업 연출, 배지 3종 각각의 획득 순간, 프로필 화면 표시를 실제로 확인할 것
 
 ### 7.2 남은 작업
 
@@ -779,7 +836,9 @@ NDCG@5 +0.033 으로 이득의 대부분을 가져온다.
 - 1단계 위치 인증 정밀화: 반경 200 m 축소 및 `location.accuracy` 반영 (사진 모델 변경 없이 장소 특이성을 높이는 저비용 개선)
 - 촬영 시각·EXIF·위치 메타데이터 교차 검증, GPS 스푸핑/순간이동 탐지
 - 추천 re-ranker 를 실제 `user_missions` 로그로 재학습(현재는 시뮬레이터 학습본), 온라인 A/B 또는 컨텍스트 밴딧으로 확장
-- 서버 사이드 포인트 검증, Firestore 보안 규칙 정비, Compose UI 테스트·Repository 계약 테스트
+- 서버 사이드 포인트 검증, Firestore 보안 규칙 정비, Compose UI 테스트·Repository 계약 테스트 — 여행 레벨·배지 카운터(4.4.1·4.4.2)도 포인트와 같은 신뢰 경계(클라이언트가 직접 쓰는 구조)에 있어 같은 서버 검증 작업 범위에 포함
+- 다음 미션 추천 카드(4.5.1)에 사용자 실시간 위치 기반 거리 표시 추가 — 이번 구현은 위치 재획득 없이 "계산 불가 시 생략" 으로 스코프를 좁혔음
+- 위 레벨/배지/추천 카드 기능의 실기기 검증(레벨업 연출, 배지 3종 각각의 최초 획득, 프로필 표시, 화면 회전 시 상태 유지)
 
 ---
 
