@@ -252,6 +252,11 @@ class FirebaseMissionRepository : MissionRepository {
                         uploadSucceeded = true,
                         needsReview = needsReview
                     )
+                    // Firestore 트랜잭션은 모든 읽기가 모든 쓰기보다 먼저 실행돼야 하므로
+                    // (안 그러면 트랜잭션 자체가 실패) 다른 문서에 쓰기 전에 이 읽기부터 끝낸다.
+                    val rewardState = if (outcome.countTowardPopularity) {
+                        MissionRewardCounters.read(transaction, userRef)
+                    } else null
                     transaction.update(
                         userMissionRef,
                         mapOf(
@@ -284,7 +289,7 @@ class FirebaseMissionRepository : MissionRepository {
                             SetOptions.merge()
                         )
                         MissionRewardCounters.applyCompletion(
-                            transaction, userRef, missionCategory, outcome.pointsToGrant
+                            transaction, userRef, rewardState!!, missionCategory, outcome.pointsToGrant
                         )
                     } else null
                     CompletionTxResult(outcome.pointsToGrant, alreadyCompleted, photoUrl, delta)

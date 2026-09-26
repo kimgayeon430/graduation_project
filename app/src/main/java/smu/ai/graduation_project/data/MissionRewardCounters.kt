@@ -33,23 +33,50 @@ object MissionRewardCounters {
         val newlyUnlockedBadges: List<BadgeId>
     )
 
-    fun applyCompletion(
-        transaction: Transaction,
-        userRef: DocumentReference,
-        missionCategory: String,
-        pointsToGrant: Int
-    ): Delta {
-        val snapshot = transaction.get(userRef)
-        val pointsBefore = snapshot.getLong("points") ?: 0L
-        val totalBefore = snapshot.getLong("completedMissionsTotal") ?: 0L
-        val weekKey = currentWeekKey()
+    /**
+     * `users/{uid}` 의 현재 카운터 상태. Firestore 트랜잭션은 **모든 읽기가 모든 쓰기보다 먼저**
+     * 실행돼야 한다(안 그러면 "transactions require all reads to be executed before all writes"
+     * 로 트랜잭션 전체가 실패한다) — 그래서 읽기([read])와 반영([applyCompletion])을 분리했다.
+     * 호출 쪽은 다른 문서에 쓰기를 하기 **전에** [read] 부터 불러야 한다.
+     */
+    data class State(
+        val pointsBefore: Long,
+        val totalBefore: Long,
+        val byCategory: Map<String, Number>,
+        val byWeek: Map<String, Number>,
+        val existingBadges: List<Map<String, Any?>>
+    )
 
+    fun read(transaction: Transaction, userRef: DocumentReference): State {
+        val snapshot = transaction.get(userRef)
         @Suppress("UNCHECKED_CAST")
         val byCategory = snapshot.get("completedByCategory") as? Map<String, Number> ?: emptyMap()
         @Suppress("UNCHECKED_CAST")
         val byWeek = snapshot.get("completedByWeek") as? Map<String, Number> ?: emptyMap()
         @Suppress("UNCHECKED_CAST")
         val existingBadges = snapshot.get("badges") as? List<Map<String, Any?>> ?: emptyList()
+        return State(
+            pointsBefore = snapshot.getLong("points") ?: 0L,
+            totalBefore = snapshot.getLong("completedMissionsTotal") ?: 0L,
+            byCategory = byCategory,
+            byWeek = byWeek,
+            existingBadges = existingBadges
+        )
+    }
+
+    fun applyCompletion(
+        transaction: Transaction,
+        userRef: DocumentReference,
+        state: State,
+        missionCategory: String,
+        pointsToGrant: Int
+    ): Delta {
+        val pointsBefore = state.pointsBefore
+        val totalBefore = state.totalBefore
+        val weekKey = currentWeekKey()
+        val byCategory = state.byCategory
+        val byWeek = state.byWeek
+        val existingBadges = state.existingBadges
         val existingBadgeIds = existingBadges.mapNotNull { it["badgeId"] as? String }
 
         val categoryKnown = missionCategory in KNOWN_CATEGORIES

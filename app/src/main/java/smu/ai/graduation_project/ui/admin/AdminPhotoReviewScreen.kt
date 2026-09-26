@@ -149,6 +149,14 @@ fun AdminPhotoReviewScreen(onNavigateBack: () -> Unit) {
             )
             if (!outcome.markCompleted) return@runTransaction false
 
+            val uid = snapshot.getString("userId")
+            val missionId = snapshot.getString("missionId")
+            // Firestore 트랜잭션은 모든 읽기가 모든 쓰기보다 먼저 실행돼야 하므로(안 그러면
+            // 트랜잭션 자체가 실패한다) 아래 쓰기들 전에 users 문서 읽기부터 끝낸다.
+            val rewardState = if (outcome.countTowardPopularity && uid != null) {
+                MissionRewardCounters.read(transaction, db.collection("users").document(uid))
+            } else null
+
             transaction.update(
                 userMissionRef,
                 mapOf(
@@ -161,8 +169,6 @@ fun AdminPhotoReviewScreen(onNavigateBack: () -> Unit) {
                     "completedAt" to FieldValue.serverTimestamp()
                 )
             )
-            val uid = snapshot.getString("userId")
-            val missionId = snapshot.getString("missionId")
             if (outcome.countTowardPopularity) {
                 if (missionId != null) {
                     transaction.set(
@@ -172,10 +178,11 @@ fun AdminPhotoReviewScreen(onNavigateBack: () -> Unit) {
                     )
                 }
                 // 승인 시점에도 사진 제출 즉시-완료 경로와 같은 카운터(배지/레벨용)를 원자적으로 올린다.
-                if (uid != null) {
+                if (uid != null && rewardState != null) {
                     MissionRewardCounters.applyCompletion(
                         transaction,
                         db.collection("users").document(uid),
+                        rewardState,
                         item.missionCategory,
                         outcome.pointsToGrant
                     )
