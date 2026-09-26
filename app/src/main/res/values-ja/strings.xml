@@ -118,6 +118,13 @@
     <!-- 사진 인증 결과 화면(전체 화면) -->
     <string name="perform_result_analyzing_title">写真を分析しています</string>
     <string name="perform_result_analyzing_desc">少々お待ちください。</string>
+
+    <!-- PASS判定直後、1〜1.5秒表示する達成アニメーション -->
+    <string name="perform_celebration_title">ミッション完了!</string>
+    <string name="perform_celebration_subtitle">「%1$s」で今日の旅の一片を完成させました</string>
+    <string name="perform_celebration_points_format">+%1$dP</string>
+    <string name="perform_celebration_weekly_progress">今週のミッション %1$d/%2$d</string>
+
     <string name="perform_result_pass_title">ミッション認証完了</string>
     <string name="perform_result_pass_desc">AIがミッション条件に合う写真と確認しました。</string>
     <string name="perform_result_btn_done">完了</string>
