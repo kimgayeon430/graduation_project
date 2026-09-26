@@ -107,7 +107,7 @@ fun MissionPhotoAnalyzingOverlay() {
 }
 
 /**
- * PASS 판정 직후 1~1.5초 보여주는 성취 연출. [PhotoResultUi] 화면은 이미 준비돼 있고,
+ * PASS 판정 직후 약 2.2초 보여주는 성취 연출. [PhotoResultUi] 화면은 이미 준비돼 있고,
  * 애니메이션이 끝나면 화면(타이머)이 [MissionPerformViewModel.onCelebrationFinished] 를 불러
  * 이 연출을 닫으면 그 결과 화면이 자연스럽게 이어서 보인다.
  */
@@ -117,7 +117,7 @@ fun MissionSuccessCelebrationOverlay(celebration: CelebrationUi) {
     val progress = remember { Animatable(0f) }
     LaunchedEffect(Unit) {
         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-        progress.animateTo(1f, animationSpec = tween(durationMillis = 1100, easing = LinearEasing))
+        progress.animateTo(1f, animationSpec = tween(durationMillis = 2200, easing = LinearEasing))
     }
 
     val badgeScale by animateFloatAsState(

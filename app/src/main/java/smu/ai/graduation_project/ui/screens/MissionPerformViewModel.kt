@@ -382,7 +382,7 @@ class MissionPerformViewModel(
         uiState = uiState.copy(photoResult = null)
     }
 
-    // ---- 성취 연출(PASS 전용, 1~1.5초) --------------------------------------
+    // ---- 성취 연출(PASS 전용, 약 2.2초) --------------------------------------
 
     /** 연출 애니메이션이 끝나면 화면이 호출한다 — 결과 화면(이미 준비돼 있음)으로 이어진다. */
     fun onCelebrationFinished() {

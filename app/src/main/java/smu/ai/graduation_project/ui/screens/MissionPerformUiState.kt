@@ -32,7 +32,7 @@ data class PhotoResultUi(
 )
 
 /**
- * PASS 판정 직후 짧게(1~1.5초) 보여주는 성취 연출에 필요한 값. 이 화면을 지나야
+ * PASS 판정 직후 짧게(약 2.2초) 보여주는 성취 연출에 필요한 값. 이 화면을 지나야
  * [PhotoResultUi] 결과 화면(이미 준비돼 있음)이 이어서 보인다.
  */
 data class CelebrationUi(

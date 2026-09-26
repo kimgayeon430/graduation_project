@@ -123,10 +123,10 @@ fun MissionPerformScreen(
         }
     }
 
-    // 일회성 이벤트: 성취 연출은 버튼이 아니라 타이머로 끝난다(1.1초 애니메이션 + 여유).
+    // 일회성 이벤트: 성취 연출은 버튼이 아니라 타이머로 끝난다(2.2초 애니메이션 + 여유).
     LaunchedEffect(state.celebration) {
         if (state.celebration != null) {
-            delay(1300)
+            delay(2500)
             viewModel.onCelebrationFinished()
         }
     }
