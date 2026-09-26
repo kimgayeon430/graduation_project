@@ -64,9 +64,11 @@ import smu.ai.graduation_project.data.LanguagePreference
 import smu.ai.graduation_project.data.RerankerSource
 import smu.ai.graduation_project.data.localizedString
 import smu.ai.graduation_project.domain.GeoDistance
+import smu.ai.graduation_project.domain.MissionCompletion
 import smu.ai.graduation_project.domain.MissionRecommender
 import smu.ai.graduation_project.domain.MissionScorer
 import smu.ai.graduation_project.domain.RecommendationContext
+import smu.ai.graduation_project.domain.WeekBoundary
 import smu.ai.graduation_project.model.Mission
 import smu.ai.graduation_project.ui.components.recommendationReasonLabel
 import smu.ai.graduation_project.ui.theme.CardGray
@@ -82,7 +84,7 @@ fun HomeScreen(onNavigateToDetail: (String) -> Unit) {
     val user = Firebase.auth.currentUser
     var points by remember { mutableLongStateOf(0L) }
     var userName by remember { mutableStateOf(user?.displayName ?: "Traveler") }
-    var startedCount by remember { mutableIntStateOf(0) }
+    var weeklyCompletedCount by remember { mutableIntStateOf(0) }
     val totalGoal = 5
 
     var activeMission by remember { mutableStateOf<Mission?>(null) }
@@ -156,7 +158,14 @@ fun HomeScreen(onNavigateToDetail: (String) -> Unit) {
                     if (snapshot == null) return@addSnapshotListener
 
                     val documents = snapshot.documents
-                    startedCount = documents.size
+                    val startOfWeek = WeekBoundary.startOfThisWeekMillis()
+                    weeklyCompletedCount = documents.count { doc ->
+                        val status = doc.getString("status").orEmpty()
+                        val completedAt = doc.getTimestamp("completedAt")
+                        MissionCompletion.isCompleted(status) &&
+                            completedAt != null &&
+                            completedAt.toDate().time >= startOfWeek
+                    }
 
                     completedMissionIds = documents
                         .filter { doc ->
@@ -276,14 +285,14 @@ fun HomeScreen(onNavigateToDetail: (String) -> Unit) {
                 Spacer(modifier = Modifier.height(8.dp))
                 Row(verticalAlignment = Alignment.Bottom) {
                     Text(
-                        "$startedCount/$totalGoal",
+                        "$weeklyCompletedCount/$totalGoal",
                         color = Color.White,
                         fontSize = 24.sp,
                         fontWeight = FontWeight.Bold
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     LinearProgressIndicator(
-                        progress = { (startedCount.toFloat() / totalGoal).coerceIn(0f, 1f) },
+                        progress = { (weeklyCompletedCount.toFloat() / totalGoal).coerceIn(0f, 1f) },
                         modifier = Modifier
                             .fillMaxWidth(0.7f)
                             .height(8.dp)

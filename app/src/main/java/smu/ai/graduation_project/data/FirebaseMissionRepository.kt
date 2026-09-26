@@ -10,7 +10,7 @@ import com.google.firebase.firestore.firestore
 import smu.ai.graduation_project.domain.MissionCompletion
 import smu.ai.graduation_project.domain.MissionRewardPolicy
 import smu.ai.graduation_project.domain.PhotoVerificationConfig
-import java.util.Calendar
+import smu.ai.graduation_project.domain.WeekBoundary
 import java.util.concurrent.Executors
 
 /** [FirebaseMissionRepository.uploadPhotoAndComplete] 트랜잭션의 반환값. */
@@ -326,7 +326,7 @@ class FirebaseMissionRepository : MissionRepository {
             .whereEqualTo("userId", uid)
             .get()
             .addOnSuccessListener { snapshot ->
-                val startOfWeek = startOfThisWeekMillis()
+                val startOfWeek = WeekBoundary.startOfThisWeekMillis()
                 val count = snapshot.documents.count { doc ->
                     val status = doc.getString("status").orEmpty()
                     val completedAt = doc.getTimestamp("completedAt")
@@ -337,18 +337,5 @@ class FirebaseMissionRepository : MissionRepository {
                 onResult(count)
             }
             .addOnFailureListener { onResult(0) }
-    }
-
-    /** 이번 주 월요일 0시(기기 로컬 시각)의 epoch millis. */
-    private fun startOfThisWeekMillis(): Long {
-        val calendar = Calendar.getInstance().apply {
-            firstDayOfWeek = Calendar.MONDAY
-            set(Calendar.DAY_OF_WEEK, Calendar.MONDAY)
-            set(Calendar.HOUR_OF_DAY, 0)
-            set(Calendar.MINUTE, 0)
-            set(Calendar.SECOND, 0)
-            set(Calendar.MILLISECOND, 0)
-        }
-        return calendar.timeInMillis
     }
 }

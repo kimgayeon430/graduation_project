@@ -7,7 +7,7 @@ import com.google.firebase.firestore.SetOptions
 import com.google.firebase.firestore.Transaction
 import smu.ai.graduation_project.domain.BadgeId
 import smu.ai.graduation_project.domain.BadgeUnlockEvaluator
-import java.util.Calendar
+import smu.ai.graduation_project.domain.WeekBoundary
 
 /**
  * 미션이 **처음으로** 완료될 때(= `MissionCompletion.Outcome.countTowardPopularity == true`)만
@@ -126,20 +126,6 @@ object MissionRewardCounters {
         )
     }
 
-    /**
-     * 이번 주 월요일 0시(기기 로컬 시각) epoch millis 를 키로 쓴다 — 연도 경계의 ISO 주차 계산
-     * 같은 미묘함 없이, [FirebaseMissionRepository.countMissionsCompletedThisWeek] 가 쓰는 "이번 주"
-     * 정의와 정확히 같은 경계를 공유한다.
-     */
-    private fun currentWeekKey(): String {
-        val calendar = Calendar.getInstance().apply {
-            firstDayOfWeek = Calendar.MONDAY
-            set(Calendar.DAY_OF_WEEK, Calendar.MONDAY)
-            set(Calendar.HOUR_OF_DAY, 0)
-            set(Calendar.MINUTE, 0)
-            set(Calendar.SECOND, 0)
-            set(Calendar.MILLISECOND, 0)
-        }
-        return calendar.timeInMillis.toString()
-    }
+    /** 이번 주 월요일 0시(기기 로컬 시각) epoch millis 를 키로 쓴다. [WeekBoundary] 참고. */
+    private fun currentWeekKey(): String = WeekBoundary.startOfThisWeekMillis().toString()
 }
