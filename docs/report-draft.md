@@ -54,11 +54,16 @@ Android 애플리케이션을 개발한다. 사용자는 취향에 맞는 미션
 - Firebase Authentication 기반 회원가입·로그인·로그아웃, 로그인 없이 둘러보는 게스트 진입
 - 회원가입 직후 여행 취향(투어·맛집·체험·쇼핑) 복수 선택 및 저장, 기존 사용자는 `preferences` 유무를 판정해 취향 화면을 건너뛰거나 거침
 - 전체 미션 목록·상세 조회, 미션 목록 ↔ 네이버 지도 전환(좌표가 있는 미션을 마커로)
+  - 지도 마커는 이 사용자의 미션 진행 상태(수행 전·수행 중·완료)에 따라 색이 다르고, 사진 인증을 완료한 미션의 마커를 누르면 실제로 제출한 인증 사진을 정보창에서 볼 수 있다 (4.2절)
+  - 미션 상세 화면에서 위치 권한이 있으면 현재 위치로부터의 거리를 보여주고, "길찾기" 버튼으로 기기에 설치된 지도 앱의 경로 안내로 바로 이동한다 (4.2절)
 - 미션별 GPS 위치 인증(목표 반경 200m 이내)
 - 위치 인증 후 카메라 촬영 → 미리보기 → 사진 인증
 - 인증 단계별 포인트 지급 및 진행 상태 저장(중복 지급 방지), 진행 중 미션 이어서 수행
-- 홈에서 선호 카테고리를 우선한 규칙 기반 미션 추천(완료한 미션 제외)
-- 누적 포인트 기반 사용자 랭킹, 프로필에서 포인트·레벨·미션 현황 확인
+- **PASS 판정 직후 성취 연출** — 포인트 상승·컨페티·햅틱에 이어, 이번 완료로 레벨이 올랐으면 "LEVEL UP!" 배너를, 새 배지를 얻었으면 배지 알림을 함께 보여준다 (6.8.4절)
+- **미션 성공 화면 하단 다음 미션 추천 카드** — "다음에는 이런 미션 어때요?" 카드 1개, 기존 추천 로직을 그대로 재사용 (4.5.1절)
+- 홈에서 취향·완료 이력 기반 미션 추천(규칙 점수 + 완료 로그 학습 re-ranker 하이브리드, 완료한 미션 제외), 추천 카드에 현재 위치로부터의 실제 거리 표시 (4.5절)
+- 누적 포인트 기반 사용자 랭킹
+- **누적 포인트 기반 여행 레벨(Lv.1~5, 구간별 진행률)과 여행 배지 3종**(첫 발자국·주간 탐험가·취향 발견)을 프로필에서 확인 — 미획득 배지도 조건과 함께 표시 (4.4.1·4.4.2절)
 - 마이페이지에서 **보유 포인트를 누르면 적립 내역**(미션별 위치·사진 인증 보상)을 확인
 - 마이페이지에서 **한국어 / English / 日本語 3개 언어 UI 전환** — 하단 메뉴바·관리자 화면을 포함한 앱 전체 화면과 미션 콘텐츠(제목·설명)가 즉시 선택한 언어로 전환 (4.7절)
 - 사진 인증 후 **AI 판정 결과를 전체 화면으로 확인** — 제출한 사진, 판정 상태(통과·검토중·반려), 요구/예측 카테고리, AI 신뢰도, 포인트 지급 여부를 한 화면에서 보고 판정별로 다른 다음 행동(완료 확인 / 다시 촬영 / 미션 내용 보기)을 선택 (6.8절)
@@ -110,7 +115,7 @@ firebase.json         # Firebase CLI 설정 (규칙 배포)
 
 | 모듈 | 책임 |
 | --- | --- |
-| `GeoDistance` | 두 좌표 사이 거리 계산 (Haversine) |
+| `GeoDistance` | 두 좌표 사이 거리 계산(Haversine) + 사람이 읽는 거리 표기(`format`, "320m"/"1.2km") |
 | `LocationVerification` | 허용 반경(기본 200m) 이내 여부 판정 |
 | `MissionRewardPolicy` | 1·2단계 보상 계산과 중복 지급 방지 |
 | `MissionCompletion` | 사진 인증 가능 여부·완료 처리 결과(`resolve`) 계산 |
@@ -120,6 +125,9 @@ firebase.json         # Firebase CLI 설정 (규칙 배포)
 | `LearnedReranker` | 완료 로그로 학습한 로지스틱 회귀로 완료 확률 추정 |
 | `MissionRecommender` | 후보 필터 + 점수 정렬 + 다양성 감점으로 상위 N건 추천 |
 | `PhotoVerification` | 온디바이스 모델의 라벨별 점수 → 통과 / 재촬영 / 관리자 검수 판정 |
+| `TravelLevelPolicy` | 누적 포인트 → 여행 레벨(Lv.1~5) + 현재 구간 진행률 계산(4.4.1) |
+| `BadgeUnlockEvaluator` | 완료 전/후 카운터 쌍 → 이번에 처음 조건을 충족한 배지 판정(4.4.2) |
+| `WeekBoundary` | "이번 주"(월요일 0시~) 경계 계산 — 배지·주간 진행률·성취 연출이 공유 |
 
 ### 3.3 앱 내비게이션
 
@@ -137,11 +145,13 @@ firebase.json         # Firebase CLI 설정 (규칙 배포)
 
 | 경로 | 주요 필드 |
 | --- | --- |
-| `users/{uid}` | `nickname`, `mail`, `points`, `level`, `preferences[]` |
-| `missions/{id}` | `title`, `desc`, `category`, `points`, `imageUrl`, `location`(GeoPoint), `completionCount` |
+| `users/{uid}` | `nickname`, `mail`, `points`, `level`(가입 시 1회 기록, 미사용 레거시 — 4.4.1), `preferences[]`, `completedMissionsTotal`(Long, optional), `completedByCategory`(Map, optional), `completedByWeek`(Map, optional), `badges[]`(optional, 각 원소 `badgeId`/`unlockedAt`/`relatedCategory`/`relatedWeek`/`isNew` — 4.4.2) |
+| `missions/{id}` | `title`, `desc`, `category`, `points`, `imageUrl`, `location`(GeoPoint), `completionCount`, `estimatedMinutes`(Int, optional — 4.5.1), `photoEmbedding`/`photoEmbeddings`(6.7절) |
 | `user_missions/{id}` | `userId`, `missionId`, `status`, `progress`, `stage1RewardGranted`, `stage1RewardPoints`, `stage1VerifiedAt`, `stage2RewardGranted`, `stage2RewardPoints`, `photoUrl`, `photoStoragePath`, `photoVerified`, `photoUploadedAt`, `completedAt`, `photoNeedsReview`, `photoVerifyScore`, `photoVerifyLabel`, `photoVerifyModelVersion` |
 | `admins/{uid}` | `email`, `name` |
 | Supabase `mission-photos/<missionKey>/{uid}_{timestamp}.jpg` | 사진 인증 이미지 (공개 URL). `missionKey` 는 `missionId` 를 Supabase 스토리지 키 규칙에 맞춰 ASCII 로 정규화한 값(4.3절) |
+
+`users/{uid}` 의 레벨·배지 관련 필드는 전부 optional 로 추가했다 — 필드가 없는 기존 사용자 문서도 0/빈 값으로 취급되어 그대로 동작한다(4.4.2절). `completedByWeek` 의 키는 ISO 주차가 아니라 "이번 주 월요일 0시" 기기 로컬 epoch millis 문자열이다(`domain/WeekBoundary`).
 
 ### 3.5 필요 권한
 
@@ -829,6 +839,14 @@ NDCG@5 +0.033 으로 이득의 대부분을 가져온다.
   - `dbe0d06` 관리자 검수 대상 사진이 승인 전에 완료·포인트 지급되던 문제 수정
   - `85e0680` 검수 대기 시 잘못된 "사진 인증 완료" 토스트 문구 표시 수정
   - `be56bd1` 사진 인증 결과를 전체 화면으로 표시
+  - `c6f77da` 검수 대기 재인증 시 `PERMISSION_DENIED` 로 저장 실패하던 `firestore.rules` 버그 수정
+  - `7c84b9a` 미션 성공 성취 연출(포인트·컨페티·햅틱) 추가
+  - `d524c43` / `6b1f121` 성취 연출 문자열 리소스 누락 수정, 연출 길이 1.1초→2.2초로 조정
+  - `4efb90a` 여행 레벨·배지 3종·성취 연출 확장(레벨업·배지 알림)·다음 미션 추천 카드 추가(4.4·4.5.1·6.8.4절) — `TravelLevelPolicyTest`/`BadgeUnlockEvaluatorTest` 포함
+  - `e7be908` 배지/레벨 카운터 추가로 깨졌던 미션 완료 저장 트랜잭션 순서 버그 수정(Firestore 는 모든 읽기가 모든 쓰기보다 먼저여야 함)
+  - `4406c4d` 홈 화면 "이번 주 진행률"이 위치 인증만 해도 올라가던 버그 수정, `domain/WeekBoundary` 로 "이번 주" 계산 통합
+  - `e7731a1` 미션 지도 핀에 진행 상태별 색상 + 사진 인증 완료 미션은 인증 사진을 정보창에 표시(4.2절)
+  - `5b30e1a` 홈 추천 카드·미션 상세 화면에 실제 거리 표시, 미션 상세 화면 "길찾기" 버튼 추가(4.2·4.5절)
 
 ---
 
