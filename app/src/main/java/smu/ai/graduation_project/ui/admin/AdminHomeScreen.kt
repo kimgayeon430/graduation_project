@@ -19,6 +19,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AdminPanelSettings
 import androidx.compose.material.icons.filled.Assignment
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.FactCheck
 import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material3.Card
@@ -44,7 +45,8 @@ import smu.ai.graduation_project.ui.theme.MainPurple
 fun AdminHomeScreen(
     onNavigateToMissionManagement: () -> Unit,
     onNavigateToUserManagement: () -> Unit,
-    onNavigateToPhotoReview: () -> Unit
+    onNavigateToPhotoReview: () -> Unit,
+    onNavigateToMissionReview: () -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -90,6 +92,13 @@ fun AdminHomeScreen(
             desc = stringResource(R.string.admin_home_missions_desc),
             icon = Icons.Default.Assignment,
             onClick = onNavigateToMissionManagement
+        )
+
+        AdminMenuCard(
+            title = stringResource(R.string.admin_home_mission_review_title),
+            desc = stringResource(R.string.admin_home_mission_review_desc),
+            icon = Icons.Default.FactCheck,
+            onClick = onNavigateToMissionReview
         )
 
         AdminMenuCard(

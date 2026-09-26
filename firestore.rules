@@ -31,13 +31,53 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
-    // 미션: 게스트 포함 누구나 읽기. 생성/삭제/일반 수정은 관리자만.
-    // 예외: 로그인 사용자는 completionCount 필드만 바꿀 수 있다(미션 완료 시 인기도 신호 갱신).
+    // 미션: 게스트 포함 누구나 읽기. 삭제/일반 수정은 관리자만.
+    // 예외 1: 로그인 사용자는 completionCount/likeCount/bookmarkCount 필드만 바꿀 수 있다
+    //   (미션 완료·좋아요·찜 시 인기도 신호 갱신). completionCount 와 마찬가지로 서버 검증이 없어
+    //   값 자체의 위조까지는 막지 못한다(10장 한계, 기존과 동일한 신뢰 모델).
+    // 예외 2: 로그인 사용자는 본인이 제안자(creatorId)인 미션을 pending 상태·points=0 으로 생성할 수
+    //   있다 — 포인트는 관리자가 검수 승인 시에만 정할 수 있다.
+    // 예외 3: 제안자는 관리자가 "수정 요청"(changes_requested)한 자신의 미션을 pending 으로
+    //   되돌리며(=재제출) 수정할 수 있다. 이때도 points/creatorId 는 못 바꾸고, 카운터 필드도 못 건든다.
     match /missions/{missionId} {
       allow read: if true;
-      allow create, delete: if isAdmin();
+      allow create: if isAdmin()
+        || (signedIn()
+            && request.resource.data.creatorId == request.auth.uid
+            && request.resource.data.reviewStatus == 'pending'
+            && request.resource.data.points == 0);
+      allow delete: if isAdmin();
       allow update: if isAdmin()
-        || (signedIn() && onlyChanged(['completionCount']));
+        || (signedIn() && onlyChanged(['completionCount', 'likeCount', 'bookmarkCount']))
+        || (signedIn()
+            && resource.data.creatorId == request.auth.uid
+            && resource.data.reviewStatus == 'changes_requested'
+            && request.resource.data.reviewStatus == 'pending'
+            && request.resource.data.points == resource.data.points
+            && request.resource.data.creatorId == resource.data.creatorId
+            && !request.resource.data.diff(resource.data).affectedKeys()
+                  .hasAny(['likeCount', 'bookmarkCount', 'completionCount']));
+    }
+
+    // 미션 좋아요: 공개 반응이라 누구나 읽을 수 있다. 문서 ID를 "{uid}_{missionId}" 로 고정해
+    // 사용자당 미션당 최대 1건만 만들 수 있게 강제한다(중복 좋아요 방지). 취소는 본인 문서 삭제.
+    match /mission_likes/{likeId} {
+      allow read: if true;
+      allow create: if signedIn()
+        && request.resource.data.userId == request.auth.uid
+        && likeId == request.auth.uid + '_' + request.resource.data.missionId;
+      allow delete: if signedIn() && resource.data.userId == request.auth.uid;
+      allow update: if false;
+    }
+
+    // 미션 찜: 개인적인 저장이라 본인만 읽는다. 좋아요와 같은 방식으로 중복을 방지한다.
+    match /mission_bookmarks/{bookmarkId} {
+      allow read: if signedIn() && resource.data.userId == request.auth.uid;
+      allow create: if signedIn()
+        && request.resource.data.userId == request.auth.uid
+        && bookmarkId == request.auth.uid + '_' + request.resource.data.missionId;
+      allow delete: if signedIn() && resource.data.userId == request.auth.uid;
+      allow update: if false;
     }
 
     // 사용자 프로필: 로그인 사용자는 읽기. 본인 또는 관리자만 생성/수정. 삭제 불가.

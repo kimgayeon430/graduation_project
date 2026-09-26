@@ -44,6 +44,7 @@ import androidx.compose.ui.unit.sp
 import com.google.firebase.Firebase
 import com.google.firebase.firestore.firestore
 import smu.ai.graduation_project.R
+import smu.ai.graduation_project.domain.MissionReviewStatus
 import smu.ai.graduation_project.model.Mission
 import smu.ai.graduation_project.ui.theme.CardGray
 import smu.ai.graduation_project.ui.theme.MainPurple
@@ -69,9 +70,14 @@ fun AdminMissionListScreen(
                     desc = doc.getString("desc") ?: "",
                     points = doc.getLong("points")?.toInt() ?: 0,
                     category = doc.getString("category") ?: "투어",
-                    imageUrl = doc.getString("imageUrl").orEmpty()
+                    imageUrl = doc.getString("imageUrl").orEmpty(),
+                    creatorId = doc.getString("creatorId"),
+                    creatorName = doc.getString("creatorName").orEmpty(),
+                    reviewStatus = doc.getString("reviewStatus") ?: MissionReviewStatus.APPROVED
                 )
-            }.orEmpty()
+                // 검수 대기/수정요청/반려 건은 전용 검수 화면(AdminMissionReviewScreen)에서 다루므로
+                // 여기(승인된 미션 관리)에서는 제외한다.
+            }.orEmpty().filter { MissionReviewStatus.isPubliclyVisible(it.reviewStatus) }
         }
     }
 
@@ -117,6 +123,14 @@ fun AdminMissionListScreen(
                     Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         Text(mission.title, fontWeight = FontWeight.Bold, fontSize = 18.sp)
                         Text(mission.desc, color = Color.Gray, fontSize = 13.sp)
+                        if (!mission.creatorId.isNullOrBlank()) {
+                            Text(
+                                stringResource(R.string.admin_mission_proposed_by, mission.creatorName.ifBlank { stringResource(R.string.admin_user_default_name) }),
+                                color = MainPurple,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                             Surface(color = Color.White) {
                                 Text(mission.category, modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp), color = MainPurple, fontWeight = FontWeight.Bold)
