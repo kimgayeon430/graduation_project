@@ -3,7 +3,14 @@ package smu.ai.graduation_project.ui.screens
 import android.content.ComponentCallbacks
 import android.content.Context
 import android.content.res.Configuration
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.drawable.Drawable
 import android.os.Bundle
+import android.view.View
+import android.widget.ImageView
+import android.widget.LinearLayout
+import android.widget.TextView
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -44,6 +51,8 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import coil.imageLoader
+import coil.request.ImageRequest
 import com.naver.maps.geometry.LatLng
 import com.naver.maps.geometry.LatLngBounds
 import com.naver.maps.map.CameraUpdate
@@ -122,7 +131,7 @@ fun MissionMapScreen(
             groups.forEach { (coordinate, group) ->
                 val marker = Marker(coordinate).apply {
                     icon = OverlayImage.fromResource(
-                        if (group.size == 1) R.drawable.ic_map_pin_single else R.drawable.ic_map_pin_cluster
+                        if (group.size == 1) missionPinDrawableRes(group.first().status) else R.drawable.ic_map_pin_cluster
                     )
                     captionText = if (group.size == 1) group.first().title
                         else context.getLocalizedString(R.string.map_marker_cluster, group.size)
@@ -138,20 +147,50 @@ fun MissionMapScreen(
                         openInfoWindow?.close()
                         if (group.size == 1) {
                             val mission = group.first()
-                            val window = InfoWindow().apply {
-                                position = coordinate
-                                adapter = object : InfoWindow.DefaultTextAdapter(context) {
-                                    override fun getText(infoWindow: InfoWindow): CharSequence =
-                                        context.getLocalizedString(R.string.map_bubble_single, mission.title, mission.points)
+                            val photoUrl = mission.verifiedPhotoUrl
+                            if (mission.status == "완료" && !photoUrl.isNullOrBlank()) {
+                                // 사진은 비동기로 불러와야 하므로, 로드가 끝난 뒤에 정보창을 연다.
+                                context.imageLoader.enqueue(
+                                    ImageRequest.Builder(context)
+                                        .data(photoUrl)
+                                        .target(onSuccess = { drawable ->
+                                            if (active && !holder.destroyed) {
+                                                val window = InfoWindow().apply {
+                                                    position = coordinate
+                                                    adapter = object : InfoWindow.Adapter() {
+                                                        override fun getImage(infoWindow: InfoWindow): OverlayImage =
+                                                            OverlayImage.fromBitmap(
+                                                                renderViewToBitmap(buildPhotoInfoWindowView(context, mission, drawable))
+                                                            )
+                                                    }
+                                                    setOnClickListener {
+                                                        close()
+                                                        currentOnClick(mission.id)
+                                                        true
+                                                    }
+                                                }
+                                                window.open(map)
+                                                openInfoWindow = window
+                                            }
+                                        })
+                                        .build()
+                                )
+                            } else {
+                                val window = InfoWindow().apply {
+                                    position = coordinate
+                                    adapter = object : InfoWindow.DefaultTextAdapter(context) {
+                                        override fun getText(infoWindow: InfoWindow): CharSequence =
+                                            context.getLocalizedString(R.string.map_bubble_single, mission.title, mission.points)
+                                    }
+                                    setOnClickListener {
+                                        close()
+                                        currentOnClick(mission.id)
+                                        true
+                                    }
                                 }
-                                setOnClickListener {
-                                    close()
-                                    currentOnClick(mission.id)
-                                    true
-                                }
+                                window.open(map)
+                                openInfoWindow = window
                             }
-                            window.open(map)
-                            openInfoWindow = window
                         } else {
                             openInfoWindow = null
                             selectedIds = group.map { it.id }
@@ -253,6 +292,62 @@ fun MissionMapScreen(
                 TextButton(onClick = { selectedIds = emptyList() }) {
                     Text(stringResource(R.string.map_dialog_close), color = MainPurple)
                 }
+            }
+        )
+    }
+}
+
+/** 수행 전/중/완료 상태별로 다른 색 핀을 쓴다. 여러 미션이 묶인 클러스터 핀은 상태와 무관하게 그대로 둔다. */
+private fun missionPinDrawableRes(status: String): Int = when (status) {
+    "완료" -> R.drawable.ic_map_pin_completed
+    "진행중" -> R.drawable.ic_map_pin_in_progress
+    else -> R.drawable.ic_map_pin_not_started
+}
+
+/**
+ * 네이버 지도 `InfoWindow.Adapter` 는 (구글 지도와 달리) 살아있는 View 를 못 붙이고
+ * [OverlayImage]（비트맵）만 받는다 — 그래서 View 를 측정·배치한 뒤 캔버스에 직접 그려 비트맵으로 만든다.
+ */
+private fun renderViewToBitmap(view: View): Bitmap {
+    val unspecified = View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED)
+    view.measure(unspecified, unspecified)
+    view.layout(0, 0, view.measuredWidth, view.measuredHeight)
+    val bitmap = Bitmap.createBitmap(
+        view.measuredWidth.coerceAtLeast(1),
+        view.measuredHeight.coerceAtLeast(1),
+        Bitmap.Config.ARGB_8888
+    )
+    view.draw(Canvas(bitmap))
+    return bitmap
+}
+
+/**
+ * 사진 인증을 완료한 미션의 정보창. 촬영한 인증 사진을 미리보기처럼 위에 보여주고
+ * 그 아래에 기존과 같은 제목·포인트·"상세 보기" 문구를 둔다.
+ */
+private fun buildPhotoInfoWindowView(context: Context, mission: Mission, photoDrawable: Drawable?): View {
+    val density = context.resources.displayMetrics.density
+    fun dp(value: Int) = (value * density).toInt()
+    val imageSize = dp(140)
+
+    return LinearLayout(context).apply {
+        orientation = LinearLayout.VERTICAL
+        setBackgroundColor(android.graphics.Color.WHITE)
+        setPadding(dp(10), dp(10), dp(10), dp(10))
+        addView(
+            ImageView(context).apply {
+                layoutParams = LinearLayout.LayoutParams(imageSize, imageSize)
+                scaleType = ImageView.ScaleType.CENTER_CROP
+                setImageDrawable(photoDrawable)
+            }
+        )
+        addView(
+            TextView(context).apply {
+                layoutParams = LinearLayout.LayoutParams(imageSize, LinearLayout.LayoutParams.WRAP_CONTENT)
+                text = context.getLocalizedString(R.string.map_bubble_single, mission.title, mission.points)
+                setTextColor(CAPTION_TEXT_COLOR)
+                textSize = 12f
+                setPadding(0, dp(6), 0, 0)
             }
         )
     }

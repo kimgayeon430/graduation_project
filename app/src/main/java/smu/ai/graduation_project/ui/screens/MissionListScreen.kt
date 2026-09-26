@@ -139,7 +139,8 @@ fun MissionListScreen(onMissionClick: (String) -> Unit) {
                                 mission.copy(
                                     status = normalizedStatus,
                                     progress = progress.coerceIn(0f, 1f),
-                                    progressText = if (progress >= 1f) "1/1" else if (progress > 0f) "2/3" else "0/1"
+                                    progressText = if (progress >= 1f) "1/1" else if (progress > 0f) "2/3" else "0/1",
+                                    verifiedPhotoUrl = userMission?.getString("photoUrl")?.takeIf { it.isNotBlank() }
                                 )
                             }
                             loading = false

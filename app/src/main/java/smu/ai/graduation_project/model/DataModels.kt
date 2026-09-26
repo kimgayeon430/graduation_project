@@ -21,7 +21,9 @@ data class Mission(
     /** 사진 인증은 제출됐지만 자동 판정이 애매해 관리자 승인 대기 중인지. 승인 전까지 완료·포인트 지급 보류. */
     val photoNeedsReview: Boolean = false,
     /** 예상 소요 시간(분). 관리자가 아직 입력하지 않은 기존 미션은 null — UI 는 null 이면 이 값을 숨긴다. */
-    val estimatedMinutes: Int? = null
+    val estimatedMinutes: Int? = null,
+    /** 이 사용자가 사진 인증에 실제로 제출한 사진(`user_missions.photoUrl`). [imageUrl](대표 이미지)과 다르다. */
+    val verifiedPhotoUrl: String? = null
 )
 
 data class UserRank(
