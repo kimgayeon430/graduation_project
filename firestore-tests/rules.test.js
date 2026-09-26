@@ -173,3 +173,94 @@ describe("user_missions/{id}", () => {
     await assertSucceeds(deleteDoc(doc(asUser("admin1"), "user_missions", "um1")));
   });
 });
+
+describe("missions/{id} — 사용자 제안", () => {
+  test("로그인 사용자는 본인이 creatorId인 pending·points=0 제안을 만들 수 있다", async () => {
+    await assertSucceeds(setDoc(doc(asUser("alice"), "missions", "p1"), {
+      title: "제안", category: "투어", points: 0, creatorId: "alice", reviewStatus: "pending",
+    }));
+  });
+  test("포인트를 0이 아닌 값으로 스스로 정할 수 없다", async () => {
+    await assertFails(setDoc(doc(asUser("alice"), "missions", "p1"), {
+      title: "제안", category: "투어", points: 100, creatorId: "alice", reviewStatus: "pending",
+    }));
+  });
+  test("reviewStatus를 approved로 직접 만들 수 없다(자기 승인 불가)", async () => {
+    await assertFails(setDoc(doc(asUser("alice"), "missions", "p1"), {
+      title: "제안", category: "투어", points: 0, creatorId: "alice", reviewStatus: "approved",
+    }));
+  });
+  test("남의 이름으로 creatorId를 지정할 수 없다", async () => {
+    await assertFails(setDoc(doc(asUser("alice"), "missions", "p1"), {
+      title: "제안", category: "투어", points: 0, creatorId: "mallory", reviewStatus: "pending",
+    }));
+  });
+  test("관리자는 승인하며 포인트를 정할 수 있다", async () => {
+    await seedAdmin("admin1");
+    await seedMission("p1", { creatorId: "alice", reviewStatus: "pending", points: 0 });
+    await assertSucceeds(updateDoc(doc(asUser("admin1"), "missions", "p1"),
+      { points: 150, reviewStatus: "approved" }));
+  });
+  test("제안자는 수정요청(changes_requested) 상태에서만 재제출(pending으로)할 수 있다", async () => {
+    await seedMission("p1", { creatorId: "alice", reviewStatus: "changes_requested", points: 0, reviewNote: "사유" });
+    await assertSucceeds(updateDoc(doc(asUser("alice"), "missions", "p1"),
+      { title: "수정된 제목", reviewStatus: "pending" }));
+  });
+  test("반려(rejected) 상태의 미션은 재제출할 수 없다", async () => {
+    await seedMission("p1", { creatorId: "alice", reviewStatus: "rejected", points: 0 });
+    await assertFails(updateDoc(doc(asUser("alice"), "missions", "p1"),
+      { title: "수정된 제목", reviewStatus: "pending" }));
+  });
+  test("재제출하면서 포인트를 스스로 올릴 수 없다", async () => {
+    await seedMission("p1", { creatorId: "alice", reviewStatus: "changes_requested", points: 0 });
+    await assertFails(updateDoc(doc(asUser("alice"), "missions", "p1"),
+      { title: "x", reviewStatus: "pending", points: 999 }));
+  });
+  test("남의 제안을 재제출할 수 없다", async () => {
+    await seedMission("p1", { creatorId: "alice", reviewStatus: "changes_requested", points: 0 });
+    await assertFails(updateDoc(doc(asUser("mallory"), "missions", "p1"),
+      { title: "x", reviewStatus: "pending" }));
+  });
+  test("로그인 사용자는 likeCount/bookmarkCount 필드만 갱신할 수 있다", async () => {
+    await seedMission("m1", { likeCount: 0, bookmarkCount: 0 });
+    await assertSucceeds(updateDoc(doc(asUser("bob"), "missions", "m1"), { likeCount: 1 }));
+    await assertSucceeds(updateDoc(doc(asUser("bob"), "missions", "m1"), { bookmarkCount: 1 }));
+    await assertFails(updateDoc(doc(asUser("bob"), "missions", "m1"), { likeCount: 2, points: 999 }));
+  });
+});
+
+describe("mission_likes/{id}", () => {
+  test("본인 uid로 시작하는 문서ID로만 좋아요를 만들 수 있다", async () => {
+    await assertSucceeds(setDoc(doc(asUser("alice"), "mission_likes", "alice_m1"),
+      { userId: "alice", missionId: "m1" }));
+  });
+  test("문서ID가 uid_missionId 형식이 아니면 거부된다(중복 방지)", async () => {
+    await assertFails(setDoc(doc(asUser("alice"), "mission_likes", "random"),
+      { userId: "alice", missionId: "m1" }));
+  });
+  test("남의 uid로 좋아요를 만들 수 없다", async () => {
+    await assertFails(setDoc(doc(asUser("alice"), "mission_likes", "mallory_m1"),
+      { userId: "mallory", missionId: "m1" }));
+  });
+  test("누구나 좋아요를 읽을 수 있다(공개 반응)", async () => {
+    await seed((db) => setDoc(doc(db, "mission_likes", "alice_m1"), { userId: "alice", missionId: "m1" }));
+    await assertSucceeds(getDoc(doc(asGuest(), "mission_likes", "alice_m1")));
+  });
+  test("본인은 좋아요를 취소(삭제)할 수 있고 남의 것은 못 지운다", async () => {
+    await seed((db) => setDoc(doc(db, "mission_likes", "alice_m1"), { userId: "alice", missionId: "m1" }));
+    await assertFails(deleteDoc(doc(asUser("mallory"), "mission_likes", "alice_m1")));
+    await assertSucceeds(deleteDoc(doc(asUser("alice"), "mission_likes", "alice_m1")));
+  });
+});
+
+describe("mission_bookmarks/{id}", () => {
+  test("본인 uid로 시작하는 문서ID로만 찜을 만들 수 있다", async () => {
+    await assertSucceeds(setDoc(doc(asUser("alice"), "mission_bookmarks", "alice_m1"),
+      { userId: "alice", missionId: "m1" }));
+  });
+  test("남은 본인 찜을 읽을 수 없다(개인 저장)", async () => {
+    await seed((db) => setDoc(doc(db, "mission_bookmarks", "alice_m1"), { userId: "alice", missionId: "m1" }));
+    await assertFails(getDoc(doc(asUser("mallory"), "mission_bookmarks", "alice_m1")));
+    await assertSucceeds(getDoc(doc(asUser("alice"), "mission_bookmarks", "alice_m1")));
+  });
+});

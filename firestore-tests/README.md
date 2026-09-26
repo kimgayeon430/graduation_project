@@ -1,7 +1,7 @@
 # Firestore 보안 규칙 테스트
 
 `../firestore.rules` 를 Firestore 에뮬레이터에 올려 `@firebase/rules-unit-testing` 으로 검증한다.
-`assertSucceeds` / `assertFails` 20건 (`rules.test.js`).
+`assertSucceeds` / `assertFails` 37건 (`rules.test.js`).
 
 ## 실행
 
@@ -22,6 +22,9 @@ npm test          # firebase emulators:exec 로 에뮬레이터를 띄우고 nod
 | `missions` | 게스트 읽기 O · 비관리자 생성/삭제 X · 비관리자는 `completionCount` 만 갱신 (다른 필드 섞으면 거부) |
 | `users` | 로그인 읽기 O(게스트 X) · 본인/관리자만 수정 · 삭제 불가 |
 | `user_missions` | 본인 문서만 생성 · 본인은 진행 상태 수정 O · **본인은 `photoNeedsReview` true→false 불가** · 관리자만 승인/삭제 |
+| `missions` (사용자 제안) | 본인 creatorId·pending·points=0 으로만 생성 · 포인트/승인상태 자가 설정 불가 · 재제출은 `changes_requested`에서만, 포인트/creatorId 불변 · `likeCount`/`bookmarkCount` 는 로그인 사용자 누구나 갱신 가능 |
+| `mission_likes` | 문서ID `{uid}_{missionId}` 형식만 생성 허용(중복 방지) · 남의 uid로 생성 불가 · 공개 읽기 · 본인만 삭제(취소) |
+| `mission_bookmarks` | 위와 동일한 생성 규칙 · 본인만 읽기(개인 저장) |
 
 ## 배포 (검증 후)
 
