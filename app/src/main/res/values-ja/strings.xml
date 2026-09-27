@@ -218,6 +218,7 @@
     <string name="profile_toast_nickname_empty">ニックネームを入力してください。</string>
     <string name="profile_toast_nickname_updated">ニックネームが変更されました。</string>
     <string name="profile_toast_nickname_update_failed">ニックネームの変更に失敗しました。</string>
+    <string name="profile_toast_photo_upload_failed">プロフィール写真の変更に失敗しました。</string>
 
     <!-- 관리자 홈 -->
     <string name="admin_home_title">管理者</string>
@@ -414,6 +415,7 @@
     <!-- 회원가입 -->
     <string name="signup_title">会員登録</string>
     <string name="signup_name_label">名前</string>
+    <string name="signup_photo_label">プロフィール写真（任意）</string>
     <string name="signup_email_label">メールアドレス</string>
     <string name="signup_password_label">パスワード</string>
     <string name="signup_toast_empty_fields">すべての項目を入力してください。</string>

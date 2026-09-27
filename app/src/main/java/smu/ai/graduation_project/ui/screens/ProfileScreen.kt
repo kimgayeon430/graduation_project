@@ -1,6 +1,9 @@
 package smu.ai.graduation_project.ui.screens
 
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -36,6 +39,7 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Stars
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CenterAlignedTopAppBar
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -55,24 +59,31 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
 import com.google.firebase.Firebase
 import com.google.firebase.auth.auth
 import com.google.firebase.auth.userProfileChangeRequest
 import com.google.firebase.Timestamp
 import com.google.firebase.firestore.Query
 import com.google.firebase.firestore.firestore
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import smu.ai.graduation_project.R
+import smu.ai.graduation_project.data.SupabaseStorage
 import smu.ai.graduation_project.data.AppLanguage
 import smu.ai.graduation_project.data.LanguagePreference
 import smu.ai.graduation_project.domain.BadgeId
@@ -97,6 +108,7 @@ import smu.ai.graduation_project.ui.theme.SuccessGreen
 import smu.ai.graduation_project.ui.theme.SurfaceCard
 import smu.ai.graduation_project.ui.theme.TextPrimary
 import smu.ai.graduation_project.ui.theme.TextSecondary
+import java.io.IOException
 import java.text.SimpleDateFormat
 import java.util.Locale
 
@@ -114,11 +126,15 @@ fun ProfileScreen(
     val currentUser = Firebase.auth.currentUser
     val db = Firebase.firestore
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
 
     val guestNickname = stringResource(R.string.profile_guest_nickname)
     val guestEmail = stringResource(R.string.profile_guest_email)
+    val photoUploadFailedMessage = stringResource(R.string.profile_toast_photo_upload_failed)
     var nickname by remember { mutableStateOf(currentUser?.displayName ?: guestNickname) }
     var email by remember { mutableStateOf(currentUser?.email ?: guestEmail) }
+    var photoUrl by remember { mutableStateOf<String?>(null) }
+    var isUploadingPhoto by remember { mutableStateOf(false) }
     var level by remember { mutableStateOf("Lv.1") }
     var points by remember { mutableIntStateOf(0) }
     var completedCount by remember { mutableIntStateOf(0) }
@@ -130,12 +146,45 @@ fun ProfileScreen(
     var showLanguageDialog by remember { mutableStateOf(false) }
     var nicknameDraft by remember { mutableStateOf(nickname) }
 
+    val photoPicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        val uid = currentUser?.uid
+        if (uri == null || uid == null) return@rememberLauncherForActivityResult
+        isUploadingPhoto = true
+        scope.launch {
+            val uploadedUrl = try {
+                withContext(Dispatchers.IO) {
+                    val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+                        ?: throw IOException("cannot read picked image")
+                    SupabaseStorage.upload("avatars/${uid}_${System.currentTimeMillis()}.jpg", bytes)
+                }
+            } catch (e: Exception) {
+                null
+            }
+            if (uploadedUrl == null) {
+                isUploadingPhoto = false
+                Toast.makeText(context, photoUploadFailedMessage, Toast.LENGTH_SHORT).show()
+                return@launch
+            }
+            db.collection("users").document(uid)
+                .update("photoUrl", uploadedUrl)
+                .addOnSuccessListener {
+                    photoUrl = uploadedUrl
+                    isUploadingPhoto = false
+                }
+                .addOnFailureListener {
+                    isUploadingPhoto = false
+                    Toast.makeText(context, photoUploadFailedMessage, Toast.LENGTH_SHORT).show()
+                }
+        }
+    }
+
     LaunchedEffect(currentUser?.uid) {
         currentUser?.uid?.let { uid ->
             db.collection("users").document(uid).addSnapshotListener { snapshot, _ ->
                 if (snapshot != null && snapshot.exists()) {
                     nickname = snapshot.getString("nickname") ?: currentUser.displayName ?: guestNickname
                     email = snapshot.getString("mail") ?: currentUser.email ?: guestEmail
+                    photoUrl = snapshot.getString("photoUrl")
                     level = snapshot.getString("level") ?: "Lv.1"
                     points = snapshot.getLong("points")?.toInt() ?: 0
                     @Suppress("UNCHECKED_CAST")
@@ -211,15 +260,41 @@ fun ProfileScreen(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(Spacing.sm + 2.dp)
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .size(92.dp)
-                            .border(2.dp, Color.White, CircleShape)
-                            .padding(4.dp)
-                            .background(Color.White, CircleShape),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(Icons.Default.Person, null, tint = MainPurple, modifier = Modifier.size(48.dp))
+                    Box(modifier = Modifier.size(92.dp)) {
+                        Box(
+                            modifier = Modifier
+                                .matchParentSize()
+                                .border(2.dp, Color.White, CircleShape)
+                                .padding(4.dp)
+                                .clip(CircleShape)
+                                .background(Color.White)
+                                .clickable(enabled = !isUploadingPhoto) {
+                                    photoPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                                },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            when {
+                                isUploadingPhoto -> CircularProgressIndicator(modifier = Modifier.size(28.dp), color = MainPurple)
+                                photoUrl != null -> AsyncImage(
+                                    model = photoUrl,
+                                    contentDescription = null,
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentScale = ContentScale.Crop
+                                )
+                                else -> Icon(Icons.Default.Person, null, tint = MainPurple, modifier = Modifier.size(48.dp))
+                            }
+                        }
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.BottomEnd)
+                                .size(24.dp)
+                                .clip(CircleShape)
+                                .background(MainPurple)
+                                .border(1.5.dp, Color.White, CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(Icons.Default.Edit, null, tint = Color.White, modifier = Modifier.size(14.dp))
+                        }
                     }
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(

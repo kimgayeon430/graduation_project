@@ -58,7 +58,8 @@ fun RankingScreen() {
                             rank = index + 1,
                             name = doc.getString("nickname") ?: defaultName,
                             points = doc.getLong("points")?.toInt() ?: 0,
-                            uid = doc.id
+                            uid = doc.id,
+                            photoUrl = doc.getString("photoUrl")
                         )
                     }
                 }
@@ -134,7 +135,8 @@ fun RankingScreen() {
                                 rank = userRank.rank,
                                 name = if (userRank.uid == currentUser?.uid) stringResource(R.string.ranking_you) else userRank.name,
                                 points = userRank.points,
-                                isMe = userRank.uid == currentUser?.uid
+                                isMe = userRank.uid == currentUser?.uid,
+                                photoUrl = userRank.photoUrl
                             )
                             if (index < visibleRanking.drop(3).lastIndex) {
                                 HorizontalDivider(

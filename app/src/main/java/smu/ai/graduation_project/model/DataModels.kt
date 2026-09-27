@@ -43,5 +43,6 @@ data class UserRank(
     val rank: Int,
     val name: String,
     val points: Int,
-    val uid: String
+    val uid: String,
+    val photoUrl: String? = null
 )

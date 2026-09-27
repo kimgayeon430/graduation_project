@@ -16,12 +16,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.clickable
 import androidx.compose.ui.res.stringResource
+import coil.compose.AsyncImage
 import smu.ai.graduation_project.R
 import smu.ai.graduation_project.domain.BadgeId
 import smu.ai.graduation_project.domain.TravelLevel
@@ -344,19 +346,19 @@ fun TopThreeSection(top3: List<UserRank>) {
         verticalAlignment = Alignment.Bottom
     ) {
         if (top3.size >= 2) {
-            TopRankItem(rank = 2, name = top3[1].name, points = top3[1].points, color = Color(0xFFC0C0C0))
+            TopRankItem(rank = 2, name = top3[1].name, points = top3[1].points, color = Color(0xFFC0C0C0), photoUrl = top3[1].photoUrl)
         }
         if (top3.isNotEmpty()) {
-            TopRankItem(rank = 1, name = top3[0].name, points = top3[0].points, color = Color(0xFFFFD700), isFirst = true)
+            TopRankItem(rank = 1, name = top3[0].name, points = top3[0].points, color = Color(0xFFFFD700), isFirst = true, photoUrl = top3[0].photoUrl)
         }
         if (top3.size >= 3) {
-            TopRankItem(rank = 3, name = top3[2].name, points = top3[2].points, color = Color(0xFFCD7F32))
+            TopRankItem(rank = 3, name = top3[2].name, points = top3[2].points, color = Color(0xFFCD7F32), photoUrl = top3[2].photoUrl)
         }
     }
 }
 
 @Composable
-fun TopRankItem(rank: Int, name: String, points: Int, color: Color, isFirst: Boolean = false) {
+fun TopRankItem(rank: Int, name: String, points: Int, color: Color, isFirst: Boolean = false, photoUrl: String? = null) {
     val size = if (isFirst) 100.dp else 80.dp
     val avatarSize = if (isFirst) 80.dp else 65.dp
     
@@ -380,10 +382,20 @@ fun TopRankItem(rank: Int, name: String, points: Int, color: Color, isFirst: Boo
                 Box(
                     modifier = Modifier
                         .size(avatarSize)
-                        .background(Color.LightGray, CircleShape),
+                        .clip(CircleShape)
+                        .background(Color.LightGray),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(Icons.Default.Person, null, modifier = Modifier.size(size / 2), tint = Color.White)
+                    if (photoUrl != null) {
+                        AsyncImage(
+                            model = photoUrl,
+                            contentDescription = null,
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Crop
+                        )
+                    } else {
+                        Icon(Icons.Default.Person, null, modifier = Modifier.size(size / 2), tint = Color.White)
+                    }
                 }
                 Surface(
                     color = color,
@@ -406,7 +418,7 @@ fun TopRankItem(rank: Int, name: String, points: Int, color: Color, isFirst: Boo
 }
 
 @Composable
-fun RankingListItem(rank: Int, name: String, points: Int, isMe: Boolean) {
+fun RankingListItem(rank: Int, name: String, points: Int, isMe: Boolean, photoUrl: String? = null) {
     Surface(
         color = if (isMe) LightPurple.copy(alpha = 0.5f) else Color.Transparent,
         modifier = Modifier.fillMaxWidth()
@@ -427,10 +439,20 @@ fun RankingListItem(rank: Int, name: String, points: Int, isMe: Boolean) {
             Box(
                 modifier = Modifier
                     .size(40.dp)
-                    .background(Color.LightGray, CircleShape),
+                    .clip(CircleShape)
+                    .background(Color.LightGray),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(Icons.Default.Person, null, modifier = Modifier.size(24.dp), tint = Color.White)
+                if (photoUrl != null) {
+                    AsyncImage(
+                        model = photoUrl,
+                        contentDescription = null,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
+                    )
+                } else {
+                    Icon(Icons.Default.Person, null, modifier = Modifier.size(24.dp), tint = Color.White)
+                }
             }
             Spacer(modifier = Modifier.width(16.dp))
             Text(

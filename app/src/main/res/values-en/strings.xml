@@ -218,6 +218,7 @@
     <string name="profile_toast_nickname_empty">Please enter a nickname.</string>
     <string name="profile_toast_nickname_updated">Nickname updated.</string>
     <string name="profile_toast_nickname_update_failed">Failed to update nickname.</string>
+    <string name="profile_toast_photo_upload_failed">Failed to update profile photo.</string>
 
     <!-- 관리자 홈 -->
     <string name="admin_home_title">Admin</string>
@@ -414,6 +415,7 @@
     <!-- 회원가입 -->
     <string name="signup_title">Sign up</string>
     <string name="signup_name_label">Name</string>
+    <string name="signup_photo_label">Profile photo (optional)</string>
     <string name="signup_email_label">Email</string>
     <string name="signup_password_label">Password</string>
     <string name="signup_toast_empty_fields">Fill in all fields.</string>
