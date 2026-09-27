@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -171,6 +172,10 @@ fun ProfileScreen(
     }
 
     Scaffold(
+        // 하단 탭 Scaffold(MainActivity) 안에 중첩되는 화면 — 바깥 Scaffold가 이미 하단 내비게이션
+        // 바 높이만큼 콘텐츠 영역을 잡아주므로, 기본 WindowInsets를 여기서 또 적용하면 하단 바와
+        // 콘텐츠 사이에 실제로는 없는 여백이 이중으로 생긴다.
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
             CenterAlignedTopAppBar(
                 title = { Text(stringResource(R.string.profile_title), style = MaterialTheme.typography.titleLarge, color = TextPrimary) },
