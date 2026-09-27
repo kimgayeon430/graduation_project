@@ -291,43 +291,45 @@ fun ProfileScreen(
                 }
             }
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                StatCard(
-                    title = stringResource(R.string.profile_stat_points),
-                    value = String.format("%,dP", points),
-                    icon = Icons.Default.Stars,
-                    modifier = Modifier.weight(1f),
-                    onClick = onNavigateToPointHistory
-                )
-                StatCard(
-                    title = stringResource(R.string.profile_stat_ranking),
-                    value = if (rank > 0) "#$rank" else "-",
-                    icon = Icons.Default.EmojiEvents,
-                    modifier = Modifier.weight(1f)
-                )
-            }
+            Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.sm)
+                ) {
+                    StatCard(
+                        title = stringResource(R.string.profile_stat_points),
+                        value = String.format("%,dP", points),
+                        icon = Icons.Default.Stars,
+                        modifier = Modifier.weight(1f),
+                        onClick = onNavigateToPointHistory
+                    )
+                    StatCard(
+                        title = stringResource(R.string.profile_stat_ranking),
+                        value = if (rank > 0) "#$rank" else "-",
+                        icon = Icons.Default.EmojiEvents,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                StatCard(
-                    title = stringResource(R.string.profile_stat_in_progress),
-                    value = progressCount.toString(),
-                    icon = Icons.Default.HourglassTop,
-                    modifier = Modifier.weight(1f),
-                    onClick = onNavigateToInProgressMissions
-                )
-                StatCard(
-                    title = stringResource(R.string.profile_stat_completed),
-                    value = completedCount.toString(),
-                    icon = Icons.Default.Flag,
-                    modifier = Modifier.weight(1f),
-                    onClick = onNavigateToCompletedMissions
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.sm)
+                ) {
+                    StatCard(
+                        title = stringResource(R.string.profile_stat_in_progress),
+                        value = progressCount.toString(),
+                        icon = Icons.Default.HourglassTop,
+                        modifier = Modifier.weight(1f),
+                        onClick = onNavigateToInProgressMissions
+                    )
+                    StatCard(
+                        title = stringResource(R.string.profile_stat_completed),
+                        value = completedCount.toString(),
+                        icon = Icons.Default.Flag,
+                        modifier = Modifier.weight(1f),
+                        onClick = onNavigateToCompletedMissions
+                    )
+                }
             }
 
             Surface(
