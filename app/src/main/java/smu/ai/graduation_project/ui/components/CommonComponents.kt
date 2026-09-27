@@ -152,18 +152,20 @@ fun StatCard(
         shape = RoundedCornerShape(Radius.md)
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = Spacing.sm + Spacing.xs, vertical = Spacing.sm + Spacing.xs),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = Spacing.md, vertical = Spacing.md),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Box(
                 modifier = Modifier
-                    .size(32.dp)
+                    .size(46.dp)
                     .background(LightPurple, CircleShape),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(icon, null, tint = MainPurple, modifier = Modifier.size(17.dp))
+                Icon(icon, null, tint = MainPurple, modifier = Modifier.size(24.dp))
             }
-            Spacer(modifier = Modifier.width(Spacing.sm))
+            Spacer(modifier = Modifier.width(Spacing.sm + Spacing.xs))
             Column {
                 Text(title, style = MaterialTheme.typography.labelMedium, color = TextSecondary)
                 Text(value, style = MaterialTheme.typography.titleMedium, color = TextPrimary)
