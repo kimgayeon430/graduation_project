@@ -27,6 +27,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -73,12 +74,19 @@ import smu.ai.graduation_project.domain.RecommendationContext
 import smu.ai.graduation_project.domain.WeekBoundary
 import smu.ai.graduation_project.model.Mission
 import smu.ai.graduation_project.ui.components.recommendationReasonLabel
+import smu.ai.graduation_project.ui.theme.AppBackground
 import smu.ai.graduation_project.ui.theme.CardGray
 import smu.ai.graduation_project.ui.theme.GradientEnd
 import smu.ai.graduation_project.ui.theme.GradientStart
 import smu.ai.graduation_project.ui.theme.LightPurple
 import smu.ai.graduation_project.ui.theme.MainPurple
 import smu.ai.graduation_project.ui.theme.Orange
+import smu.ai.graduation_project.ui.theme.Radius
+import smu.ai.graduation_project.ui.theme.Spacing
+import smu.ai.graduation_project.ui.theme.SuccessGreen
+import smu.ai.graduation_project.ui.theme.SurfaceCard
+import smu.ai.graduation_project.ui.theme.TextPrimary
+import smu.ai.graduation_project.ui.theme.TextSecondary
 
 @Composable
 fun HomeScreen(onNavigateToDetail: (String) -> Unit) {
@@ -238,71 +246,80 @@ fun HomeScreen(onNavigateToDetail: (String) -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .background(AppBackground)
             .verticalScroll(rememberScrollState())
-            .padding(16.dp)
+            .padding(horizontal = Spacing.lg, vertical = Spacing.md)
     ) {
-        Text("Seoul Quest", color = MainPurple, fontWeight = FontWeight.Bold, fontSize = 24.sp)
-
-        Spacer(modifier = Modifier.height(24.dp))
-
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.Top
         ) {
             Column {
-                Text("Hello,", fontSize = 28.sp, fontWeight = FontWeight.Bold)
-                Text("$userName!", fontSize = 28.sp, fontWeight = FontWeight.Bold)
-                Text(stringResource(R.string.home_tagline), fontSize = 14.sp, color = Color.Gray)
+                Text(
+                    stringResource(R.string.home_greeting, userName),
+                    style = MaterialTheme.typography.headlineMedium,
+                    color = TextPrimary
+                )
+                Spacer(modifier = Modifier.height(Spacing.xs))
+                Text(
+                    stringResource(R.string.home_tagline),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = TextSecondary
+                )
             }
 
             Surface(
-                color = CardGray,
-                shape = RoundedCornerShape(20.dp),
-                modifier = Modifier.padding(top = 8.dp)
+                color = LightPurple,
+                shape = RoundedCornerShape(Radius.pill),
+                modifier = Modifier.padding(top = 4.dp)
             ) {
                 Row(
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                    modifier = Modifier.padding(horizontal = Spacing.md, vertical = Spacing.sm),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(Icons.Default.Stars, contentDescription = null, tint = Orange, modifier = Modifier.size(20.dp))
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(String.format("%,d", points), fontWeight = FontWeight.Bold)
+                    Icon(Icons.Default.Stars, contentDescription = null, tint = Orange, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(Spacing.xs))
+                    Text(String.format("%,d", points), style = MaterialTheme.typography.labelLarge, color = MainPurple)
                 }
             }
         }
 
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(Spacing.xl))
 
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(120.dp)
+                .height(128.dp)
                 .background(
                     Brush.linearGradient(listOf(GradientStart, GradientEnd)),
-                    RoundedCornerShape(16.dp)
+                    RoundedCornerShape(Radius.xl)
                 )
-                .padding(16.dp)
+                .padding(Spacing.lg)
         ) {
             Column {
-                Text(stringResource(R.string.home_weekly_progress_title), color = Color.White, fontSize = 16.sp)
-                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    stringResource(R.string.home_weekly_progress_title),
+                    style = MaterialTheme.typography.titleSmall,
+                    color = Color.White.copy(alpha = 0.9f)
+                )
+                Spacer(modifier = Modifier.height(Spacing.sm))
                 Row(verticalAlignment = Alignment.Bottom) {
                     Text(
                         "$weeklyCompletedCount/$totalGoal",
-                        color = Color.White,
-                        fontSize = 24.sp,
-                        fontWeight = FontWeight.Bold
+                        style = MaterialTheme.typography.headlineMedium,
+                        color = Color.White
                     )
-                    Spacer(modifier = Modifier.width(8.dp))
+                    Spacer(modifier = Modifier.width(Spacing.md))
                     LinearProgressIndicator(
                         progress = { (weeklyCompletedCount.toFloat() / totalGoal).coerceIn(0f, 1f) },
                         modifier = Modifier
                             .fillMaxWidth(0.7f)
                             .height(8.dp)
-                            .clip(CircleShape),
+                            .clip(CircleShape)
+                            .padding(bottom = 6.dp),
                         color = Color.White,
-                        trackColor = Color.White.copy(alpha = 0.3f)
+                        trackColor = Color.White.copy(alpha = 0.25f)
                     )
                 }
             }
@@ -316,7 +333,7 @@ fun HomeScreen(onNavigateToDetail: (String) -> Unit) {
             )
         }
 
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(Spacing.xl))
 
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -326,59 +343,56 @@ fun HomeScreen(onNavigateToDetail: (String) -> Unit) {
             Text(
                 if (activeMission != null) stringResource(R.string.home_active_mission_title)
                 else stringResource(R.string.home_recommended_title),
-                fontWeight = FontWeight.Bold,
-                fontSize = 18.sp
+                style = MaterialTheme.typography.titleLarge,
+                color = TextPrimary
             )
             TextButton(onClick = { }) {
-                Text(stringResource(R.string.home_view_more), color = MainPurple)
+                Text(stringResource(R.string.home_view_more), style = MaterialTheme.typography.labelLarge, color = MainPurple)
             }
         }
+
+        Spacer(modifier = Modifier.height(Spacing.sm))
 
         activeMission?.let { mission ->
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = Color.White),
-                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-                shape = RoundedCornerShape(16.dp)
+                colors = CardDefaults.cardColors(containerColor = SurfaceCard),
+                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+                shape = RoundedCornerShape(Radius.lg)
             ) {
                 Row(
-                    modifier = Modifier.padding(12.dp),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    modifier = Modifier.padding(Spacing.md),
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.md)
                 ) {
                     HomeMissionImage(
                         imageUrl = allMissions.firstOrNull { it.id == mission.id }?.imageUrl.orEmpty(),
                         title = mission.title
                     )
                     Column(modifier = Modifier.width(220.dp)) {
-                        Surface(
-                            color = if (mission.status == "진행중") Color(0xFF4CAF50) else MainPurple,
-                            shape = RoundedCornerShape(4.dp)
-                        ) {
-                            Text(
-                                if (mission.status == "진행중") stringResource(R.string.home_badge_in_progress)
-                                else stringResource(R.string.home_badge_recommended),
-                                color = Color.White,
-                                fontSize = 10.sp,
-                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
-                            )
-                        }
-                        Text(mission.title, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                        Text(mission.desc, fontSize = 12.sp, color = Color.Gray, maxLines = 1)
+                        HomeStatusChip(
+                            text = if (mission.status == "진행중") stringResource(R.string.home_badge_in_progress)
+                            else stringResource(R.string.home_badge_recommended),
+                            tint = if (mission.status == "진행중") SuccessGreen else MainPurple
+                        )
+                        Spacer(modifier = Modifier.height(Spacing.xs))
+                        Text(mission.title, style = MaterialTheme.typography.titleMedium, color = TextPrimary)
+                        Text(mission.desc, style = MaterialTheme.typography.bodySmall, color = TextSecondary, maxLines = 1)
+                        Spacer(modifier = Modifier.height(Spacing.xs))
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(stringResource(R.string.shared_reward_label), fontSize = 12.sp)
                             Icon(Icons.Default.Stars, contentDescription = null, tint = Orange, modifier = Modifier.size(14.dp))
-                            Text(" ${mission.points}P", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            Text(" ${mission.points}P", style = MaterialTheme.typography.labelMedium, color = TextPrimary)
                         }
-                        Spacer(modifier = Modifier.height(8.dp))
+                        Spacer(modifier = Modifier.height(Spacing.sm))
                         Button(
                             onClick = { onNavigateToDetail(mission.id) },
                             modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(Radius.sm),
                             colors = ButtonDefaults.buttonColors(containerColor = MainPurple)
                         ) {
                             Text(
                                 if (mission.status == "진행중") stringResource(R.string.home_btn_continue)
                                 else stringResource(R.string.home_btn_view),
-                                fontSize = 12.sp
+                                style = MaterialTheme.typography.labelMedium
                             )
                         }
                     }
@@ -387,7 +401,7 @@ fun HomeScreen(onNavigateToDetail: (String) -> Unit) {
         }
 
         if (showRecommendations) {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
                 recommendations.forEach { scored ->
                     RecommendedMissionCard(
                         scored = scored,
@@ -403,14 +417,14 @@ fun HomeScreen(onNavigateToDetail: (String) -> Unit) {
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(containerColor = CardGray),
                 elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-                shape = RoundedCornerShape(16.dp)
+                shape = RoundedCornerShape(Radius.lg)
             ) {
-                Column(modifier = Modifier.padding(20.dp)) {
-                    Text(stringResource(R.string.home_empty_title), fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                Column(modifier = Modifier.padding(Spacing.lg)) {
+                    Text(stringResource(R.string.home_empty_title), style = MaterialTheme.typography.titleSmall, color = TextPrimary)
                     Text(
                         stringResource(R.string.home_empty_desc),
-                        fontSize = 12.sp,
-                        color = Color.Gray
+                        style = MaterialTheme.typography.bodySmall,
+                        color = TextSecondary
                     )
                 }
             }
@@ -430,62 +444,70 @@ private fun RecommendedMissionCard(
     val mission = scored.mission
     Card(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-        shape = RoundedCornerShape(16.dp)
+        colors = CardDefaults.cardColors(containerColor = SurfaceCard),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+        shape = RoundedCornerShape(Radius.lg)
     ) {
         Row(
-            modifier = Modifier.padding(12.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
+            modifier = Modifier.padding(Spacing.md),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.md)
         ) {
             HomeMissionImage(imageUrl = mission.imageUrl, title = mission.title)
             Column(modifier = Modifier.width(220.dp)) {
-                Surface(color = MainPurple, shape = RoundedCornerShape(4.dp)) {
-                    Text(
-                        stringResource(R.string.home_badge_recommended),
-                        color = Color.White,
-                        fontSize = 10.sp,
-                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
-                    )
-                }
-                Text(mission.title, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                HomeStatusChip(text = stringResource(R.string.home_badge_recommended), tint = MainPurple)
+                Spacer(modifier = Modifier.height(Spacing.xs))
+                Text(mission.title, style = MaterialTheme.typography.titleMedium, color = TextPrimary)
                 if (scored.reasons.isNotEmpty()) {
                     Row(
-                        modifier = Modifier.padding(top = 2.dp),
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        modifier = Modifier.padding(top = 4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         scored.reasons.take(2).forEach { reason ->
-                            Surface(color = LightPurple, shape = RoundedCornerShape(4.dp)) {
+                            Surface(color = LightPurple, shape = RoundedCornerShape(Radius.pill)) {
                                 Text(
                                     recommendationReasonLabel(reason),
+                                    style = MaterialTheme.typography.labelSmall,
                                     color = MainPurple,
-                                    fontSize = 10.sp,
-                                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
                                 )
                             }
                         }
                     }
                 }
+                Spacer(modifier = Modifier.height(Spacing.xs))
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(stringResource(R.string.shared_reward_label), fontSize = 12.sp)
                     Icon(Icons.Default.Stars, contentDescription = null, tint = Orange, modifier = Modifier.size(14.dp))
-                    Text(" ${mission.points}P", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    Text(" ${mission.points}P", style = MaterialTheme.typography.labelMedium, color = TextPrimary)
                     distanceMeters?.let { meters ->
-                        Spacer(modifier = Modifier.width(8.dp))
+                        Spacer(modifier = Modifier.width(Spacing.sm))
                         Icon(Icons.Default.Place, contentDescription = null, tint = MainPurple, modifier = Modifier.size(14.dp))
-                        Text(" ${GeoDistance.format(meters)}", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        Text(" ${GeoDistance.format(meters)}", style = MaterialTheme.typography.labelMedium, color = TextPrimary)
                     }
                 }
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(Spacing.sm))
                 Button(
                     onClick = onClick,
                     modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(Radius.sm),
                     colors = ButtonDefaults.buttonColors(containerColor = MainPurple)
                 ) {
-                    Text(stringResource(R.string.home_btn_view), fontSize = 12.sp)
+                    Text(stringResource(R.string.home_btn_view), style = MaterialTheme.typography.labelMedium)
                 }
             }
         }
+    }
+}
+
+/** 상태 배지(진행중/추천 등)를 톤온톤 캡슐 칩으로 통일해서 그린다. */
+@Composable
+private fun HomeStatusChip(text: String, tint: Color) {
+    Surface(color = tint.copy(alpha = 0.12f), shape = RoundedCornerShape(Radius.pill)) {
+        Text(
+            text,
+            style = MaterialTheme.typography.labelSmall,
+            color = tint,
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+        )
     }
 }
 
@@ -495,7 +517,7 @@ private fun HomeMissionImage(imageUrl: String, title: String) {
     Box(
         modifier = Modifier
             .size(100.dp)
-            .clip(RoundedCornerShape(12.dp))
+            .clip(RoundedCornerShape(Radius.md))
             .background(LightPurple),
         contentAlignment = Alignment.Center
     ) {

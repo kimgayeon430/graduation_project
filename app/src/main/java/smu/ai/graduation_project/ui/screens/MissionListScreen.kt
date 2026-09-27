@@ -1,6 +1,7 @@
 package smu.ai.graduation_project.ui.screens
 
 import android.widget.Toast
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -34,6 +35,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -68,9 +70,20 @@ import smu.ai.graduation_project.domain.MissionReviewStatus
 import smu.ai.graduation_project.model.Mission
 import smu.ai.graduation_project.ui.components.categoryLabel
 import smu.ai.graduation_project.ui.components.missionStatusLabel
+import smu.ai.graduation_project.ui.theme.AppBackground
 import smu.ai.graduation_project.ui.theme.CardGray
+import smu.ai.graduation_project.ui.theme.DangerRed
 import smu.ai.graduation_project.ui.theme.MainPurple
 import smu.ai.graduation_project.ui.theme.Orange
+import smu.ai.graduation_project.ui.theme.OutlineSoft
+import smu.ai.graduation_project.ui.theme.Radius
+import smu.ai.graduation_project.ui.theme.Spacing
+import smu.ai.graduation_project.ui.theme.SuccessGreen
+import smu.ai.graduation_project.ui.theme.SurfaceCard
+import smu.ai.graduation_project.ui.theme.TextPrimary
+import smu.ai.graduation_project.ui.theme.TextSecondary
+import smu.ai.graduation_project.ui.theme.TextTertiary
+import smu.ai.graduation_project.ui.theme.WarningAmber
 
 private data class MissionCategory(val label: String, val dbValue: String?)
 
@@ -226,21 +239,24 @@ fun MissionListScreen(onMissionClick: (String) -> Unit) {
     }
 
     Scaffold(
-        containerColor = Color.White,
+        containerColor = AppBackground,
         topBar = {
             CenterAlignedTopAppBar(
                 title = {
                     Text(
                         if (showMap) stringResource(R.string.mission_map_title) else stringResource(R.string.mission_list_title),
-                        fontWeight = FontWeight.Bold, fontSize = 20.sp
+                        style = MaterialTheme.typography.titleLarge, color = TextPrimary
                     )
                 },
                 actions = {
                     TextButton(onClick = { showMap = !showMap }) {
-                        Text(if (showMap) stringResource(R.string.view_list) else stringResource(R.string.view_map))
+                        Text(
+                            if (showMap) stringResource(R.string.view_list) else stringResource(R.string.view_map),
+                            style = MaterialTheme.typography.labelLarge
+                        )
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.White)
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = AppBackground)
             )
         }
     ) { innerPadding ->
@@ -248,28 +264,28 @@ fun MissionListScreen(onMissionClick: (String) -> Unit) {
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .background(Color.White)
+                .background(AppBackground)
         ) {
             LazyRow(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 8.dp, bottom = 12.dp),
-                contentPadding = PaddingValues(horizontal = 16.dp),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    .padding(top = Spacing.sm, bottom = Spacing.md),
+                contentPadding = PaddingValues(horizontal = Spacing.md),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.sm)
             ) {
                 items(categories) { category ->
                     val selected = category == selectedCategory
                     Surface(
                         modifier = Modifier.clickable { selectedCategory = category },
-                        shape = RoundedCornerShape(12.dp),
-                        color = if (selected) MainPurple else Color.Transparent
+                        shape = RoundedCornerShape(Radius.pill),
+                        color = if (selected) MainPurple else SurfaceCard,
+                        border = if (selected) null else BorderStroke(1.dp, OutlineSoft)
                     ) {
                         Text(
                             text = categoryLabel(category.label),
-                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
-                            color = if (selected) Color.White else Color.Gray,
-                            fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-                            fontSize = 13.sp
+                            modifier = Modifier.padding(horizontal = Spacing.md, vertical = 10.dp),
+                            style = MaterialTheme.typography.labelLarge,
+                            color = if (selected) Color.White else TextSecondary
                         )
                     }
                 }
@@ -296,8 +312,8 @@ fun MissionListScreen(onMissionClick: (String) -> Unit) {
             } else {
                 LazyColumn(
                     modifier = Modifier.fillMaxWidth().weight(1f),
-                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 12.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                    contentPadding = PaddingValues(horizontal = Spacing.md, vertical = Spacing.sm),
+                    verticalArrangement = Arrangement.spacedBy(Spacing.sm + Spacing.xs)
                 ) {
                     items(missions) { mission ->
                         MissionListCard(
@@ -322,21 +338,22 @@ private fun MissionListCard(
 ) {
     Surface(
         onClick = onClick,
-        shape = RoundedCornerShape(18.dp),
-        color = Color.White,
-        shadowElevation = 4.dp
+        shape = RoundedCornerShape(Radius.lg),
+        color = SurfaceCard,
+        border = BorderStroke(1.dp, OutlineSoft),
+        shadowElevation = 1.dp
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(12.dp),
+                .padding(Spacing.md),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Box(
                 modifier = Modifier
-                    .size(width = 74.dp, height = 86.dp)
-                    .background(CardGray, RoundedCornerShape(12.dp))
-                    .clip(RoundedCornerShape(12.dp))
+                    .size(width = 76.dp, height = 88.dp)
+                    .background(CardGray, RoundedCornerShape(Radius.md))
+                    .clip(RoundedCornerShape(Radius.md))
             ) {
                 if (mission.imageUrl.isNotBlank()) {
                     AsyncImage(
@@ -358,24 +375,25 @@ private fun MissionListCard(
 
                 Surface(
                     color = missionStatusColor(mission.status),
-                    shape = RoundedCornerShape(topStart = 12.dp, bottomEnd = 10.dp),
-                    modifier = Modifier.align(Alignment.TopStart)
+                    shape = RoundedCornerShape(Radius.pill),
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(6.dp)
                 ) {
                     Text(
                         text = missionStatusLabel(mission.status),
                         color = Color.White,
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                        style = MaterialTheme.typography.labelSmall,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.width(12.dp))
+            Spacer(modifier = Modifier.width(Spacing.md))
 
             Column(
                 modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(6.dp)
+                verticalArrangement = Arrangement.spacedBy(Spacing.xs + 2.dp)
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -384,25 +402,23 @@ private fun MissionListCard(
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
                             text = mission.title,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 17.sp,
-                            color = Color(0xFF303030)
+                            style = MaterialTheme.typography.titleMedium,
+                            color = TextPrimary
                         )
                         Text(
                             text = mission.desc,
-                            color = Color.Gray,
-                            fontSize = 12.sp,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = TextSecondary,
                             maxLines = 2
                         )
                     }
-                    Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null, tint = Color.LightGray)
+                    Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null, tint = TextTertiary)
                 }
 
                 Text(
                     text = mission.progressText,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 16.sp,
-                    color = Color(0xFF353535)
+                    style = MaterialTheme.typography.labelLarge,
+                    color = TextPrimary
                 )
 
                 LinearProgressIndicator(
@@ -410,9 +426,9 @@ private fun MissionListCard(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(6.dp)
-                        .clip(RoundedCornerShape(12.dp)),
-                    color = Color(0xFF70BE63),
-                    trackColor = Color(0xFFE8E8E8)
+                        .clip(RoundedCornerShape(Radius.pill)),
+                    color = SuccessGreen,
+                    trackColor = CardGray
                 )
 
                 Row(
@@ -421,30 +437,30 @@ private fun MissionListCard(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.Circle, null, tint = Orange, modifier = Modifier.size(9.dp))
+                        Icon(Icons.Default.Circle, null, tint = Orange, modifier = Modifier.size(8.dp))
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
                             text = "${mission.points}P",
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 14.sp,
-                            color = Color(0xFF404040)
+                            style = MaterialTheme.typography.labelLarge,
+                            color = TextPrimary
                         )
                     }
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(2.dp)) {
                         IconButton(onClick = onToggleLike, modifier = Modifier.size(28.dp)) {
                             Icon(
                                 if (mission.isLikedByMe) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
                                 contentDescription = null,
-                                tint = if (mission.isLikedByMe) Color(0xFFE0537A) else Color.LightGray,
+                                tint = if (mission.isLikedByMe) DangerRed else TextTertiary,
                                 modifier = Modifier.size(18.dp)
                             )
                         }
-                        Text("${mission.likeCount}", fontSize = 11.sp, color = Color.Gray)
+                        Text("${mission.likeCount}", style = MaterialTheme.typography.labelSmall, color = TextSecondary)
+                        Spacer(modifier = Modifier.width(Spacing.xs))
                         IconButton(onClick = onToggleBookmark, modifier = Modifier.size(28.dp)) {
                             Icon(
                                 if (mission.isBookmarkedByMe) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
                                 contentDescription = null,
-                                tint = if (mission.isBookmarkedByMe) MainPurple else Color.LightGray,
+                                tint = if (mission.isBookmarkedByMe) MainPurple else TextTertiary,
                                 modifier = Modifier.size(18.dp)
                             )
                         }
@@ -457,8 +473,8 @@ private fun MissionListCard(
 
 private fun missionStatusColor(status: String): Color {
     return when (status) {
-        "진행중" -> Color(0xFF7BC96F)
+        "진행중" -> SuccessGreen
         "완료" -> MainPurple
-        else -> Color(0xFFD6A248)
+        else -> WarningAmber
     }
 }

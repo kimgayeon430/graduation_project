@@ -434,6 +434,7 @@
     <string name="preference_btn_done">완료</string>
 
     <!-- 홈 -->
+    <string name="home_greeting">%1$s님,</string>
     <string name="home_tagline">오늘도 새로운 미션에 도전해보세요!</string>
     <string name="home_weekly_progress_title">이번 주 미션 진행률</string>
     <string name="home_active_mission_title">현재 진행 중인 미션</string>

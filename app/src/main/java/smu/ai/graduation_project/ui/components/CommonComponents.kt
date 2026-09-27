@@ -146,19 +146,27 @@ fun StatCard(
         modifier = modifier.then(
             if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier
         ),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        border = BorderStroke(0.5.dp, Color.LightGray),
-        shape = RoundedCornerShape(12.dp)
+        colors = CardDefaults.cardColors(containerColor = SurfaceCard),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+        border = BorderStroke(1.dp, OutlineSoft),
+        shape = RoundedCornerShape(Radius.md)
     ) {
         Row(
-            modifier = Modifier.padding(16.dp),
+            modifier = Modifier.padding(Spacing.md),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(icon, null, tint = MainPurple, modifier = Modifier.size(24.dp))
-            Spacer(modifier = Modifier.width(12.dp))
+            Box(
+                modifier = Modifier
+                    .size(38.dp)
+                    .background(LightPurple, CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(icon, null, tint = MainPurple, modifier = Modifier.size(20.dp))
+            }
+            Spacer(modifier = Modifier.width(Spacing.sm + Spacing.xs))
             Column {
-                Text(title, fontSize = 11.sp, color = Color.Gray)
-                Text(value, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                Text(title, style = MaterialTheme.typography.labelMedium, color = TextSecondary)
+                Text(value, style = MaterialTheme.typography.titleMedium, color = TextPrimary)
             }
         }
     }
@@ -183,13 +191,20 @@ fun ProfileMenuItem(title: String, icon: ImageVector, onClick: () -> Unit) {
     ) {
         Row(
             modifier = Modifier
-                .padding(horizontal = 32.dp, vertical = 12.dp),
+                .padding(horizontal = Spacing.lg, vertical = Spacing.sm + Spacing.xs),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(icon, null, modifier = Modifier.size(24.dp), tint = Color.Gray)
-            Spacer(modifier = Modifier.width(16.dp))
-            Text(title, fontSize = 16.sp, modifier = Modifier.weight(1f))
-            Icon(Icons.Default.ChevronRight, null, tint = Color.LightGray)
+            Box(
+                modifier = Modifier
+                    .size(34.dp)
+                    .background(CardGray, CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(icon, null, modifier = Modifier.size(18.dp), tint = TextSecondary)
+            }
+            Spacer(modifier = Modifier.width(Spacing.md))
+            Text(title, style = MaterialTheme.typography.bodyLarge, color = TextPrimary, modifier = Modifier.weight(1f))
+            Icon(Icons.Default.ChevronRight, null, tint = TextTertiary)
         }
     }
 }

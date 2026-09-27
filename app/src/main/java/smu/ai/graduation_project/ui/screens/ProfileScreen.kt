@@ -1,7 +1,9 @@
 package smu.ai.graduation_project.ui.screens
 
 import android.widget.Toast
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -34,9 +36,11 @@ import androidx.compose.material.icons.filled.Stars
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
@@ -78,10 +82,16 @@ import smu.ai.graduation_project.ui.components.badgeIcon
 import smu.ai.graduation_project.ui.components.badgeLockedHint
 import smu.ai.graduation_project.ui.components.badgeTitle
 import smu.ai.graduation_project.ui.components.travelLevelLabel
-import smu.ai.graduation_project.ui.theme.CardGray
+import smu.ai.graduation_project.ui.theme.AppBackground
 import smu.ai.graduation_project.ui.theme.LightPurple
 import smu.ai.graduation_project.ui.theme.MainPurple
 import smu.ai.graduation_project.ui.theme.Orange
+import smu.ai.graduation_project.ui.theme.OutlineSoft
+import smu.ai.graduation_project.ui.theme.Radius
+import smu.ai.graduation_project.ui.theme.Spacing
+import smu.ai.graduation_project.ui.theme.SurfaceCard
+import smu.ai.graduation_project.ui.theme.TextPrimary
+import smu.ai.graduation_project.ui.theme.TextSecondary
 import java.text.SimpleDateFormat
 import java.util.Locale
 
@@ -163,49 +173,50 @@ fun ProfileScreen(
     Scaffold(
         topBar = {
             CenterAlignedTopAppBar(
-                title = { Text(stringResource(R.string.profile_title), fontWeight = FontWeight.Bold) },
+                title = { Text(stringResource(R.string.profile_title), style = MaterialTheme.typography.titleLarge, color = TextPrimary) },
                 actions = {
                     IconButton(onClick = onLogout) {
-                        Icon(Icons.AutoMirrored.Filled.ExitToApp, null)
+                        Icon(Icons.AutoMirrored.Filled.ExitToApp, null, tint = TextSecondary)
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.White)
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = AppBackground)
             )
         },
-        containerColor = Color.White
+        containerColor = AppBackground
     ) { innerPadding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp, vertical = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(18.dp)
+                .padding(horizontal = Spacing.lg, vertical = Spacing.md),
+            verticalArrangement = Arrangement.spacedBy(Spacing.lg - 2.dp)
         ) {
             Surface(
                 modifier = Modifier.fillMaxWidth(),
                 color = LightPurple,
-                shape = RoundedCornerShape(24.dp)
+                shape = RoundedCornerShape(Radius.xl)
             ) {
                 Column(
-                    modifier = Modifier.padding(22.dp),
+                    modifier = Modifier.padding(Spacing.lg),
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                    verticalArrangement = Arrangement.spacedBy(Spacing.sm + 2.dp)
                 ) {
                     Box(
                         modifier = Modifier
                             .size(92.dp)
+                            .border(2.dp, Color.White, CircleShape)
+                            .padding(4.dp)
                             .background(Color.White, CircleShape),
                         contentAlignment = Alignment.Center
                     ) {
-                        Icon(Icons.Default.Person, null, tint = MainPurple, modifier = Modifier.size(50.dp))
+                        Icon(Icons.Default.Person, null, tint = MainPurple, modifier = Modifier.size(48.dp))
                     }
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
                             text = nickname,
-                            fontWeight = FontWeight.ExtraBold,
-                            fontSize = 24.sp,
-                            color = Color(0xFF2B2B2B)
+                            style = MaterialTheme.typography.headlineMedium,
+                            color = TextPrimary
                         )
                         IconButton(onClick = {
                             nicknameDraft = nickname
@@ -214,18 +225,18 @@ fun ProfileScreen(
                             Icon(Icons.Default.Edit, null, tint = MainPurple, modifier = Modifier.size(18.dp))
                         }
                     }
-                    Text(email, color = Color.Gray, fontSize = 14.sp)
-                    Surface(color = Color.White, shape = RoundedCornerShape(50)) {
+                    Text(email, style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
+                    Surface(color = Color.White, shape = RoundedCornerShape(Radius.pill)) {
                         Row(
-                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                            modifier = Modifier.padding(horizontal = Spacing.md, vertical = Spacing.sm),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Icon(Icons.Default.Stars, null, tint = Orange, modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.width(6.dp))
+                            Spacer(modifier = Modifier.width(Spacing.xs))
                             Text(
                                 text = "$level · ${String.format("%,d", points)}P",
-                                fontWeight = FontWeight.Bold,
-                                color = Color(0xFF333333)
+                                style = MaterialTheme.typography.labelLarge,
+                                color = TextPrimary
                             )
                         }
                     }
@@ -235,12 +246,13 @@ fun ProfileScreen(
             val levelProgress = remember(points) { TravelLevelPolicy.progressFor(points) }
             Surface(
                 modifier = Modifier.fillMaxWidth(),
-                color = CardGray,
-                shape = RoundedCornerShape(20.dp)
+                color = SurfaceCard,
+                border = BorderStroke(1.dp, OutlineSoft),
+                shape = RoundedCornerShape(Radius.lg)
             ) {
-                Column(modifier = Modifier.padding(18.dp)) {
-                    Text(stringResource(R.string.profile_level_section_title), fontWeight = FontWeight.Bold, fontSize = 15.sp, color = Color.Gray)
-                    Spacer(modifier = Modifier.height(8.dp))
+                Column(modifier = Modifier.padding(Spacing.lg)) {
+                    Text(stringResource(R.string.profile_level_section_title), style = MaterialTheme.typography.labelLarge, color = TextSecondary)
+                    Spacer(modifier = Modifier.height(Spacing.sm))
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -248,9 +260,8 @@ fun ProfileScreen(
                     ) {
                         Text(
                             stringResource(R.string.level_display_format, travelLevelLabel(levelProgress.level), levelProgress.level.number),
-                            fontWeight = FontWeight.ExtraBold,
-                            fontSize = 18.sp,
-                            color = Color(0xFF2C2C2C)
+                            style = MaterialTheme.typography.titleLarge,
+                            color = TextPrimary
                         )
                         Text(
                             if (levelProgress.isMaxLevel) {
@@ -258,12 +269,11 @@ fun ProfileScreen(
                             } else {
                                 stringResource(R.string.level_points_to_next, levelProgress.pointsToNextLevel ?: 0)
                             },
-                            fontSize = 13.sp,
-                            color = MainPurple,
-                            fontWeight = FontWeight.SemiBold
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MainPurple
                         )
                     }
-                    Spacer(modifier = Modifier.height(10.dp))
+                    Spacer(modifier = Modifier.height(Spacing.sm + 2.dp))
                     LinearProgressIndicator(
                         progress = { levelProgress.progressRatio },
                         modifier = Modifier
@@ -317,31 +327,31 @@ fun ProfileScreen(
 
             Surface(
                 modifier = Modifier.fillMaxWidth(),
-                color = CardGray,
-                shape = RoundedCornerShape(20.dp)
+                color = SurfaceCard,
+                border = BorderStroke(1.dp, OutlineSoft),
+                shape = RoundedCornerShape(Radius.lg)
             ) {
                 Column(
-                    modifier = Modifier.padding(18.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                    modifier = Modifier.padding(Spacing.lg),
+                    verticalArrangement = Arrangement.spacedBy(Spacing.sm)
                 ) {
-                    Text(stringResource(R.string.profile_activity_summary_title), fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                    Text(stringResource(R.string.profile_activity_summary_title), style = MaterialTheme.typography.titleMedium, color = TextPrimary)
                     Text(
                         text = when {
                             completedCount > 0 -> stringResource(R.string.profile_activity_summary_both, completedCount, progressCount)
                             progressCount > 0 -> stringResource(R.string.profile_activity_summary_progress_only, progressCount)
                             else -> stringResource(R.string.profile_activity_summary_none)
                         },
-                        color = Color.Gray,
-                        lineHeight = 20.sp,
-                        fontSize = 14.sp
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = TextSecondary
                     )
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Default.LocalFireDepartment, null, tint = Orange, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(6.dp))
+                        Spacer(modifier = Modifier.width(Spacing.xs))
                         Text(
                             text = stringResource(R.string.profile_next_goal),
-                            color = Color(0xFF444444),
-                            fontSize = 13.sp
+                            style = MaterialTheme.typography.bodySmall,
+                            color = TextPrimary
                         )
                     }
                 }
@@ -349,13 +359,13 @@ fun ProfileScreen(
 
             Surface(
                 modifier = Modifier.fillMaxWidth(),
-                color = Color.White,
-                shadowElevation = 1.dp,
-                shape = RoundedCornerShape(20.dp)
+                color = SurfaceCard,
+                border = BorderStroke(1.dp, OutlineSoft),
+                shape = RoundedCornerShape(Radius.lg)
             ) {
-                Column(modifier = Modifier.padding(18.dp)) {
-                    Text(stringResource(R.string.profile_badges_title), fontWeight = FontWeight.Bold, fontSize = 18.sp)
-                    Spacer(modifier = Modifier.height(14.dp))
+                Column(modifier = Modifier.padding(Spacing.lg)) {
+                    Text(stringResource(R.string.profile_badges_title), style = MaterialTheme.typography.titleMedium, color = TextPrimary)
+                    Spacer(modifier = Modifier.height(Spacing.sm + 6.dp))
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceEvenly
@@ -373,21 +383,26 @@ fun ProfileScreen(
 
             Surface(
                 modifier = Modifier.fillMaxWidth(),
-                color = Color.White,
-                shadowElevation = 2.dp,
-                shape = RoundedCornerShape(18.dp)
+                color = SurfaceCard,
+                border = BorderStroke(1.dp, OutlineSoft),
+                shape = RoundedCornerShape(Radius.lg)
             ) {
-                Column(modifier = Modifier.padding(vertical = 8.dp)) {
+                Column(modifier = Modifier.padding(vertical = Spacing.xs)) {
                     ProfileMenuItem(stringResource(R.string.profile_menu_nickname), Icons.Default.Edit) {
                         nicknameDraft = nickname
                         showNicknameDialog = true
                     }
+                    HorizontalDivider(color = OutlineSoft, modifier = Modifier.padding(horizontal = Spacing.lg))
                     ProfileMenuItem(stringResource(R.string.profile_menu_language), Icons.Default.Language) {
                         showLanguageDialog = true
                     }
+                    HorizontalDivider(color = OutlineSoft, modifier = Modifier.padding(horizontal = Spacing.lg))
                     ProfileMenuItem(stringResource(R.string.profile_menu_my_missions), Icons.AutoMirrored.Filled.Assignment, onClick = onNavigateToMyMissions)
+                    HorizontalDivider(color = OutlineSoft, modifier = Modifier.padding(horizontal = Spacing.lg))
                     ProfileMenuItem(stringResource(R.string.profile_menu_bookmarks), Icons.Default.Bookmark, onClick = onNavigateToBookmarkedMissions)
+                    HorizontalDivider(color = OutlineSoft, modifier = Modifier.padding(horizontal = Spacing.lg))
                     ProfileMenuItem(stringResource(R.string.profile_menu_ranking), Icons.Default.EmojiEvents, onClick = onNavigateToRanking)
+                    HorizontalDivider(color = OutlineSoft, modifier = Modifier.padding(horizontal = Spacing.lg))
                     ProfileMenuItem(stringResource(R.string.profile_menu_logout), Icons.AutoMirrored.Filled.ExitToApp, onClick = onLogout)
                 }
             }
