@@ -29,7 +29,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -320,21 +319,12 @@ fun HomeScreen(onNavigateToDetail: (String) -> Unit) {
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                if (activeMission != null) stringResource(R.string.home_active_mission_title)
-                else stringResource(R.string.home_recommended_title),
-                fontWeight = FontWeight.Bold,
-                fontSize = 18.sp
-            )
-            TextButton(onClick = { }) {
-                Text(stringResource(R.string.home_view_more), color = MainPurple)
-            }
-        }
+        Text(
+            if (activeMission != null) stringResource(R.string.home_active_mission_title)
+            else "✨ " + stringResource(R.string.home_recommended_title),
+            fontWeight = FontWeight.Bold,
+            fontSize = 18.sp
+        )
 
         activeMission?.let { mission ->
             Card(
@@ -444,14 +434,6 @@ private fun RecommendedMissionCard(
         ) {
             HomeMissionImage(imageUrl = mission.imageUrl, title = mission.title, category = mission.category)
             Column(modifier = Modifier.width(220.dp)) {
-                Surface(color = MainPurple, shape = RoundedCornerShape(4.dp)) {
-                    Text(
-                        stringResource(R.string.home_badge_recommended),
-                        color = Color.White,
-                        fontSize = 10.sp,
-                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
-                    )
-                }
                 Text(mission.title, fontWeight = FontWeight.Bold, fontSize = 16.sp)
                 if (scored.reasons.isNotEmpty()) {
                     Row(
