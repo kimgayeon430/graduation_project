@@ -85,11 +85,27 @@ fun travelLevelLabel(level: TravelLevel): String = when (level) {
     TravelLevel.MASTER_TRAVELER -> stringResource(R.string.level_name_5)
 }
 
-/** 배지 아이콘. 획득/미획득 모두 같은 아이콘을 쓰고 색만 달리한다(획득=보라, 미획득=회색+자물쇠). */
+/** 레벨별 이모지("새싹"=🌱 ~ "마스터"=👑). 언어와 무관하게 항상 같은 기호라 문자열 리소스로 안 뺐다. */
+fun travelLevelEmoji(level: TravelLevel): String = when (level) {
+    TravelLevel.SEEDLING -> "🌱"
+    TravelLevel.NEIGHBORHOOD_EXPLORER -> "🚶"
+    TravelLevel.CITY_TRAVELER -> "🏙️"
+    TravelLevel.HIDDEN_GEM_COLLECTOR -> "💎"
+    TravelLevel.MASTER_TRAVELER -> "👑"
+}
+
+/** 배지 아이콘. 획득/미획득 모두 같은 아이콘을 쓰고 색만 달리한다(획득=배지별 색, 미획득=회색+자물쇠). */
 fun badgeIcon(badgeId: BadgeId): ImageVector = when (badgeId) {
     BadgeId.FIRST_STEP -> Icons.AutoMirrored.Filled.DirectionsWalk
     BadgeId.WEEKLY_EXPLORER -> Icons.Default.Explore
     BadgeId.TASTE_DISCOVERY -> Icons.Default.Favorite
+}
+
+/** 배지 3종을 같은 보라색이 아니라 성격에 맞는 색으로 구분한다(성장=초록, 탐험=파랑, 취향/맛=주황). */
+fun badgeAccentColor(badgeId: BadgeId): Color = when (badgeId) {
+    BadgeId.FIRST_STEP -> SuccessGreen
+    BadgeId.WEEKLY_EXPLORER -> InfoBlue
+    BadgeId.TASTE_DISCOVERY -> Orange
 }
 
 @Composable
@@ -140,6 +156,7 @@ fun StatCard(
     value: String,
     icon: ImageVector,
     modifier: Modifier = Modifier,
+    accentColor: Color = MainPurple,
     onClick: (() -> Unit)? = null
 ) {
     Card(
@@ -160,10 +177,10 @@ fun StatCard(
             Box(
                 modifier = Modifier
                     .size(46.dp)
-                    .background(LightPurple, CircleShape),
+                    .background(accentColor.copy(alpha = 0.14f), CircleShape),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(icon, null, tint = MainPurple, modifier = Modifier.size(24.dp))
+                Icon(icon, null, tint = accentColor, modifier = Modifier.size(24.dp))
             }
             Spacer(modifier = Modifier.width(Spacing.sm + Spacing.xs))
             Column {

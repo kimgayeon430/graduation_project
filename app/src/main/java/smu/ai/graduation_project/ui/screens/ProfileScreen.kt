@@ -82,14 +82,18 @@ import smu.ai.graduation_project.ui.components.StatCard
 import smu.ai.graduation_project.ui.components.badgeIcon
 import smu.ai.graduation_project.ui.components.badgeLockedHint
 import smu.ai.graduation_project.ui.components.badgeTitle
+import smu.ai.graduation_project.ui.components.badgeAccentColor
+import smu.ai.graduation_project.ui.components.travelLevelEmoji
 import smu.ai.graduation_project.ui.components.travelLevelLabel
 import smu.ai.graduation_project.ui.theme.AppBackground
+import smu.ai.graduation_project.ui.theme.InfoBlue
 import smu.ai.graduation_project.ui.theme.LightPurple
 import smu.ai.graduation_project.ui.theme.MainPurple
 import smu.ai.graduation_project.ui.theme.Orange
 import smu.ai.graduation_project.ui.theme.OutlineSoft
 import smu.ai.graduation_project.ui.theme.Radius
 import smu.ai.graduation_project.ui.theme.Spacing
+import smu.ai.graduation_project.ui.theme.SuccessGreen
 import smu.ai.graduation_project.ui.theme.SurfaceCard
 import smu.ai.graduation_project.ui.theme.TextPrimary
 import smu.ai.graduation_project.ui.theme.TextSecondary
@@ -264,7 +268,8 @@ fun ProfileScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            stringResource(R.string.level_display_format, travelLevelLabel(levelProgress.level), levelProgress.level.number),
+                            "${travelLevelEmoji(levelProgress.level)} " +
+                                stringResource(R.string.level_display_format, travelLevelLabel(levelProgress.level), levelProgress.level.number),
                             style = MaterialTheme.typography.titleLarge,
                             color = TextPrimary
                         )
@@ -301,13 +306,15 @@ fun ProfileScreen(
                         value = String.format("%,dP", points),
                         icon = Icons.Default.Stars,
                         modifier = Modifier.weight(1f),
+                        accentColor = Orange,
                         onClick = onNavigateToPointHistory
                     )
                     StatCard(
                         title = stringResource(R.string.profile_stat_ranking),
                         value = if (rank > 0) "#$rank" else "-",
                         icon = Icons.Default.EmojiEvents,
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier.weight(1f),
+                        accentColor = MainPurple
                     )
                 }
 
@@ -320,6 +327,7 @@ fun ProfileScreen(
                         value = progressCount.toString(),
                         icon = Icons.Default.HourglassTop,
                         modifier = Modifier.weight(1f),
+                        accentColor = InfoBlue,
                         onClick = onNavigateToInProgressMissions
                     )
                     StatCard(
@@ -327,6 +335,7 @@ fun ProfileScreen(
                         value = completedCount.toString(),
                         icon = Icons.Default.Flag,
                         modifier = Modifier.weight(1f),
+                        accentColor = SuccessGreen,
                         onClick = onNavigateToCompletedMissions
                     )
                 }
@@ -506,6 +515,7 @@ fun ProfileScreen(
 @Composable
 private fun ProfileBadgeItem(badgeId: BadgeId, unlockedAtMillis: Long?, modifier: Modifier = Modifier) {
     val unlocked = unlockedAtMillis != null
+    val accent = badgeAccentColor(badgeId)
     Column(
         modifier = modifier,
         horizontalAlignment = Alignment.CenterHorizontally
@@ -513,13 +523,13 @@ private fun ProfileBadgeItem(badgeId: BadgeId, unlockedAtMillis: Long?, modifier
         Box(
             modifier = Modifier
                 .size(56.dp)
-                .background(if (unlocked) LightPurple else Color(0xFFEDEDED), CircleShape),
+                .background(if (unlocked) accent.copy(alpha = 0.14f) else Color(0xFFEDEDED), CircleShape),
             contentAlignment = Alignment.Center
         ) {
             Icon(
                 if (unlocked) badgeIcon(badgeId) else Icons.Default.Lock,
                 null,
-                tint = if (unlocked) MainPurple else Color(0xFFAFAFAF),
+                tint = if (unlocked) accent else Color(0xFFAFAFAF),
                 modifier = Modifier.size(if (unlocked) 26.dp else 20.dp)
             )
         }
