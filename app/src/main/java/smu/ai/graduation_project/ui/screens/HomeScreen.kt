@@ -252,8 +252,11 @@ fun HomeScreen(onNavigateToDetail: (String) -> Unit) {
             verticalAlignment = Alignment.Top
         ) {
             Column {
-                Text("Hello,", fontSize = 28.sp, fontWeight = FontWeight.Bold)
-                Text("$userName!", fontSize = 28.sp, fontWeight = FontWeight.Bold)
+                Text(
+                    "${stringResource(R.string.home_greeting, userName)} 👋",
+                    fontSize = 24.sp,
+                    fontWeight = FontWeight.Bold
+                )
                 Text(stringResource(R.string.home_tagline), fontSize = 14.sp, color = Color.Gray)
             }
 
@@ -321,10 +324,12 @@ fun HomeScreen(onNavigateToDetail: (String) -> Unit) {
 
         Text(
             if (activeMission != null) stringResource(R.string.home_active_mission_title)
-            else "✨ " + stringResource(R.string.home_recommended_title),
+            else stringResource(R.string.home_recommended_title),
             fontWeight = FontWeight.Bold,
             fontSize = 18.sp
         )
+
+        Spacer(modifier = Modifier.height(10.dp))
 
         activeMission?.let { mission ->
             Card(

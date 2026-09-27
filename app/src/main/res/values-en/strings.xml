@@ -430,7 +430,7 @@
     <string name="preference_btn_done">Done</string>
 
     <!-- 홈 -->
-    <string name="home_greeting">Hi %1$s,</string>
+    <string name="home_greeting">Hello, %1$s!</string>
     <string name="home_tagline">Discover a new mission today!</string>
     <string name="home_weekly_progress_title">This week\'s mission progress</string>
     <string name="home_active_mission_title">Mission in progress</string>

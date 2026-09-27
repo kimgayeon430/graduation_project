@@ -430,7 +430,7 @@
     <string name="preference_btn_done">完了</string>
 
     <!-- 홈 -->
-    <string name="home_greeting">%1$sさん、</string>
+    <string name="home_greeting">こんにちは、%1$sさん!</string>
     <string name="home_tagline">今日も新しいミッションに挑戦してみましょう！</string>
     <string name="home_weekly_progress_title">今週のミッション進行率</string>
     <string name="home_active_mission_title">現在進行中のミッション</string>
