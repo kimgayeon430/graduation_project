@@ -75,6 +75,26 @@ fun recommendationReasonLabel(reason: String): String = when {
     else -> reason
 }
 
+/** 미션 카테고리(투어/맛집/체험/쇼핑)를 서로 다른 색으로 구분한다. 대표 이미지 플레이스홀더 등에 쓴다. */
+fun categoryAccentColor(category: String): Color = when (category) {
+    "투어" -> MainPurple
+    "맛집" -> Orange
+    "체험" -> SuccessGreen
+    "쇼핑" -> InfoBlue
+    else -> MainPurple
+}
+
+/** 추천 근거 칩을 전부 같은 보라색 대신 근거 종류별로 다른 색으로 구분한다. */
+fun recommendationReasonAccentColor(reason: String): Color = when {
+    reason.endsWith(CATEGORY_PREFERENCE_SUFFIX) -> MainPurple
+    reason == "자주 하는 유형" -> InfoBlue
+    reason == "지금 레벨에 적당" -> SuccessGreen
+    reason == "가까운 미션" -> Orange
+    reason == "인기 미션" -> DangerRed
+    reason == "지금 하기 좋은 시간" -> InfoBlue
+    else -> MainPurple
+}
+
 /** [TravelLevel] 을 현재 언어의 표시용 이름으로 바꾼다("여행 새싹", "동네 탐험가" 등). */
 @Composable
 fun travelLevelLabel(level: TravelLevel): String = when (level) {

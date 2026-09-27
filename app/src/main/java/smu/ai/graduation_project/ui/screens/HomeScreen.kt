@@ -72,11 +72,13 @@ import smu.ai.graduation_project.domain.MissionScorer
 import smu.ai.graduation_project.domain.RecommendationContext
 import smu.ai.graduation_project.domain.WeekBoundary
 import smu.ai.graduation_project.model.Mission
+import smu.ai.graduation_project.ui.components.categoryAccentColor
+import smu.ai.graduation_project.ui.components.recommendationReasonAccentColor
 import smu.ai.graduation_project.ui.components.recommendationReasonLabel
 import smu.ai.graduation_project.ui.theme.CardGray
 import smu.ai.graduation_project.ui.theme.GradientEnd
 import smu.ai.graduation_project.ui.theme.GradientStart
-import smu.ai.graduation_project.ui.theme.LightPurple
+import smu.ai.graduation_project.ui.theme.InfoBlue
 import smu.ai.graduation_project.ui.theme.MainPurple
 import smu.ai.graduation_project.ui.theme.Orange
 
@@ -345,9 +347,11 @@ fun HomeScreen(onNavigateToDetail: (String) -> Unit) {
                     modifier = Modifier.padding(12.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
+                    val matchedMission = allMissions.firstOrNull { it.id == mission.id }
                     HomeMissionImage(
-                        imageUrl = allMissions.firstOrNull { it.id == mission.id }?.imageUrl.orEmpty(),
-                        title = mission.title
+                        imageUrl = matchedMission?.imageUrl.orEmpty(),
+                        title = mission.title,
+                        category = matchedMission?.category ?: mission.category
                     )
                     Column(modifier = Modifier.width(220.dp)) {
                         Surface(
@@ -438,7 +442,7 @@ private fun RecommendedMissionCard(
             modifier = Modifier.padding(12.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            HomeMissionImage(imageUrl = mission.imageUrl, title = mission.title)
+            HomeMissionImage(imageUrl = mission.imageUrl, title = mission.title, category = mission.category)
             Column(modifier = Modifier.width(220.dp)) {
                 Surface(color = MainPurple, shape = RoundedCornerShape(4.dp)) {
                     Text(
@@ -455,10 +459,11 @@ private fun RecommendedMissionCard(
                         horizontalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
                         scored.reasons.take(2).forEach { reason ->
-                            Surface(color = LightPurple, shape = RoundedCornerShape(4.dp)) {
+                            val reasonColor = recommendationReasonAccentColor(reason)
+                            Surface(color = reasonColor.copy(alpha = 0.12f), shape = RoundedCornerShape(4.dp)) {
                                 Text(
                                     recommendationReasonLabel(reason),
-                                    color = MainPurple,
+                                    color = reasonColor,
                                     fontSize = 10.sp,
                                     modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
                                 )
@@ -472,7 +477,7 @@ private fun RecommendedMissionCard(
                     Text(" ${mission.points}P", fontSize = 12.sp, fontWeight = FontWeight.Bold)
                     distanceMeters?.let { meters ->
                         Spacer(modifier = Modifier.width(8.dp))
-                        Icon(Icons.Default.Place, contentDescription = null, tint = MainPurple, modifier = Modifier.size(14.dp))
+                        Icon(Icons.Default.Place, contentDescription = null, tint = InfoBlue, modifier = Modifier.size(14.dp))
                         Text(" ${GeoDistance.format(meters)}", fontSize = 12.sp, fontWeight = FontWeight.Bold)
                     }
                 }
@@ -489,19 +494,21 @@ private fun RecommendedMissionCard(
     }
 }
 
-/** Home cards use the same Firestore imageUrl as the mission list and detail. */
+/** Home cards use the same Firestore imageUrl as the mission list and detail. 대표 이미지가 없으면
+ * 카테고리별 색으로 구분한 플레이스홀더를 보여준다(투어=보라/맛집=주황/체험=초록/쇼핑=파랑). */
 @Composable
-private fun HomeMissionImage(imageUrl: String, title: String) {
+private fun HomeMissionImage(imageUrl: String, title: String, category: String = "투어") {
+    val accent = categoryAccentColor(category)
     Box(
         modifier = Modifier
             .size(100.dp)
             .clip(RoundedCornerShape(12.dp))
-            .background(LightPurple),
+            .background(accent.copy(alpha = 0.12f)),
         contentAlignment = Alignment.Center
     ) {
         if (imageUrl.isBlank()) {
             Icon(Icons.Default.Landscape, contentDescription = null,
-                tint = MainPurple, modifier = Modifier.size(40.dp))
+                tint = accent, modifier = Modifier.size(40.dp))
         } else {
             val fallback = rememberVectorPainter(Icons.Default.Landscape)
             AsyncImage(
