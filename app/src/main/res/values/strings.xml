@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">graduation_project</string>
+    <string name="app_name">Travel Mission</string>
 
     <!-- 하단 메뉴바 -->
     <string name="nav_home">홈</string>
