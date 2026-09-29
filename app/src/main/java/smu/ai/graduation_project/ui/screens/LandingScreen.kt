@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -54,25 +55,22 @@ fun LandingScreen(
             .fillMaxSize()
             .background(Color(0xFFF7F7FB))
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(320.dp)
-                .background(
-                    Brush.verticalGradient(
-                        colors = listOf(GradientStart, GradientEnd, Color(0xFF7F6BFF))
+        Column(modifier = Modifier.fillMaxSize()) {
+            // 보라색 배경을 고정 높이 박스로 따로 두면, 내용을 아래로 밀 때 배경 높이가 안 맞아
+            // 카드와 겹친다 — 그래서 배경을 내용에 직접 씌워 내용 길이에 맞게 늘어나게 한다.
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(
+                        Brush.verticalGradient(
+                            colors = listOf(GradientStart, GradientEnd, Color(0xFF7F6BFF))
+                        )
                     )
-                )
-        )
+                    .padding(horizontal = 24.dp)
+            ) {
+                // 상단바에 딱 붙지 않도록 화면 높이의 15%만큼 내려서 시작한다.
+                Spacer(Modifier.fillMaxHeight(0.15f))
 
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(24.dp),
-            verticalArrangement = Arrangement.SpaceBetween
-        ) {
-            Column {
-                Spacer(Modifier.height(28.dp))
                 Surface(
                     color = Color.White.copy(alpha = 0.18f),
                     shape = RoundedCornerShape(50)
@@ -101,10 +99,15 @@ fun LandingScreen(
                     LandingInfoPill(Icons.Default.Explore, stringResource(R.string.landing_pill_onsite))
                     LandingInfoPill(Icons.Default.EmojiEvents, stringResource(R.string.landing_pill_reward))
                 }
+                Spacer(Modifier.height(28.dp))
             }
 
+            Spacer(Modifier.height(32.dp))
+
             Surface(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp),
                 color = Color.White,
                 shape = RoundedCornerShape(28.dp),
                 shadowElevation = 8.dp
