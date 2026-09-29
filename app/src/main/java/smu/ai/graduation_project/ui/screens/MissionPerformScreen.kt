@@ -279,7 +279,12 @@ fun MissionPerformScreen(
     // ---- 위치(GPS) 획득: Android 프레임워크 영역 ----
 
     /**
-     * [provider] 로 **새 위치를 한 번 요청**한다. 못 받으면 [fallback] 으로 한 번 더 시도한다.
+     * GPS 와 network(와이파이·기지국) 를 **동시에** 요청해서 먼저 도착하는 신선한 좌표를 쓴다.
+     *
+     * 예전엔 GPS 가 실패할 때까지 기다렸다가 그제서야 network 로 넘어갔는데, 실내에서는 GPS 가
+     * 위성을 못 잡아 수십 초씩 걸리다 타임아웃 나는 경우가 흔해서 위치 인증 체감 속도가 많이
+     * 느렸다. 허용 반경이 200m(`LocationVerification.DEFAULT_ALLOWED_RADIUS_METERS`)로 넉넉해서
+     * network 위치 정확도로도 충분히 판정 가능하므로, 정확도보다 응답 속도를 우선해 경합시킨다.
      *
      * `getLastKnownLocation` 은 쓰지 않는다. 그건 GPS 를 켜지 않고 마지막으로 저장된 값만
      * 돌려주므로, 실내이거나 오랜만에 실행하면 몇 시간 전 다른 동네 좌표가 그대로 나온다.
@@ -287,47 +292,50 @@ fun MissionPerformScreen(
      *
      * [LocationManagerCompat] 는 API 30 의 `getCurrentLocation` 을 구버전까지 backport 한다.
      */
-    fun requestFreshLocation(provider: String, fallback: String?) {
-        val lm = locationManager ?: return viewModel.onLocationResult(null)
-        // null 은 두 CancellationSignal 오버로드 사이에서 모호하므로 타입을 못 박는다.
-        LocationManagerCompat.getCurrentLocation(
-            lm, provider, null as CancellationSignal?, ContextCompat.getMainExecutor(context)
-        ) { location: Location? ->
-            val fresh = location != null && locationAgeMillis(location) <= MAX_LOCATION_AGE_MILLIS
-            when {
-                fresh -> viewModel.onLocationResult(location)
-                // GPS 는 실내에서 자주 실패한다. 그때는 network(와이파이·기지국) 로 넘어간다.
-                fallback != null -> requestFreshLocation(fallback, null)
-                else -> viewModel.onLocationResult(null)
-            }
-        }
-    }
-
     fun requestLocation() {
         if (Firebase.auth.currentUser == null) {
             Toast.makeText(context, context.getString(R.string.toast_login_required), Toast.LENGTH_SHORT).show()
             return
         }
-        if (locationManager == null) {
+        val lm = locationManager
+        if (lm == null) {
             Toast.makeText(context, context.getString(R.string.toast_location_unavailable), Toast.LENGTH_SHORT).show()
             return
         }
-        val gpsEnabled = locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)
-        val networkEnabled = locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER)
-        if (!gpsEnabled && !networkEnabled) {
+        val providers = listOfNotNull(
+            LocationManager.GPS_PROVIDER.takeIf { lm.isProviderEnabled(it) },
+            LocationManager.NETWORK_PROVIDER.takeIf { lm.isProviderEnabled(it) },
+        )
+        if (providers.isEmpty()) {
             Toast.makeText(context, context.getString(R.string.toast_enable_gps), Toast.LENGTH_SHORT).show()
             return
         }
 
         viewModel.onLocationRequestStarted()
-        // GPS 가 정확하므로 먼저 쓰고, 실패하면 network 로 폴백한다.
-        if (gpsEnabled) {
-            requestFreshLocation(
-                LocationManager.GPS_PROVIDER,
-                fallback = if (networkEnabled) LocationManager.NETWORK_PROVIDER else null,
-            )
-        } else {
-            requestFreshLocation(LocationManager.NETWORK_PROVIDER, fallback = null)
+
+        var settled = false
+        var pending = providers.size
+        val cancelSignals = providers.associateWith { CancellationSignal() }
+
+        fun finish(location: Location?) {
+            if (settled) return
+            settled = true
+            cancelSignals.values.forEach { it.cancel() }
+            viewModel.onLocationResult(location)
+        }
+
+        providers.forEach { provider ->
+            LocationManagerCompat.getCurrentLocation(
+                lm, provider, cancelSignals.getValue(provider), ContextCompat.getMainExecutor(context)
+            ) { location: Location? ->
+                pending--
+                val fresh = location != null && locationAgeMillis(location) <= MAX_LOCATION_AGE_MILLIS
+                when {
+                    fresh -> finish(location)
+                    // 아직 응답 안 한 provider 가 남아있으면 그쪽 결과를 기다린다.
+                    pending <= 0 -> finish(null)
+                }
+            }
         }
     }
 
