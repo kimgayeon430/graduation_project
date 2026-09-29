@@ -135,7 +135,6 @@ fun ProfileScreen(
     var email by remember { mutableStateOf(currentUser?.email ?: guestEmail) }
     var photoUrl by remember { mutableStateOf<String?>(null) }
     var isUploadingPhoto by remember { mutableStateOf(false) }
-    var level by remember { mutableStateOf("Lv.1") }
     var points by remember { mutableIntStateOf(0) }
     var completedCount by remember { mutableIntStateOf(0) }
     var progressCount by remember { mutableIntStateOf(0) }
@@ -185,7 +184,6 @@ fun ProfileScreen(
                     nickname = snapshot.getString("nickname") ?: currentUser.displayName ?: guestNickname
                     email = snapshot.getString("mail") ?: currentUser.email ?: guestEmail
                     photoUrl = snapshot.getString("photoUrl")
-                    level = snapshot.getString("level") ?: "Lv.1"
                     points = snapshot.getLong("points")?.toInt() ?: 0
                     @Suppress("UNCHECKED_CAST")
                     unlockedBadges = (snapshot.get("badges") as? List<Map<String, Any?>>)
@@ -250,6 +248,11 @@ fun ProfileScreen(
                 .padding(horizontal = Spacing.lg, vertical = Spacing.md),
             verticalArrangement = Arrangement.spacedBy(Spacing.lg - 2.dp)
         ) {
+            // 계정 배지 · "여행 레벨" 카드가 항상 같은 값을 보도록 포인트에서 매번 계산한
+            // 값 하나만 쓴다(예전엔 계정 배지가 가입 시 1회만 기록되는 죽은 `users.level`
+            // 문자열을 따로 읽어 실제 레벨과 어긋났었다).
+            val levelProgress = remember(points) { TravelLevelPolicy.progressFor(points) }
+
             Surface(
                 modifier = Modifier.fillMaxWidth(),
                 color = LightPurple,
@@ -318,7 +321,7 @@ fun ProfileScreen(
                             Icon(Icons.Default.Stars, null, tint = Orange, modifier = Modifier.size(16.dp))
                             Spacer(modifier = Modifier.width(Spacing.xs))
                             Text(
-                                text = "$level · ${String.format("%,d", points)}P",
+                                text = "Lv.${levelProgress.level.number} · ${String.format("%,d", points)}P",
                                 style = MaterialTheme.typography.labelLarge,
                                 color = TextPrimary
                             )
@@ -327,7 +330,6 @@ fun ProfileScreen(
                 }
             }
 
-            val levelProgress = remember(points) { TravelLevelPolicy.progressFor(points) }
             Surface(
                 modifier = Modifier.fillMaxWidth(),
                 color = SurfaceCard,
@@ -337,27 +339,24 @@ fun ProfileScreen(
                 Column(modifier = Modifier.padding(Spacing.lg)) {
                     Text(stringResource(R.string.profile_level_section_title), style = MaterialTheme.typography.labelLarge, color = TextSecondary)
                     Spacer(modifier = Modifier.height(Spacing.sm))
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            "${travelLevelEmoji(levelProgress.level)} " +
-                                stringResource(R.string.level_display_format, travelLevelLabel(levelProgress.level), levelProgress.level.number),
-                            style = MaterialTheme.typography.titleLarge,
-                            color = TextPrimary
-                        )
-                        Text(
-                            if (levelProgress.isMaxLevel) {
-                                stringResource(R.string.level_max_reached)
-                            } else {
-                                stringResource(R.string.level_points_to_next, levelProgress.pointsToNextLevel ?: 0)
-                            },
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MainPurple
-                        )
-                    }
+                    // 레벨명 옆에 "다음 레벨까지"를 나란히 두면 긴 레벨명("숨은 명소 수집가 Lv.4" 등)에서
+                    // 두 텍스트가 서로 겹쳤다 — 길이에 상관없이 항상 안전하도록 위아래로 쌓는다.
+                    Text(
+                        "${travelLevelEmoji(levelProgress.level)} " +
+                            stringResource(R.string.level_display_format, travelLevelLabel(levelProgress.level), levelProgress.level.number),
+                        style = MaterialTheme.typography.titleLarge,
+                        color = TextPrimary
+                    )
+                    Spacer(modifier = Modifier.height(Spacing.xs))
+                    Text(
+                        if (levelProgress.isMaxLevel) {
+                            stringResource(R.string.level_max_reached)
+                        } else {
+                            stringResource(R.string.level_points_to_next, levelProgress.pointsToNextLevel ?: 0)
+                        },
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MainPurple
+                    )
                     Spacer(modifier = Modifier.height(Spacing.sm + 2.dp))
                     LinearProgressIndicator(
                         progress = { levelProgress.progressRatio },
