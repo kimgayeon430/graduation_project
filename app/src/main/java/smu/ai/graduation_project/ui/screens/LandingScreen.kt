@@ -87,7 +87,7 @@ fun LandingScreen(
                     }
                 }
                 Spacer(Modifier.height(24.dp))
-                Text("TripQuest", color = Color.White, fontSize = 34.sp, fontWeight = FontWeight.ExtraBold)
+                Text("SeoulQuest", color = Color.White, fontSize = 34.sp, fontWeight = FontWeight.ExtraBold)
                 Spacer(Modifier.height(10.dp))
                 Text(
                     stringResource(R.string.landing_headline),
